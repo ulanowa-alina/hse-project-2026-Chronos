@@ -1,6 +1,23 @@
+#include <QApplication>
+#include <QWidget>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <pqxx/pqxx>
 #include <iostream>
 
-int main() {
-    std::cout << "Hello world!" << std::endl;
-    return 0;
+int main(int argc, char *argv[]) {
+    QApplication app(argc, argv);
+
+    QWidget window;
+    window.setWindowTitle("Chronos");
+    window.resize(400, 200);
+
+    QVBoxLayout *layout = new QVBoxLayout(&window);
+
+    QLabel *labelTitle = new QLabel("<h2>Hello World!</h2>");
+
+    layout->addWidget(labelTitle);
+
+    window.show();
+    return app.exec();
 }
