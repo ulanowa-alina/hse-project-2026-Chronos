@@ -4,29 +4,34 @@ project(chronos LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt6")
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTORCC ON)
+if(APPLE)
+    include_directories(
+            /opt/homebrew/include
+            /opt/homebrew/opt/libpq/include
+            /opt/homebrew/opt/libpqxx/include
+    )
+    link_directories(
+            /opt/homebrew/lib
+            /opt/homebrew/opt/libpq/lib
+            /opt/homebrew/opt/libpqxx/lib
+    )
+    set(DB_LIBS pqxx pq)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PQXX REQUIRED libpqxx)
+    pkg_check_modules(LIBPQ REQUIRED libpq)
 
-include_directories(
-        /opt/homebrew/include
-        /opt/homebrew/opt/libpq/include
-)
+    include_directories(${PQXX_INCLUDE_DIRS} ${LIBPQ_INCLUDE_DIRS})
+    link_directories(${PQXX_LIBRARY_DIRS} ${LIBPQ_LIBRARY_DIRS})
+    set(DB_LIBS ${PQXX_LIBRARIES} ${LIBPQ_LIBRARIES})
+endif()
 
-link_directories(
-        /opt/homebrew/lib
-        /opt/homebrew/opt/libpq/lib
-)
-
-add_executable(chronos_backend
-        backend/src/main.cpp
-)
+add_executable(chronos_backend backend/src/main.cpp)
 
 target_link_libraries(chronos_backend PRIVATE
+        Qt6::Core
         Qt6::Widgets
-        pqxx
-        "/opt/homebrew/opt/libpq/lib/libpq.dylib"
+        ${DB_LIBS}
 )

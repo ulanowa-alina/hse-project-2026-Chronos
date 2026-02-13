@@ -14,6 +14,8 @@ int main(int argc, char *argv[]) {
 
     QVBoxLayout *layout = new QVBoxLayout(&window);
 
+    pqxx::connection c("host=localhost port=5432 user=postgres password=mysecretpassword dbname=chronos_db");
+
     QLabel *labelTitle = new QLabel("<h2>Hello World!</h2>");
 
     layout->addWidget(labelTitle);
