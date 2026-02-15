@@ -12,13 +12,15 @@ on:
 
 jobs:
   build-backend:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install CMake
-        run: brew install cmake
+      - name: Install CMake and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ build-essential
 
       - name: Configure build
         run: |
@@ -29,5 +31,4 @@ jobs:
       - name: Build backend
         run: |
           cd backend/build
-          cmake --build . -- -j$(sysctl -n hw.ncpu)
-
+          cmake --build . -- -j$(nproc)
