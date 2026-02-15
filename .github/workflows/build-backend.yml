@@ -1,0 +1,33 @@
+name: Backend Build Check
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'CMakeLists.txt'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'CMakeLists.txt'
+
+jobs:
+  build-backend:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install CMake
+        run: brew install cmake
+
+      - name: Configure build
+        run: |
+          mkdir -p backend/build
+          cd backend/build
+          cmake ..
+
+      - name: Build backend
+        run: |
+          cd backend/build
+          cmake --build . -- -j$(sysctl -n hw.ncpu)
+
