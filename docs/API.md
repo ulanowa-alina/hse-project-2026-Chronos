@@ -1,9 +1,9 @@
-**Актуальная версия: 1.0**
+**Актуальная версия: 1.1
 ### Содержание: 
 1. [[#История изменений]]
 2. [[#Входные параметры]]
-	3.1. [[#Endpoints]]
-	3.2. [[#Endpoints]]
+	3.1. [[#Endpoints]] 
+	3.2. [[#Модели]]
 	3.3. [[#Ограничения и проверки параметров]]
 3. [[#Выходные параметры]]
 	4.1. [[#Положительный ответ]]
@@ -17,26 +17,27 @@
 **Дата** - дата в формате ДД.ММ.ГГГГ
 **Описание изменений** - текстовое описание изменений документа
 
-| Версия | Дата       | Описание                        |
-| ------ | ---------- | ------------------------------- |
-| 1.0    | 07.02.2026 | Создана первая версия документа |
+| Версия | Дата       | Описание                                                                      |
+| ------ | ---------- | ----------------------------------------------------------------------------- |
+| 1.0    | 07.02.2026 | Создана первая версия документа                                               |
+| 1.1    | 15.02.2026 | Обновлены Endpoints(обновлены примеры запросов и ответов). Удалена модель Tag |
 
 
 
 ### Входные параметры 
 ##### Endpoints
 
-| Метод  | Endpoint                | Описание                           | Request body | Response       |
-| ------ | ----------------------- | ---------------------------------- | ------------ | -------------- |
-| POST   | /auth/login             | Авторизация пользователя           | LoginRequest | LoginResponse  |
-| GET    | /boards                 | Получить список досок пользователя | —            | Board[]        |
-| POST   | /boards                 | Создать новую доску                | Board        | Board          |
-| GET    | /boards/{boardId}       | Получить доску по id               | —            | Board          |
-| DELETE | /boards/{boardId}       | Удалить доску                      | —            | 204 No Content |
-| GET    | /boards/{boardId}/tasks | Получить задачи доски              | —            | Task[]         |
-| POST   | /boards/{boardId}/tasks | Создать задачу                     | Task         | Task           |
-| PATCH  | /tasks/{taskId}         | Обновить задачу                    | Partial Task | Task           |
-| DELETE | /tasks/{taskId}         | Удалить задачу                     | —            | 204 No Content |
+| Метод  | Endpoint               | Описание                           | Request body                      | Response                           |
+| ------ | ---------------------- | ---------------------------------- | --------------------------------- | ---------------------------------- |
+| POST   | /auth/v1/login         | Авторизация пользователя           | LoginRequest                      | LoginResponse                      |
+| GET    | /boards/v1/get         | Получить список досок пользователя | —                                 | {"boards": Board[]}                |
+| POST   | /boards/v1/create      | Создать новую доску                | {"title": "..."}                  | {"board_id": "id", "title": "..."} |
+| GET    | /board/v1/get          | Получить доску по id               | —                                 | {"board": {...}}                   |
+| DELETE | /board/v1/delete       | Удалить доску                      | {"board_id": "id"}                | 204 No Content                     |
+| GET    | /board/v1/tasks        | Получить задачи доски              | —                                 | {"tasks": Task[]}                  |
+| POST   | /board/v1/tasks/create | Создать задачу                     | {"board_id": "id", "text": "..."} | {"task_id": "id", ...}             |
+| PATCH  | /tasks/v1/update       | Обновить задачу                    | {"task_id": "id", "text": "..."}  | {"task_id": "id", ...}             |
+| DELETE | /tasks/v1/delete       | Удалить задачу                     | {"task_id": "id"}                 | 204 No Content                     |
 ##### Модели
 1. User (Пользователь)
 User object
@@ -76,16 +77,8 @@ Task object
 | 9   | deadline      | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
 | 7   | tags          | array of objects  | нет            | Массив меток                  | см. Tag              |
 
-4. Tag (Метка)
-Tag object
 
-| №   | Параметр | Тип данных | Обязательность | Описание            | Пример  |
-| --- | -------- | ---------- | -------------- | ------------------- | ------- |
-| 1   | id       | integer    | да             | Идентификатор метки | 5       |
-| 2   | name     | string     | да             | Название метки      | экзамен |
-| 3   | color    | string     | да             | Цвет метки          | purple  |
-
-5. Post (Авторизация)
+4. Post (Авторизация)
 LoginRequest
 
 | №   | Параметр | Тип данных | Обязательность | Описание            |
@@ -97,7 +90,7 @@ LoginResponse
 | №   | Параметр | Тип данных | Обязательность | Описание            | Пример    |
 | --- | -------- | ---------- | -------------- | ------------------- | --------- |
 | 1   | token    | string     | да             | JWT токен           | jwt_token |
-| 2   | user     | object     | да             | Объект пользователя | см. User  |
+
 ##### Ограничения и проверки параметров
 
 1. User
@@ -290,7 +283,7 @@ HTTP 204 No Content
 1. Авторизация пользователя
 Запрос:
 ```bash
-POST /api/auth/login
+POST /api/auth/v1/login
 Content-Type: application/json
 { "email": "user@mail.ru", 
  "password": "password123" 
@@ -314,7 +307,7 @@ Content-Type: application/json
 2. Получение списка досок пользователя
 Запрос
 ```bash
-GET /api/boards
+GET /api/boards/v1/get
 Authorization: Bearer <JWT>
 ```
 Ответ:
@@ -336,7 +329,7 @@ Authorization: Bearer <JWT>
 3. Создание новой доски
 Запрос:
 ```bash
-POST /api/boards
+POST /api/boards/v1/create
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
@@ -363,11 +356,12 @@ Content-Type: application/json
 4. Создание задачи в доске
 Запрос:
 ```bash
-POST /api/boards/10/tasks
+POST /api/board/v1/tasks/create
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
 {
+  "board_id": 10,
   "title": "Оформить README",
   "status": "todo",
   "priorityColor": "red"
@@ -391,7 +385,7 @@ Content-Type: application/json
 
 Запрос:
 ```bash
-POST /api/boards
+POST /api/boards/v1/create
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
@@ -417,7 +411,3 @@ Content-Type: application/json
   }
 }
 ```
-
-
-
-
