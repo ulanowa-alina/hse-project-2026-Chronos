@@ -1,7 +1,8 @@
-#include <QApplication>
 #include "profile_interface.h"
 
-int main(int argc, char *argv[]) {
+#include <QApplication>
+
+int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
     ProfileInterface window;
