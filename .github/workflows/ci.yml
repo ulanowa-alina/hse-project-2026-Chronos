@@ -21,7 +21,7 @@ jobs:
         run: cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Run Clang-Format Check
-        run: find . -name "*.cpp" -o -name "*.hpp" | xargs clang-format --style=file --dry-run -Werror
+        run: find . -not -path '*/build/*' \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) | xargs clang-format --style=file --dry-run -Werror
 
-      - name: Run Clang-Tidy
-        run: clang-tidy -p build/ src/*.cpp --warnings-as-errors='*'
+      - name: Run Clang-Tidy Check
+        run: find . -not -path '*/build/*' \( -name "*.cpp" -o -name "*.cc" \) | xargs clang-tidy -p build/ --warnings-as-errors='*'
