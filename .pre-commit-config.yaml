@@ -5,11 +5,12 @@ repos:
         name: clang-format
         entry: clang-format -i -style=file
         language: system
-        types: [c++]
+        types_or: [c++, c]
+        exclude: ^build/|^.*/
 
       - id: clang-tidy
         name: clang-tidy
         entry: clang-tidy -p build/
         language: system
-        types: [c++]
-        exclude: ^external/
+        types_or: [c++, c]
+        exclude: ^build/|^external/|^.*/
