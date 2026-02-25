@@ -1,4 +1,8 @@
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: end-of-file-fixer
   - repo: local
     hooks:
       - id: clang-format
@@ -14,3 +18,4 @@ repos:
         language: system
         types_or: [c++, c]
         exclude: ^build/|^external/|^.*/
+        
