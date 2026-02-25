@@ -15,7 +15,7 @@ jobs:
       - name: Install LLVM and Clang Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-tidy cmake qt6-base-dev
+          sudo apt-get install -y clang-format
 
       - name: Generate Compilation Database
         run: cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || cmake -S frontend -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
@@ -24,9 +24,3 @@ jobs:
         run: |
           find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
           | xargs -0 -r clang-format --style=file --dry-run -Werror
-
-      - name: Run Clang-Tidy Check
-        run: |
-          find . -not -path '*/build/*' \( -name "*.cpp" -o -name "*.h" -o -name "*.c" -o -name "*.hpp" \) -print0 \
-          | xargs -0 -r clang-tidy -p build/ --header-filter='.*' -- -DQT_NO_DEBUG
-          

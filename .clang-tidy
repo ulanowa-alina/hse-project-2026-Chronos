@@ -4,24 +4,12 @@ Checks: >
   modernize-*,
   performance-*,
   readability-*,
-  cppcoreguidelines-*,
-  -modernize-use-trailing-return-type,
-  -cppcoreguidelines-avoid-magic-numbers,
-  -readability-magic-numbers,
-  -cppcoreguidelines-owning-memory,
-  -cppcoreguidelines-pro-type-member-init,
-  -cppcoreguidelines-avoid-non-const-global-variables,
-  -readability-static-accessed-through-instance,
-  -modernize-use-nodiscard,
-  -readability-convert-member-functions-to-static,
-  -readability-identifier-naming
+  cppcoreguidelines-*
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: '.*hse-project-2026-Chronos/.*'
+HeaderFilterRegex: 'backend/.*'
 
 CheckOptions:
   - key: modernize-use-nullptr.NullMacros
     value: 'NULL'
-  - key: readability-function-size.LineThreshold
-    value: 150
