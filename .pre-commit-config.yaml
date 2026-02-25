@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format
+        entry: clang-format -i -style=file
+        language: system
+        types_or: [c++, c]
+        exclude: ^build/|^.*/
+
+      - id: clang-tidy
+        name: clang-tidy
+        entry: clang-tidy -p build/
+        language: system
+        types_or: [c++, c]
+        exclude: ^build/|^external/|^.*/
+        
