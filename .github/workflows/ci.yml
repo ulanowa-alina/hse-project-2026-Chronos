@@ -1,0 +1,32 @@
+name: Code Quality (Lint)
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM and Clang Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy cmake
+
+      - name: Generate Compilation Database
+        run: cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run Clang-Format Check
+        run: |
+          find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
+          | xargs -0 -r clang-format --style=file --dry-run -Werror
+
+      - name: Run Clang-Tidy Check
+        run: |
+          find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
+          | xargs -0 -r clang-tidy -p build/ --header-filter=.* --warnings-as-errors='*'
+          
