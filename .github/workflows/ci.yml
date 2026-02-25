@@ -2,9 +2,11 @@ name: Code Quality (Lint)
 
 on:
   push:
-    branches: ["**"]
+    branches-ignore:
+      - 'api'
   pull_request:
-    branches: ["**"]
+    branches-ignore:
+      - 'api'
 
 jobs:
   lint:
