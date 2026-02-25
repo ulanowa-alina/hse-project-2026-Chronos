@@ -3,6 +3,7 @@ project(ChronosClient LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -12,8 +13,10 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 add_executable(ChronosClient
         src/main.cpp
-        src/profile_interface.cpp
-        include/profile_interface.h
+        src/profile_screen.cpp
+        src/main_window.cpp
+        include/profile_screen.h
+        include/main_window.h
 )
 
 

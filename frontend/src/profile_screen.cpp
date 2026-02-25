@@ -1,15 +1,13 @@
-#include "profile_interface.h"
-ProfileInterface::ProfileInterface(QWidget* parent)
-    : QMainWindow(parent) {
-    setWindowTitle("Профиль");
-    resize(400, 500);
-
+#include "profile_screen.h"
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+ProfileScreen::ProfileScreen(QWidget* parent)
+    : QWidget(parent) {
     setupLayout();
 }
 
-void ProfileInterface::setupLayout() {
-    central_widget_ = new QWidget(this);
-    auto* main_layout = new QVBoxLayout(central_widget_);
+void ProfileScreen::setupLayout() {
+    auto* main_layout = new QVBoxLayout(this);
     main_layout->setContentsMargins(20, 15, 20, 20);
     main_layout->setSpacing(10);
 
@@ -20,9 +18,6 @@ void ProfileInterface::setupLayout() {
         "font-weight: bold; color: #305CDE; font-size: 18px; font-family: 'Arial';");
 
     logout_button_ = new QPushButton("Выход из аккаунта");
-    logout_button_->setIconSize(QSize(18, 18));
-    logout_button_->setLayoutDirection(Qt::LeftToRight);
-
     logout_button_->setStyleSheet("QPushButton { "
                                   "   background: transparent; "
                                   "   color: #C03438; "
@@ -36,8 +31,6 @@ void ProfileInterface::setupLayout() {
                                   "   color: #e74c3c; "
                                   "   text-decoration: underline; "
                                   "}");
-
-    logout_button_->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 
     top_bar->addWidget(logo_label_);
     top_bar->addStretch();
@@ -83,6 +76,5 @@ void ProfileInterface::setupLayout() {
                                 "   background-color: #2549B3; "
                                 "}");
     main_layout->addWidget(edit_button_);
-
-    setCentralWidget(central_widget_);
 }
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
