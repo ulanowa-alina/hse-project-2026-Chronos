@@ -76,5 +76,7 @@ void ProfileScreen::setupLayout() {
                                 "   background-color: #2549B3; "
                                 "}");
     main_layout->addWidget(edit_button_);
+
+    connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

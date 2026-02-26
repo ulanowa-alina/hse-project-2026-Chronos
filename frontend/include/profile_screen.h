@@ -14,6 +14,9 @@ class ProfileScreen : public QWidget {
   public:
     explicit ProfileScreen(QWidget* parent = nullptr);
 
+  signals:
+    void logoutRequested();
+
   private:
     QPushButton* edit_button_{nullptr};
     QPushButton* logout_button_{nullptr};
