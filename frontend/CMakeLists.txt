@@ -27,7 +27,6 @@ target_link_libraries(ChronosClient PRIVATE Qt6::Widgets)
 
 set_target_properties(ChronosClient PROPERTIES
         MACOSX_BUNDLE TRUE
-        WIN32_EXECUTABLE TRUE
 )
 
 add_custom_target(run
