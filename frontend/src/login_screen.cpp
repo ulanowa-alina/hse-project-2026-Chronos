@@ -64,9 +64,9 @@ void LoginScreen::setupLayout() {
     auto* pass_hint = new QLabel("Password", pass_container);
     pass_hint->setStyleSheet("color: #8E8E8E; font-size: 12px; border: none;");
 
-    password_input_ = new QLineEdit(pass_container);          // Создаем пустым
-    password_input_->setEchoMode(QLineEdit::Password);        // Скрываем вводимые символы
-    password_input_->setPlaceholderText("Create a password"); // Подсказка в виде точек
+    password_input_ = new QLineEdit(pass_container);
+    password_input_->setEchoMode(QLineEdit::Password);
+    password_input_->setPlaceholderText("Create a password");
     password_input_->setStyleSheet("border: none; font-size: 16px; background: transparent;");
 
     pass_lay->addWidget(pass_hint);
