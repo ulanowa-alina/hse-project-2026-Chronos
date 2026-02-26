@@ -3,6 +3,7 @@
 
 #include "login_screen.h"
 #include "profile_screen.h"
+
 #include <QMainWindow>
 #include <QStackedWidget>
 class MainWindow : public QMainWindow {
@@ -13,14 +14,12 @@ class MainWindow : public QMainWindow {
   private slots:
     void switchToProfile();
     void switchToLogin();
-    //void switchToRegistration(); потом сделаю
+    // void switchToRegistration(); потом сделаю
   private:
     QStackedWidget* stacked_widget_{
         nullptr}; // <-- через эту штуку будем переключаться между экранами
     LoginScreen* login_screen_{nullptr};
     ProfileScreen* profile_screen_{nullptr};
-
 };
-
 
 #endif // MAIN_WINDOW_H
