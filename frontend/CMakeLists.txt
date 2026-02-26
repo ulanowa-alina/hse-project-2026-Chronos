@@ -15,9 +15,11 @@ add_executable(ChronosClient
         src/main.cpp
         src/login_screen.cpp
         src/profile_screen.cpp
+        src/registration_screen.cpp
         src/main_window.cpp
         include/login_screen.h
         include/profile_screen.h
+        include/registration_screen.h
         include/main_window.h
 )
 

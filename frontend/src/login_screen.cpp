@@ -66,7 +66,7 @@ void LoginScreen::setupLayout() {
 
     password_input_ = new QLineEdit(pass_container);
     password_input_->setEchoMode(QLineEdit::Password);
-    password_input_->setPlaceholderText("Create a password");
+    password_input_->setPlaceholderText("Enter password");
     password_input_->setStyleSheet("border: none; font-size: 16px; background: transparent;");
 
     pass_lay->addWidget(pass_hint);
@@ -110,6 +110,6 @@ void LoginScreen::setupLayout() {
     main_layout->addWidget(login_button_);
 
     connect(login_button_, &QPushButton::clicked, this, &LoginScreen::loginRequested);
-    // connect(reg_btn, &QPushButton::clicked, this, &LoginScreen::registrationRequested);
+    connect(reg_btn, &QPushButton::clicked, this, &LoginScreen::registrationRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

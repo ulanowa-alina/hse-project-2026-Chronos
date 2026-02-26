@@ -1,5 +1,5 @@
-#ifndef LOGIN_SCREEN_H
-#define LOGIN_SCREEN_H
+#ifndef REGISTRATION_SCREEN_H
+#define REGISTRATION_SCREEN_H
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -9,11 +9,11 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
-class LoginScreen : public QWidget {
+class RegistrationScreen : public QWidget {
     Q_OBJECT
 
   public:
-    explicit LoginScreen(QWidget* parent = nullptr);
+    explicit RegistrationScreen(QWidget* parent = nullptr);
   signals:
     void loginRequested();
     void registrationRequested();
@@ -21,6 +21,7 @@ class LoginScreen : public QWidget {
   private:
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};
+    QPushButton* avatar_button_{nullptr};
 
     QLabel* logo_label_{nullptr};
     QLabel* no_account_label_{nullptr};
@@ -28,7 +29,9 @@ class LoginScreen : public QWidget {
 
     QLineEdit* email_input_{nullptr};
     QLineEdit* password_input_{nullptr};
+    QLineEdit* name_input_{nullptr};
+    QLineEdit* status_input_{nullptr};
 
     void setupLayout();
 };
-#endif // LOGIN_SCREEN_H
+#endif // REGISTRATION_SCREEN_H
