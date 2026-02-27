@@ -57,7 +57,8 @@ class Session : public std::enable_shared_from_this<Session> {
                     self->doRead();
                 } else {
                     beast::error_code shutdownErr;
-                    self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr); // NOLINT(bugprone-unused-return-value)
+                    self->socket_.shutdown( // NOLINT(bugprone-unused-return-value)
+                        tcp::socket::shutdown_send, shutdownErr);
                     if (shutdownErr) {
                         std::cerr << "Shutdown error: " << shutdownErr.message() << "\n";
                     }
