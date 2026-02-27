@@ -27,9 +27,10 @@ class Session : public std::enable_shared_from_this<Session> {
     void doRead() {
         req_ = {};
         http::async_read(socket_, buffer_, req_,
-                         [self = shared_from_this()](beast::error_code ec, std::size_t) {
-                             if (!ec)
+                         [self = shared_from_this()](beast::error_code err, std::size_t) {
+                             if (!err) {
                                  self->handleRequest();
+                             }
                          });
     }
 
@@ -47,15 +48,17 @@ class Session : public std::enable_shared_from_this<Session> {
     }
 
     void sendResponse(http::response<http::string_body> res) {
-        auto sp = std::make_shared<http::response<http::string_body>>(std::move(res));
-        http::async_write(socket_, *sp,
-                          [self = shared_from_this(), sp](beast::error_code ec, std::size_t) {
-                              if (!ec && sp->keep_alive()) {
-                                  self->doRead();
-                              } else {
-                                  self->socket_.shutdown(tcp::socket::shutdown_send, ec);
-                              }
-                          });
+        auto response = std::make_shared<http::response<http::string_body>>(std::move(res));
+        http::async_write(
+            socket_, *response,
+            [self = shared_from_this(), response](beast::error_code err, std::size_t) {
+                if (!err && response->keep_alive()) {
+                    self->doRead();
+                } else {
+                    beast::error_code shutdownErr;
+                    self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr);
+                }
+            });
     }
 
     tcp::socket socket_;
@@ -72,32 +75,36 @@ class Server {
 
   private:
     void doAccept() {
-        acceptor_.async_accept([this](beast::error_code ec, tcp::socket socket) {
-            if (!ec)
+        acceptor_.async_accept([this](beast::error_code err, tcp::socket socket) {
+            if (!err) {
                 std::make_shared<Session>(std::move(socket))->run();
+            }
             doAccept();
         });
     }
+
     tcp::acceptor acceptor_;
 };
 
 int main() {
     const unsigned short port = 8080;
-    const int threads = static_cast<int>(std::thread::hardware_concurrency());
+    const int threadCount = static_cast<int>(std::thread::hardware_concurrency());
 
-    asio::io_context ioc{threads};
+    asio::io_context ioc{threadCount};
     Server server{ioc, port};
 
     std::cout << "Server started on http://0.0.0.0:" << port << "\n";
     std::cout << "GET /personal/v1/info\n";
 
     std::vector<std::thread> pool;
-    pool.reserve(threads - 1);
-    for (int i = 0; i < threads - 1; ++i)
+    pool.reserve(static_cast<std::size_t>(threadCount - 1));
+    for (int idx = 0; idx < threadCount - 1; ++idx) {
         pool.emplace_back([&ioc] { ioc.run(); });
+    }
     ioc.run();
 
-    for (auto& t : pool)
-        t.join();
+    for (auto& thread : pool) {
+        thread.join();
+    }
     return 0;
 }
