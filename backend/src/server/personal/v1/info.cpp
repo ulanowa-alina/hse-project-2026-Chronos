@@ -6,12 +6,12 @@ namespace http = boost::beast::http;
 
 namespace personal::v1 {
 
-http::response<http::string_body> handleInfo(const http::request<http::string_body>& req) {
+auto handleInfo(const http::request<http::string_body>& req) -> http::response<http::string_body> {
     const std::string jsonBody = R"({
   "id": 1,
-  "username": "john",
+  "username": "john_doe",
   "email": "john@example.com",
-  "full_name": "John",
+  "full_name": "John Doe",
   "created_at": "2024-01-15T10:00:00Z"
 })";
 

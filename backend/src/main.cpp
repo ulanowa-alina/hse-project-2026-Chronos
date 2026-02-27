@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
@@ -57,6 +58,9 @@ class Session : public std::enable_shared_from_this<Session> {
                 } else {
                     beast::error_code shutdownErr;
                     self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr);
+                    if (shutdownErr) {
+                        std::cerr << "Shutdown error: " << shutdownErr.message() << "\n";
+                    }
                 }
             });
     }
@@ -86,25 +90,30 @@ class Server {
     tcp::acceptor acceptor_;
 };
 
-int main() {
-    const unsigned short port = 8080;
-    const int threadCount = static_cast<int>(std::thread::hardware_concurrency());
+auto main() -> int {
+    try {
+        const unsigned short port = 8080;
+        const int threadCount = static_cast<int>(std::thread::hardware_concurrency());
 
-    asio::io_context ioc{threadCount};
-    Server server{ioc, port};
+        asio::io_context ioc{threadCount};
+        Server server{ioc, port};
 
-    std::cout << "Server started on http://0.0.0.0:" << port << "\n";
-    std::cout << "GET /personal/v1/info\n";
+        std::cout << "Server started on http://0.0.0.0:" << port << "\n";
+        std::cout << "GET /personal/v1/info\n";
 
-    std::vector<std::thread> pool;
-    pool.reserve(static_cast<std::size_t>(threadCount - 1));
-    for (int idx = 0; idx < threadCount - 1; ++idx) {
-        pool.emplace_back([&ioc] { ioc.run(); });
-    }
-    ioc.run();
+        std::vector<std::thread> pool;
+        pool.reserve(static_cast<std::size_t>(threadCount - 1));
+        for (int idx = 0; idx < threadCount - 1; ++idx) {
+            pool.emplace_back([&ioc] { ioc.run(); });
+        }
+        ioc.run();
 
-    for (auto& thread : pool) {
-        thread.join();
+        for (auto& thread : pool) {
+            thread.join();
+        }
+    } catch (const std::exception& exc) {
+        std::cerr << "Fatal error: " << exc.what() << "\n";
+        return 1;
     }
     return 0;
 }

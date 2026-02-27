@@ -7,7 +7,7 @@ namespace http = boost::beast::http;
 
 namespace personal::v1 {
 
-http::response<http::string_body> handleInfo(const http::request<http::string_body>& req);
+auto handleInfo(const http::request<http::string_body>& req) -> http::response<http::string_body>;
 
 } // namespace personal::v1
 
