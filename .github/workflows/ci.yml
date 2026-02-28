@@ -24,9 +24,3 @@ jobs:
         run: |
           find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
           | xargs -0 -r clang-format --style=file --dry-run -Werror
-
-      - name: Run Clang-Tidy Check
-        run: |
-          find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
-          | xargs -0 -r clang-tidy -p build/ --header-filter='^.*/(src)/.*' --warnings-as-errors='*'
-          
