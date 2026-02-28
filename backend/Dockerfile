@@ -2,18 +2,19 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-    build-essential cmake git pkg-config \
-    qt6-base-dev libpq-dev libpqxx-dev \
+    build-essential \
+    cmake \
+    pkg-config \
+    libboost-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/backend
 
-COPY CMakeLists.txt .
+COPY . .
 
-COPY backend ./backend
+RUN cmake -S . -B build \
+    && cmake --build build -j$(nproc)
 
-RUN mkdir build && cd build \
-    && cmake .. \
-    && make
+EXPOSE 8080
 
-CMD ["./build/chronos_backend"]
+CMD ["./build/chronos_backend", "0.0.0.0", "8080"]
