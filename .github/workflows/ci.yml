@@ -15,7 +15,7 @@ jobs:
       - name: Install LLVM and Clang Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format
+          sudo apt-get install -y clang-format clang-tidy cmake libboost-all-dev
 
       - name: Generate Compilation Database
         run: cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || cmake -S frontend -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON

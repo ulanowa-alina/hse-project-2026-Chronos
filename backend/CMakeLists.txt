@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(Boost 1.74 REQUIRED)
 find_package(Threads REQUIRED)
 
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
@@ -20,14 +21,14 @@ add_executable(chronos_backend ${BACKEND_SOURCES})
 
 target_include_directories(chronos_backend PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    ${Boost_INCLUDE_DIRS}
 )
 
-# boost::asio and boost::system are used in header-only mode to avoid
-# platform-dependent linkage against libboost_system in CI.
 target_compile_definitions(chronos_backend PRIVATE
     BOOST_ERROR_CODE_HEADER_ONLY
 )
 
 target_link_libraries(chronos_backend PRIVATE
+    Boost::boost
     Threads::Threads
 )
