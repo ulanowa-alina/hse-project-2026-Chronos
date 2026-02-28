@@ -2,7 +2,6 @@
 
 #include <boost/asio.hpp>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -15,13 +14,14 @@ int main(int argc, char* argv[]) {
     }
 
     try {
+        const std::string host = argv[1];
         const auto port = static_cast<unsigned short>(std::stoi(argv[2]));
         const int threadCount = static_cast<int>(std::thread::hardware_concurrency());
 
         asio::io_context ioc{threadCount};
-        Server server{ioc, port};
+        Server server{ioc, host, port};
 
-        std::cout << "Server started on http://" << argv[1] << ":" << port << "\n";
+        std::cout << "Server started on http://" << host << ":" << port << "\n";
 
         std::vector<std::thread> pool;
         pool.reserve(static_cast<std::size_t>(threadCount - 1));

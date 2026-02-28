@@ -4,8 +4,9 @@
 
 #include <iostream>
 
-Session::Session(tcp::socket socket)
-    : socket_(std::move(socket)) {
+Session::Session(tcp::socket socket, Router router)
+    : socket_(std::move(socket))
+    , router_(std::move(router)) {
 }
 
 void Session::run() {
@@ -13,9 +14,13 @@ void Session::run() {
 }
 
 void Session::doRead() {
-    req_ = {};
-    http::async_read(socket_, buffer_, req_,
+    http::async_read(socket_, buffer_, req_ = {},
                      [self = shared_from_this()](beast::error_code err, std::size_t) {
+                         if (err == http::error::end_of_stream) {
+                             beast::error_code shutdownErr;
+                             self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr);
+                             return;
+                         }
                          if (!err) {
                              self->handleRequest();
                          }
@@ -23,8 +28,10 @@ void Session::doRead() {
 }
 
 void Session::handleRequest() {
-    if (req_.method() == http::verb::get && req_.target() == "/personal/v1/info") {
-        sendResponse(personal::v1::handleInfo(req_));
+    const std::string target{req_.target()};
+    auto it = router_.find(target);
+    if (it != router_.end()) {
+        sendResponse(it->second(req_));
     } else {
         http::response<http::string_body> res{http::status::not_found, req_.version()};
         res.set(http::field::content_type, "application/json");

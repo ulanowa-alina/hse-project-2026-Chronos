@@ -4,16 +4,22 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
+#include <map>
 #include <memory>
+#include <string>
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
 namespace http = beast::http;
 using tcp = asio::ip::tcp;
 
+using RequestHandler =
+    http::response<http::string_body> (*)(const http::request<http::string_body>&);
+using Router = std::map<std::string, RequestHandler>;
+
 class Session : public std::enable_shared_from_this<Session> {
   public:
-    explicit Session(tcp::socket socket);
+    Session(tcp::socket socket, Router router);
     void run();
 
   private:
@@ -24,6 +30,7 @@ class Session : public std::enable_shared_from_this<Session> {
     tcp::socket socket_;
     beast::flat_buffer buffer_;
     http::request<http::string_body> req_;
+    Router router_;
 };
 
 #endif // SERVER_SESSION_HPP
