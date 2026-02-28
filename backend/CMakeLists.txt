@@ -8,8 +8,10 @@ find_package(Boost 1.74 REQUIRED)
 find_package(Threads REQUIRED)
 
 add_executable(planner_backend
-    src/main.cpp
-    src/server/personal/v1/info.cpp
+        src/main.cpp
+        src/server/server.cpp
+        src/server/session.cpp
+        src/server/personal/v1/info.cpp
 )
 
 target_include_directories(planner_backend PRIVATE
