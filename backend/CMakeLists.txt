@@ -21,4 +21,3 @@ target_link_libraries(planner_backend PRIVATE
     Boost::boost
     Threads::Threads
 )
-

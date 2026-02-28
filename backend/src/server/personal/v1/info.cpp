@@ -25,4 +25,3 @@ auto handleInfo(const http::request<http::string_body>& req) -> http::response<h
 }
 
 } // namespace personal::v1
-
