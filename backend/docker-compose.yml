@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:15
+    container_name: chronos_db
+    environment:
+      - POSTGRES_DB=chronos_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=mysecretpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chronos_backend
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    command: ["./build/chronos_backend", "0.0.0.0", "8080"]
+
+volumes:
+  postgres_data:
