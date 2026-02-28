@@ -9,10 +9,11 @@ find_package(Threads REQUIRED)
 
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
 
 if(NOT BACKEND_SOURCES)
-    message(FATAL_ERROR "No source files found in backend/src")
+    message(FATAL_ERROR "No source files found in backend (expected *.cpp in backend/src or backend)")
 endif()
 
 add_executable(chronos_backend ${BACKEND_SOURCES})
