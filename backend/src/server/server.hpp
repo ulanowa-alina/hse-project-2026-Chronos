@@ -2,6 +2,7 @@
 #define SERVER_SERVER_HPP
 
 #include "session.hpp"
+#include "db/connection_pool.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
@@ -13,13 +14,14 @@ using tcp = asio::ip::tcp;
 
 class Server {
   public:
-    Server(asio::io_context& ioc, const std::string& host, unsigned short port);
+    Server(asio::io_context& ioc, const std::string& host, unsigned short port, ConnectionPool& pool);
 
   private:
     void doAccept();
 
     tcp::acceptor acceptor_;
     Router router_;
+    ConnectionPool& pool_;
 };
 
 #endif // SERVER_SERVER_HPP

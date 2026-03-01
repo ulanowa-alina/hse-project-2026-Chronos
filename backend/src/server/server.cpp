@@ -4,9 +4,12 @@
 
 #include <memory>
 
-Server::Server(asio::io_context& ioc, const std::string& host, unsigned short port)
-    : acceptor_(ioc, {asio::ip::make_address(host), port}) {
-    router_["/personal/v1/info"] = personal::v1::handleInfo;
+Server::Server(asio::io_context& ioc, const std::string& host, unsigned short port, ConnectionPool& pool)
+    : acceptor_(ioc, {asio::ip::make_address(host), port})
+    , pool_(pool) {
+    router_["/personal/v1/info"] = [this](const http::request<http::string_body>& req) {
+        return personal::v1::handleInfo(req, pool_);
+    };
     doAccept();
 }
 
