@@ -1,9 +1,56 @@
 #include "profile_screen.h"
+
+#include <QDebug>
+#include <QShowEvent>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+
 ProfileScreen::ProfileScreen(QWidget* parent)
     : QWidget(parent) {
     setupLayout();
+}
+
+void ProfileScreen::set_network_manager(NetworkManager* manager) {
+    network_manager_ = manager;
+
+    if (network_manager_) {
+        connect(network_manager_, &NetworkManager::responseReceived, this,
+                &ProfileScreen::on_network_response);
+    }
+}
+
+void ProfileScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+
+    if (network_manager_) {
+        qDebug() << "ProfileScreen: Окно открыто, запрашиваю данные аккаунта...";
+        network_manager_->GET(network_manager_->info_url_);
+    }
+}
+
+void ProfileScreen::on_network_response(const QString& endpoint, const QByteArray& data, int code) {
+    if (endpoint != network_manager_->info_url_)
+        return;
+
+    if (code == 200) {
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+
+        if (!doc.isNull()) {
+            qDebug() << "data - не JSON";
+            QJsonObject root = doc.object();
+
+            QString fullName = root["full_name"].toString();
+            QString email = root["email"].toString();
+            QString username = root["username"].toString();
+
+            name_label_->setText(fullName);
+            email_label_->setText(email);
+            qDebug() << "Данные профиля получены";
+        }
+    } else {
+        qDebug() << "Ошибка сервера, код:" << code;
+        name_label_->setText("Ошибка загрузки");
+    }
 }
 
 void ProfileScreen::setupLayout() {
