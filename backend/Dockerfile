@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     libboost-dev \
     libpq-dev \
     libpqxx-dev \
+    nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
