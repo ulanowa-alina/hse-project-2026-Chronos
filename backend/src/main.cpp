@@ -1,25 +1,20 @@
-#include <QApplication>
-#include <QWidget>
-#include <QLabel>
-#include <QVBoxLayout>
 #include <pqxx/pqxx>
 #include <iostream>
 
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
+int main() {
+    try {
+        pqxx::connection conn(
+            "host=localhost port=5432 user=postgres password=mysecretpassword dbname=chronos_db");
 
-    QWidget window;
-    window.setWindowTitle("Chronos");
-    window.resize(400, 200);
+        if (!conn.is_open()) {
+            std::cerr << "Failed to open database connection\n";
+            return 1;
+        }
 
-    QVBoxLayout *layout = new QVBoxLayout(&window);
-
-    pqxx::connection c("host=localhost port=5432 user=postgres password=mysecretpassword dbname=chronos_db");
-
-    QLabel *labelTitle = new QLabel("<h2>Hello World!</h2>");
-
-    layout->addWidget(labelTitle);
-
-    window.show();
-    return app.exec();
+        std::cout << "Connected to database: " << conn.dbname() << '\n';
+        return 0;
+    } catch (const std::exception& ex) {
+        std::cerr << "Error: " << ex.what() << '\n';
+        return 1;
+    }
 }
