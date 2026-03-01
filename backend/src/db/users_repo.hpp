@@ -1,7 +1,6 @@
 #pragma once
 
 #include <db/connection_pool.hpp>
-
 #include <string>
 
 struct NewUser {

@@ -1,6 +1,6 @@
-#include "server/server.hpp"
-#include "db/db_config.hpp"
 #include "db/connection_pool.hpp"
+#include "db/db_config.hpp"
+#include "server/server.hpp"
 
 #include <boost/asio.hpp>
 #include <iostream>
@@ -11,7 +11,6 @@
 int main(int argc, char* argv[]) {
     auto db = load_db_config_from_env();
     ConnectionPool pool(db.connection_info(), db.pool_size);
-
 
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <host> <port>\n";
@@ -25,7 +24,7 @@ int main(int argc, char* argv[]) {
         const int threadCount = static_cast<int>(std::thread::hardware_concurrency());
 
         asio::io_context ioc{threadCount};
-        Server server(ioc, host, port,pool);
+        Server server(ioc, host, port, pool);
 
         std::cout << "Server started on http://" << host << ":" << port << "\n";
 

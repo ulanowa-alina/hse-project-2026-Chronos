@@ -1,6 +1,7 @@
 #include "create_user.hpp"
 
 #include "db/users_repo.hpp"
+
 #include <nlohmann/json.hpp>
 
 namespace users {
@@ -23,9 +24,8 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         return res;
     }
 
-    if (!body.contains("email") || !body["email"].is_string() ||
-        !body.contains("name") || !body["name"].is_string() ||
-        !body.contains("password") || !body["password"].is_string()) {
+    if (!body.contains("email") || !body["email"].is_string() || !body.contains("name") ||
+        !body["name"].is_string() || !body.contains("password") || !body["password"].is_string()) {
 
         http::response<http::string_body> res{http::status::bad_request, req.version()};
         res.set(http::field::content_type, "application/json");

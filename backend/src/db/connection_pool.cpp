@@ -1,9 +1,9 @@
 #include "connection_pool.hpp"
 
-#include <stdexcept>
-#include <utility>
 #include <chrono>
+#include <stdexcept>
 #include <thread>
+#include <utility>
 
 ConnectionPool::ConnectionPool(std::string connection_info, std::size_t pool_size)
     : connection_info_(std::move(connection_info)) {
@@ -18,7 +18,8 @@ ConnectionPool::ConnectionPool(std::string connection_info, std::size_t pool_siz
         for (int attempt = 1; attempt <= max_attempts; ++attempt) {
             try {
                 c = std::make_unique<pqxx::connection>(connection_info_);
-                if (c->is_open()) break;
+                if (c->is_open())
+                    break;
             } catch (const pqxx::broken_connection&) {
             }
 
@@ -52,15 +53,19 @@ void ConnectionPool::release(std::unique_ptr<pqxx::connection> c) {
 }
 
 ConnectionPool::Handle::Handle(ConnectionPool* pool, std::unique_ptr<pqxx::connection> c)
-    : pool_(pool), c_(std::move(c)) {}
+    : pool_(pool)
+    , c_(std::move(c)) {
+}
 
 ConnectionPool::Handle::Handle(Handle&& other) noexcept
-    : pool_(other.pool_), c_(std::move(other.c_)) {
+    : pool_(other.pool_)
+    , c_(std::move(other.c_)) {
     other.pool_ = nullptr;
 }
 
 ConnectionPool::Handle& ConnectionPool::Handle::operator=(Handle&& other) noexcept {
-    if (this == &other) return *this;
+    if (this == &other)
+        return *this;
 
     if (pool_ && c_) {
         pool_->release(std::move(c_));

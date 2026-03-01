@@ -1,7 +1,7 @@
 #pragma once
 
-#include <db/connection_pool.hpp>
 #include <boost/beast/http.hpp>
+#include <db/connection_pool.hpp>
 
 namespace http = boost::beast::http;
 

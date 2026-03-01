@@ -1,11 +1,12 @@
 #include "server.hpp"
 
 #include "personal/v1/info.hpp"
-#include  "users/create_user.hpp"
+#include "users/create_user.hpp"
 
 #include <memory>
 
-Server::Server(asio::io_context& ioc, const std::string& host, unsigned short port, ConnectionPool& pool)
+Server::Server(asio::io_context& ioc, const std::string& host, unsigned short port,
+               ConnectionPool& pool)
     : acceptor_(ioc, {asio::ip::make_address(host), port})
     , pool_(pool) {
     router_["/personal/v1/info"] = [this](const http::request<http::string_body>& req) {

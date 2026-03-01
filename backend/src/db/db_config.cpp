@@ -6,13 +6,15 @@
 
 static std::string get_env_or(const char* key, const char* def) {
     const char* v = std::getenv(key);
-    if (v && *v) return std::string(v);
+    if (v && *v)
+        return std::string(v);
     return std::string(def);
 }
 
 static std::size_t get_env_size_or(const char* key, std::size_t def) {
     const char* v = std::getenv(key);
-    if (!v || !*v) return def;
+    if (!v || !*v)
+        return def;
     try {
         std::size_t x = std::stoull(v);
         return x == 0 ? def : x;
@@ -22,10 +24,7 @@ static std::size_t get_env_size_or(const char* key, std::size_t def) {
 }
 
 std::string DbConfig::connection_info() const {
-    return "host=" + host +
-           " port=" + port +
-           " dbname=" + name +
-           " user=" + user +
+    return "host=" + host + " port=" + port + " dbname=" + name + " user=" + user +
            " password=" + password;
 }
 

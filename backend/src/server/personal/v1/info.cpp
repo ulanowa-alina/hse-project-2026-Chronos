@@ -1,6 +1,5 @@
 #include "info.hpp"
 
-
 #include <boost/beast/http.hpp>
 #include <pqxx/pqxx>
 
@@ -8,7 +7,8 @@ namespace http = boost::beast::http;
 
 namespace personal::v1 {
 
-auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& pool) -> http::response<http::string_body> {
+auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& pool)
+    -> http::response<http::string_body> {
 
     try {
         auto h = pool.acquire();

@@ -4,19 +4,18 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <pqxx/pqxx>
 #include <queue>
 #include <string>
 
-#include <pqxx/pqxx>
-
 class ConnectionPool {
-public:
+  public:
     ConnectionPool(std::string connection_info, std::size_t pool_size);
     ConnectionPool(const ConnectionPool&) = delete;
     ConnectionPool& operator=(const ConnectionPool&) = delete;
 
     class Handle {
-    public:
+      public:
         Handle() = default;
         Handle(Handle&& other) noexcept;
         Handle& operator=(Handle&& other) noexcept;
@@ -27,7 +26,7 @@ public:
 
         explicit operator bool() const noexcept;
 
-    private:
+      private:
         friend class ConnectionPool;
         Handle(ConnectionPool* pool, std::unique_ptr<pqxx::connection> c);
 
@@ -37,7 +36,7 @@ public:
 
     Handle acquire();
 
-private:
+  private:
     void release(std::unique_ptr<pqxx::connection> c);
 
     std::string connection_info_;

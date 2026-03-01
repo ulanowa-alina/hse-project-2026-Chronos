@@ -8,17 +8,15 @@ User insert_user(ConnectionPool& pool, const NewUser& user) {
     auto h = pool.acquire();
     pqxx::work tx(h.conn());
 
-    pqxx::result r = tx.exec_params(
-       "INSERT INTO users (email, name, password_hash) "
-       "VALUES ($1, $2, $3) "
-       "RETURNING id, email, name, password_hash, created_at",
-       user.email, user.name, user.password_hash
-   );
+    pqxx::result r = tx.exec_params("INSERT INTO users (email, name, password_hash) "
+                                    "VALUES ($1, $2, $3) "
+                                    "RETURNING id, email, name, password_hash, created_at",
+                                    user.email, user.name, user.password_hash);
 
     tx.commit();
 
     if (r.empty()) {
-        throw std::runtime_error{ "Unable to insert user" };
+        throw std::runtime_error{"Unable to insert user"};
     }
 
     User out;

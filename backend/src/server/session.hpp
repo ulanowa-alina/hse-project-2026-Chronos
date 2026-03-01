@@ -4,17 +4,17 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
-#include <functional>
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
 namespace http = beast::http;
 using tcp = asio::ip::tcp;
 
-using Request  = http::request<http::string_body>;
+using Request = http::request<http::string_body>;
 using Response = http::response<http::string_body>;
 using RequestHandler = std::function<Response(const Request&)>;
 using Router = std::map<std::string, RequestHandler>;
