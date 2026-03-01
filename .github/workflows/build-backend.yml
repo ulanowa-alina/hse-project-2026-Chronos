@@ -17,10 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install CMake and build tools
+      - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ build-essential libboost-all-dev
+          sudo apt-get install -y cmake g++ build-essential libboost-all-dev pkg-config libpq-dev libpqxx-dev
 
       - name: Configure build
         run: |
