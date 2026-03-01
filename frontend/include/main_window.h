@@ -2,6 +2,7 @@
 #define MAIN_WINDOW_H
 
 #include "login_screen.h"
+#include "network_manager.h"
 #include "profile_screen.h"
 #include "registration_screen.h"
 
@@ -18,6 +19,8 @@ class MainWindow : public QMainWindow {
     void switchToRegistration();
 
   private:
+    NetworkManager* network_manager_;
+
     QStackedWidget* stacked_widget_{nullptr};
     LoginScreen* login_screen_{nullptr};
     ProfileScreen* profile_screen_{nullptr};

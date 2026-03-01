@@ -1,10 +1,50 @@
 #include "registration_screen.h"
+
+#include <QDebug>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+
 RegistrationScreen::RegistrationScreen(QWidget* parent)
     : QWidget(parent) {
     setupLayout();
 }
+
+void RegistrationScreen::set_network_manager(NetworkManager* manager) {
+    network_manager_ = manager;
+
+    if (network_manager_) {
+        connect(network_manager_, &NetworkManager::responseReceived, this,
+                &RegistrationScreen::on_network_response);
+    }
+}
+
+void RegistrationScreen::on_network_response(const QString& endpoint, const QByteArray& data,
+                                             int code) {
+    if (endpoint != network_manager_->register_url_)
+        return;
+    if (code == 200) {
+        qDebug() << "RegistrationScreen: Успешная регистрация";
+        emit registrationRequested();
+    } else {
+        // TODO: прописать вывод для других ошибок
+        qDebug() << "RegistrationScreen: Ошибка регистрации. Ответ сервера: " << code;
+    }
+}
+
+void RegistrationScreen::on_register_request() {
+    if (!network_manager_)
+        return;
+
+    QJsonObject json;
+    json["name"] = name_input_->text();
+    json["email"] = email_input_->text();
+    json["status"] = status_input_->text();
+    json["password"] = password_input_->text();
+
+    qDebug() << "RegistrationScreen: Отправляю данные на регистрацию...";
+    network_manager_->POST(network_manager_->register_url_, json);
+}
+
 void RegistrationScreen::setupLayout() {
     auto* main_layout = new QVBoxLayout(this);
     main_layout->setContentsMargins(20, 15, 20, 20);
@@ -112,7 +152,7 @@ void RegistrationScreen::setupLayout() {
     main_layout->addWidget(registration_button_);
 
     connect(registration_button_, &QPushButton::clicked, this,
-            &RegistrationScreen::registrationRequested);
+            &RegistrationScreen::on_register_request);
     connect(login_button_, &QPushButton::clicked, this, &RegistrationScreen::loginRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
