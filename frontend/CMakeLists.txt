@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 
 add_executable(ChronosClient
         src/main.cpp
@@ -17,16 +17,21 @@ add_executable(ChronosClient
         src/profile_screen.cpp
         src/registration_screen.cpp
         src/main_window.cpp
+        src/network_manager.cpp
         include/login_screen.h
         include/profile_screen.h
         include/registration_screen.h
         include/main_window.h
+        include/network_manager.h
 )
 
 
 target_include_directories(ChronosClient PRIVATE include)
 
-target_link_libraries(ChronosClient PRIVATE Qt6::Widgets)
+target_link_libraries(ChronosClient PRIVATE
+        Qt6::Widgets
+        Qt6::Network
+)
 
 
 set_target_properties(ChronosClient PROPERTIES

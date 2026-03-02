@@ -1,6 +1,8 @@
 #ifndef LOGIN_SCREEN_H
 #define LOGIN_SCREEN_H
 
+#include "network_manager.h"
+
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -14,11 +16,19 @@ class LoginScreen : public QWidget {
 
   public:
     explicit LoginScreen(QWidget* parent = nullptr);
+
+    void set_network_manager(NetworkManager* manager);
+
   signals:
     void loginRequested();
     void registrationRequested();
 
+  private slots:
+    void on_network_response(const QString& endpoint, const QByteArray& data, int code);
+
   private:
+    NetworkManager* network_manager_{nullptr};
+
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};
 
