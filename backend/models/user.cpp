@@ -1,27 +1,34 @@
 #include "user.hpp"
 #include <stdexcept>
 
+User::User(int id, const std::string& email, const std::string& name, const std::string& password_hash)
+    : id_(id)
+    , email_(email)
+    , name_(name),
+    password_hash_(password_hash)
+{}
+
 void User::save(pqxx::connection &conn) {
     try {
         pqxx::work txn(conn);
 
-        if (id == 0) {
+        if (id_ == 0) {
             pqxx::result r = txn.exec(
                 "INSERT INTO users (email, name, password_hash) VALUES (" +
-                txn.quote(email) + ", " +
-                txn.quote(name) + ", " +
-                txn.quote(password_hash) +
+                txn.quote(email_) + ", " +
+                txn.quote(name_) + ", " +
+                txn.quote(password_hash_) +
                 ") RETURNING id"
             );
 
-            id = r[0][0].as<int>();
+            id_ = r[0][0].as<int>();
         } else {
             txn.exec0(
                 "UPDATE users SET "
-                "email = " + txn.quote(email) + ", " +
-                "name = " + txn.quote(name) + ", " +
-                "password_hash = " + txn.quote(password_hash) +
-                " WHERE id = " + txn.quote(id)
+                "email = " + txn.quote(email_) + ", " +
+                "name = " + txn.quote(name_) + ", " +
+                "password_hash = " + txn.quote(password_hash_) +
+                " WHERE id = " + txn.quote(id_)
             );
         }
 
@@ -32,7 +39,7 @@ void User::save(pqxx::connection &conn) {
     }
 }
 
-User User::find_by_id(pqxx::connection &conn, int id) {
+std::optional<User> User::find_by_id(pqxx::connection &conn, int id) {
     try {
         pqxx::work txn(conn);
 
@@ -44,7 +51,7 @@ User User::find_by_id(pqxx::connection &conn, int id) {
         txn.commit();
 
         if (r.empty()) {
-            throw std::runtime_error("User not found");
+            return std::nullopt;
         }
 
         return User(

@@ -2,17 +2,23 @@
 
 #include <stdexcept>
 
+Board::Board(int id, int user_id, const std::string& title)
+    : id_(id)
+    , user_id_(user_id)
+    , title_(title) {
+}
+
 void Board::save(pqxx::connection& conn) {
     try {
         pqxx::work txn(conn);
 
-        if (id == 0) {
+        if (id_ == 0) {
             pqxx::result r = txn.exec_params(
-                "INSERT INTO boards (user_id, title) VALUES ($1, $2) RETURNING id", user_id, title);
-            id = r[0][0].as<int>();
+                "INSERT INTO boards (user_id, title) VALUES ($1, $2) RETURNING id", user_id_, title_);
+            id_ = r[0][0].as<int>();
         } else {
-            txn.exec_params("UPDATE boards SET user_id = $1, title = $2 WHERE id = $3", user_id,
-                            title, id);
+            txn.exec_params("UPDATE boards SET user_id = $1, title = $2 WHERE id = $3", user_id_,
+                            title_, id_);
         }
 
         txn.commit();
@@ -21,14 +27,14 @@ void Board::save(pqxx::connection& conn) {
     }
 }
 
-Board Board::find_by_id(pqxx::connection& conn, int board_id) {
+std::optional<Board> Board::find_by_id(pqxx::connection& conn, int board_id) {
     try {
         pqxx::work txn(conn);
         pqxx::result r =
             txn.exec_params("SELECT id, user_id, title FROM boards WHERE id = $1", board_id);
 
         if (r.empty()) {
-            throw std::runtime_error("Board not found");
+            return std::nullopt;
         }
 
         const auto& row = r[0];

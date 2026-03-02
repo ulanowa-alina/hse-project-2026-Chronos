@@ -3,22 +3,19 @@
 
 #include <pqxx/pqxx>
 #include <string>
+#include <optional>
 
 class Board {
   public:
-    int id;
-    int user_id;
-    std::string title;
+    int id_;
+    int user_id_;
+    std::string title_;
 
     Board() = default;
-    Board(int _id, int _user_id, const std::string& _title)
-        : id(_id)
-        , user_id(_user_id)
-        , title(_title) {
-    }
+    Board(int id, int user_id, const std::string& title);
 
     void save(pqxx::connection& conn);
-    static Board find_by_id(pqxx::connection& conn, int id);
+    static std::optional<Board> find_by_id(pqxx::connection& conn, int id);
 };
 
 #endif // BOARD_HPP

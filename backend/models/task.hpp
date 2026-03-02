@@ -4,37 +4,36 @@
 #include <ctime>
 #include <pqxx/pqxx>
 #include <string>
+#include <optional>
 
 class Task {
   public:
-    int id;
-    int board_id;
-    std::string title;
-    std::string description;
-    std::time_t deadline;
-    std::string status;
-    int priority;
+    int id_;
+    int board_id_;
+    std::string title_;
+    std::string description_;
+    std::time_t deadline_;
+    std::string status_;
+    int priority_;
 
-    std::time_t created_at;
-    std::time_t updated_at;
+    std::time_t created_at_;
+    std::time_t updated_at_;
 
     Task() = default;
-    Task(int _id, int _board_id, const std::string& _title, const std::string& _description,
-         std::time_t _deadline, const std::string& _status, int _priority, std::time_t _created_at,
-         std::time_t _updated_at)
-        : id(_id)
-        , board_id(_board_id)
-        , title(_title)
-        , description(_description)
-        , deadline(_deadline)
-        , status(_status)
-        , priority(_priority)
-        , created_at(_created_at)
-        , updated_at(_updated_at) {
+    Task(int id, int board_id, const std::string& title, const std::string& description,
+               std::time_t deadline, const std::string& status, int priority, std::time_t created_at,
+               std::time_t updated_at)
+        : id_(id)
+        , board_id_(board_id)
+        , title_(title)
+        , description_(description)
+        , deadline_(deadline)
+        , status_(status)
+        , priority_(priority)
+        , created_at_(created_at)
+        , updated_at_(updated_at) {
     }
 
-    void save(pqxx::connection& conn);
-    static Task find_by_id(pqxx::connection& conn, int id);
 };
 
 #endif // TASK_H

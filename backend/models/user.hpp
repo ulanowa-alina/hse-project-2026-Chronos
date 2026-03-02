@@ -3,20 +3,20 @@
 
 #include <string>
 #include <pqxx/pqxx>
+#include <optional>
 
 class User {
 public:
-    int id;
-    std::string email;
-    std::string name;
-    std::string password_hash;
+    int id_;
+    std::string email_;
+    std::string name_;
+    std::string password_hash_;
 
     User() = default;
-    User(int _id, const std::string& _email, const std::string& _name, const std::string& _password_hash)
-        : id(_id), email(_email), name(_name), password_hash(_password_hash) {}
+    User(int id, const std::string& email, const std::string& name, const std::string& password_hash);
 
     void save(pqxx::connection &conn);
-    static User find_by_id(pqxx::connection &conn, int id);
+    static std::optional<User> find_by_id(pqxx::connection &conn, int id);
 };
 
 #endif // USER_H
