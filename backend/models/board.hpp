@@ -1,9 +1,8 @@
 #ifndef BOARD_HPP
 #define BOARD_HPP
 
-#include <pqxx/pqxx>
-#include <string>
 #include <optional>
+#include <string>
 
 class Board {
   public:
@@ -12,10 +11,11 @@ class Board {
     std::string title_;
 
     Board() = default;
-    Board(int id, int user_id, const std::string& title);
-
-    void save(pqxx::connection& conn);
-    static std::optional<Board> find_by_id(pqxx::connection& conn, int id);
+    Board(int id, int user_id, const std::string& title)
+        : id_(id)
+        , user_id_(user_id)
+        , title_(title) {
+    }
 };
 
 #endif // BOARD_HPP

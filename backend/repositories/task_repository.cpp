@@ -1,8 +1,10 @@
 #include "task_repository.hpp"
-#include <stdexcept>
-#include <optional>
 
-TaskRepository::TaskRepository(pqxx::connection& conn) : conn_(conn) {};
+#include <optional>
+#include <stdexcept>
+
+TaskRepository::TaskRepository(pqxx::connection& conn)
+    : conn_(conn) {};
 
 std::string TaskRepository::time_to_string(std::time_t t) {
     char buffer[20];
@@ -12,15 +14,15 @@ std::string TaskRepository::time_to_string(std::time_t t) {
 
 void TaskRepository::insert(Task& task) {
     pqxx::work txn(conn_);
-    pqxx::result r =
-        txn.exec_params("INSERT INTO tasks (board_id, title, description, deadline, "
-                        "status, priority, created_at, updated_at) "
-                        "VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) "
-                        "RETURNING id, "
-                        "EXTRACT(EPOCH FROM created_at)::bigint, "
-                        "EXTRACT(EPOCH FROM updated_at)::bigint",
-                        task.board_id_, task.title_, task.description_,
-                        task.deadline_ ? time_to_string(task.deadline_) : nullptr, task.status_, task.priority_);
+    pqxx::result r = txn.exec_params("INSERT INTO tasks (board_id, title, description, deadline, "
+                                     "status, priority, created_at, updated_at) "
+                                     "VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) "
+                                     "RETURNING id, "
+                                     "EXTRACT(EPOCH FROM created_at)::bigint, "
+                                     "EXTRACT(EPOCH FROM updated_at)::bigint",
+                                     task.board_id_, task.title_, task.description_,
+                                     task.deadline_ ? time_to_string(task.deadline_) : nullptr,
+                                     task.status_, task.priority_);
 
     task.id_ = r[0][0].as<int>();
     task.created_at_ = static_cast<std::time_t>(r[0][1].as<long>());
@@ -31,18 +33,16 @@ void TaskRepository::insert(Task& task) {
 
 void TaskRepository::update(const Task& task) {
     pqxx::work txn(conn_);
-    txn.exec_params(
-        "UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
-        "status = $5, priority = $6, updated_at = NOW() WHERE id = $7",
-        task.board_id_, task.title_, task.description_, task.deadline_ ? time_to_string(task.deadline_) : nullptr, task.status_,
-        task.priority_, task.id_);
+    txn.exec_params("UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
+                    "status = $5, priority = $6, updated_at = NOW() WHERE id = $7",
+                    task.board_id_, task.title_, task.description_,
+                    task.deadline_ ? time_to_string(task.deadline_) : nullptr, task.status_,
+                    task.priority_, task.id_);
     txn.commit();
 }
 
-void TaskRepository::save(Task &task) {
+void TaskRepository::save(Task& task) {
     try {
-        pqxx::work txn(conn_);
-
         if (task.id_ == 0) {
             insert(task);
         } else {
@@ -52,7 +52,6 @@ void TaskRepository::save(Task &task) {
         throw std::runtime_error(std::string("Failed to save Task: ") + e.what());
     }
 }
-
 
 std::optional<Task> TaskRepository::find_by_id(int task_id) {
     try {
@@ -76,6 +75,11 @@ std::optional<Task> TaskRepository::find_by_id(int task_id) {
         t.title_ = row["title"].as<std::string>();
         t.description_ = row["description"].as<std::string>();
         t.status_ = row["status"].as<std::string>();
+        t.priority_ = row["priority"].as<int>();
+        t.deadline_ = row["deadline_sec"].is_null() ? 0 : row["deadline_sec"].as<long>();
+        t.created_at_ = row["created_sec"].as<long>();
+        t.updated_at_ = row["updated_sec"].as<long>();
+        txn.commit();
         return t;
 
     } catch (const std::exception& e) {

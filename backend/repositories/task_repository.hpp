@@ -1,18 +1,18 @@
 #ifndef TASK_REPOSITORY_HPP
 #define TASK_REPOSITORY_HPP
 
-#include "task.hpp"
-#include <pqxx/pqxx>
+#include "../models/task.hpp"
+
 #include <optional>
+#include <pqxx/pqxx>
 #include <vector>
 
 class TaskRepository {
   public:
-
     explicit TaskRepository(pqxx::connection& conn);
 
     void save(Task& task);
-    std::optional<Task> find_by_id(int id);
+    std::optional<Task> find_by_id(int task_id);
 
   private:
     pqxx::connection& conn_;

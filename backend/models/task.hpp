@@ -2,9 +2,8 @@
 #define TASK_H
 
 #include <ctime>
-#include <pqxx/pqxx>
-#include <string>
 #include <optional>
+#include <string>
 
 class Task {
   public:
@@ -21,8 +20,8 @@ class Task {
 
     Task() = default;
     Task(int id, int board_id, const std::string& title, const std::string& description,
-               std::time_t deadline, const std::string& status, int priority, std::time_t created_at,
-               std::time_t updated_at)
+         std::time_t deadline, const std::string& status, int priority, std::time_t created_at,
+         std::time_t updated_at)
         : id_(id)
         , board_id_(board_id)
         , title_(title)
@@ -33,7 +32,6 @@ class Task {
         , created_at_(created_at)
         , updated_at_(updated_at) {
     }
-
 };
 
 #endif // TASK_H
