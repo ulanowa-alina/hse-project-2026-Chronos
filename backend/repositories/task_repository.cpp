@@ -4,7 +4,8 @@
 #include <stdexcept>
 
 TaskRepository::TaskRepository(pqxx::connection& conn)
-    : conn_(conn) {}
+    : conn_(conn) {
+}
 
 std::string TaskRepository::time_to_string(std::time_t t) {
     char buffer[20];
