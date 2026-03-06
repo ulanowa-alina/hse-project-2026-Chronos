@@ -15,7 +15,7 @@ jobs:
       - name: Install LLVM and Clang Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-tidy cmake libboost-all-dev
+          sudo apt-get install -y clang-format clang-tidy cmake libboost-all-dev libpq-dev libpqxx-dev
 
       - name: Install deps
         run: |
