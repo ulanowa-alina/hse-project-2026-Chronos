@@ -21,19 +21,19 @@ auto build_json_response(const http::request<http::string_body>& req, http::stat
     return res;
 }
 
-auto build_bad_request(const http::request<http::string_body>& req, const std::string& msg)
-    -> http::response<http::string_body> {
+auto build_bad_request(const http::request<http::string_body>& req,
+                       const std::string& msg) -> http::response<http::string_body> {
     return build_json_response(req, http::status::bad_request, json{{"error", msg}});
 }
 
-auto build_db_error(const http::request<http::string_body>& req, const std::string& msg)
-    -> http::response<http::string_body> {
+auto build_db_error(const http::request<http::string_body>& req,
+                    const std::string& msg) -> http::response<http::string_body> {
     return build_json_response(req, http::status::internal_server_error,
                                json{{"error", "db_error"}, {"details", msg}});
 }
 
-auto build_create_response(const http::request<http::string_body>& req, const User& created)
-    -> http::response<http::string_body> {
+auto build_create_response(const http::request<http::string_body>& req,
+                           const User& created) -> http::response<http::string_body> {
     json out;
     out["id"] = created.id;
     out["email"] = created.email;
@@ -68,8 +68,8 @@ User createUser(ConnectionPool& pool, const NewUser& nu) {
 
 } // namespace
 
-auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& pool)
-    -> http::response<http::string_body> {
+auto handleCreate(const http::request<http::string_body>& req,
+                  ConnectionPool& pool) -> http::response<http::string_body> {
     try {
         const json body = parse_body(req);
         const NewUser nu = parse_new_user(body);

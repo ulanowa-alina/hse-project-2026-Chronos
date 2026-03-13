@@ -29,8 +29,8 @@ auto build_ok_response(const http::request<http::string_body>& req)
     return res;
 }
 
-auto build_error_response(const http::request<http::string_body>& req, const std::exception& e)
-    -> http::response<http::string_body> {
+auto build_error_response(const http::request<http::string_body>& req,
+                          const std::exception& e) -> http::response<http::string_body> {
     http::response<http::string_body> res{http::status::internal_server_error, req.version()};
     res.set(http::field::content_type, "application/json");
     res.set(http::field::access_control_allow_origin, "*");
@@ -49,8 +49,8 @@ void checkDb(ConnectionPool& pool) {
 
 } // namespace
 
-auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& pool)
-    -> http::response<http::string_body> {
+auto handleInfo(const http::request<http::string_body>& req,
+                ConnectionPool& pool) -> http::response<http::string_body> {
     try {
         checkDb(pool);
         return build_ok_response(req);
