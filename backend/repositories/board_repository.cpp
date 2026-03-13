@@ -29,6 +29,10 @@ void BoardRepository::update(const Board& board) {
 
 void BoardRepository::save(Board& board) {
     try {
+        if (board.id_ < 0) {
+            throw std::domain_error(
+                "Board ID cannot be negative (id: " + std::to_string(board.id_) + ")");
+        }
         if (board.id_ == 0) {
             insert(board);
         } else {

@@ -44,7 +44,10 @@ void TaskRepository::update(const Task& task) {
 
 void TaskRepository::save(Task& task) {
     try {
-        if (task.id_ == 0) {
+        if (task.id_ < 0) {
+            throw std::domain_error("Task ID cannot be negative (id: " + std::to_string(task.id_) +
+                                    ")");
+        } else if (task.id_ == 0) {
             insert(task);
         } else {
             update(task);

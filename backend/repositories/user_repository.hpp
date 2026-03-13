@@ -18,7 +18,7 @@ class UserRepository {
     pqxx::connection& conn_;
 
     void insert(User& user);
-    void update(User& user);
+    void update(const User& user);
 };
 
 #endif // USER_REPOSITORY_HPP

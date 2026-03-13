@@ -17,7 +17,7 @@ void UserRepository::insert(User& user) {
     txn.commit();
 }
 
-void UserRepository::update(User& user) {
+void UserRepository::update(const User& user) {
     pqxx::work txn(conn_);
     txn.exec_params("UPDATE users SET email = $1, name = $2, password_hash = $3 WHERE id = $4",
                     user.email_, user.name_, user.password_hash_, user.id_);
@@ -26,6 +26,10 @@ void UserRepository::update(User& user) {
 
 void UserRepository::save(User& user) {
     try {
+        if (user.id_ < 0) {
+            throw std::domain_error("User ID cannot be negative (id: " + std::to_string(user.id_) +
+                                    ")");
+        }
         if (user.id_ == 0) {
             insert(user);
         } else {
@@ -48,8 +52,10 @@ std::optional<User> UserRepository::find_by_id(int user_id) {
         }
 
         txn.commit();
-        return User(r[0]["id"].as<int>(), r[0]["email"].as<std::string>(),
-                    r[0]["name"].as<std::string>(), r[0]["password_hash"].as<std::string>());
+        const auto& row = r[0];
+        return User(row["id"].as<int>(), row["email"].as<std::string>(),
+                    row["name"].as<std::string>(), row["password_hash"].as<std::string>());
+
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("User::find_by_id failed: ") + e.what());
     }
