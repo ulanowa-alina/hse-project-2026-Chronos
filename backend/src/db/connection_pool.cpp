@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <thread>
 #include <utility>
+#include <string>
 
 ConnectionPool::ConnectionPool(std::string connection_info, std::size_t pool_size)
     : connection_info_(std::move(connection_info)) {
@@ -15,19 +16,26 @@ ConnectionPool::ConnectionPool(std::string connection_info, std::size_t pool_siz
         std::unique_ptr<pqxx::connection> c;
 
         const int max_attempts = 30;
+        std::string last_error;
         for (int attempt = 1; attempt <= max_attempts; ++attempt) {
             try {
                 c = std::make_unique<pqxx::connection>(connection_info_);
                 if (c->is_open())
                     break;
-            } catch (const pqxx::broken_connection&) {
+            } catch (const pqxx::broken_connection& e) {
+                last_error = e.what();
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
 
         if (!c || !c->is_open()) {
-            throw std::runtime_error("failed to connect to postgres after retries");
+            std::string msg = "failed to connect to postgres after retries";
+            if (!last_error.empty()) {
+                msg += ": ";
+                msg += last_error;
+            }
+            throw std::runtime_error(msg);
         }
 
         free_.push(std::move(c));
