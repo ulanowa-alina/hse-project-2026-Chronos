@@ -2,9 +2,9 @@
 
 #include <chrono>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
-#include <string>
 
 ConnectionPool::ConnectionPool(std::string connection_info, std::size_t pool_size)
     : connection_info_(std::move(connection_info)) {
