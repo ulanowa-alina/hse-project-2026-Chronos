@@ -7,6 +7,11 @@ namespace board::v1 {
 
 auto handleCreate(const http::request<http::string_body>& req)
     -> http::response<http::string_body> {
+
+    if (req.method() != http::verb::post) {
+        return http::response<http::string_body>{http::status::method_not_allowed, req.version()};
+    }
+
     const std::string jsonBody = R"({
   "id": 1,
   "name": "My Board",
