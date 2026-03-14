@@ -1,7 +1,7 @@
 #include "server.hpp"
 
-#include "personal/v1/info.hpp"
 #include "personal/v1/edit.hpp"
+#include "personal/v1/info.hpp"
 #include "users/create_user.hpp"
 
 #include <memory>
