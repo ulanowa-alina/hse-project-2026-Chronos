@@ -12,13 +12,13 @@ class UserRepository {
   public:
     explicit UserRepository(ConnectionPool& pool);
 
-    void save(User& user);
+    User save(const User& user);
     std::optional<User> find_by_id(int user_id);
 
   private:
     ConnectionPool& pool_;
 
-    void insert(User& user);
+    User insert(const User& user);
     void update(const User& user);
 };
 

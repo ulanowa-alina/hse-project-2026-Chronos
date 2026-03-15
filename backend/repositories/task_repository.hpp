@@ -12,14 +12,14 @@ class TaskRepository {
   public:
     explicit TaskRepository(ConnectionPool& pool);
 
-    void save(Task& task);
+    Task save(const Task& task);
     std::optional<Task> find_by_id(int task_id);
 
   private:
     ConnectionPool& pool_;
     std::string time_to_string(std::time_t t);
 
-    void insert(Task& task);
-    void update(const Task& task);
+    Task insert(const Task& task);
+    Task update(const Task& task);
 };
 #endif // TASK_REPOSITORY_HPP

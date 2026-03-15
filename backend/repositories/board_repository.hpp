@@ -12,14 +12,14 @@ class BoardRepository {
   public:
     explicit BoardRepository(ConnectionPool& pool);
 
-    void save(Board& board);
+    Board save(const Board& board);
     std::optional<Board> find_by_id(int board_id);
 
   private:
     ConnectionPool& pool_;
 
-    void insert(Board& board);
-    void update(const Board& board);
+    Board insert(const Board& board);
+    Board update(const Board& board);
 };
 
 #endif // BOARD_REPOSITORY_HPP

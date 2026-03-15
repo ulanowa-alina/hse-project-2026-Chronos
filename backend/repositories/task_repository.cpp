@@ -13,48 +13,56 @@ std::string TaskRepository::time_to_string(std::time_t t) {
     return std::string(buffer);
 }
 
-void TaskRepository::insert(Task& task) {
+Task TaskRepository::insert(const Task& task) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
     pqxx::result r = txn.exec_params("INSERT INTO tasks (board_id, title, description, deadline, "
-                                     "status, priority, created_at, updated_at) "
+                                     "status_id, priority, created_at, updated_at) "
                                      "VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) "
                                      "RETURNING id, "
                                      "EXTRACT(EPOCH FROM created_at)::bigint, "
                                      "EXTRACT(EPOCH FROM updated_at)::bigint",
                                      task.board_id_, task.title_, task.description_,
                                      task.deadline_ ? time_to_string(task.deadline_) : nullptr,
-                                     task.status_, task.priority_);
-
-    task.id_ = r[0][0].as<int>();
-    task.created_at_ = static_cast<std::time_t>(r[0][1].as<long>());
-    task.updated_at_ = static_cast<std::time_t>(r[0][2].as<long>());
+                                     task.status_id_, task.priority_);
 
     txn.commit();
+
+    return Task(r[0][0].as<int>(), task.board_id_, task.title_, task.description_, task.deadline_,
+                task.status_id_, task.priority_, static_cast<std::time_t>(r[0][1].as<long>()),
+                static_cast<std::time_t>(r[0][2].as<long>()));
 }
 
-void TaskRepository::update(const Task& task) {
+Task TaskRepository::update(const Task& task) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
-    txn.exec_params("UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
-                    "status = $5, priority = $6, updated_at = NOW() WHERE id = $7",
-                    task.board_id_, task.title_, task.description_,
-                    task.deadline_ ? time_to_string(task.deadline_) : nullptr, task.status_,
-                    task.priority_, task.id_);
+    pqxx::result r = txn.exec_params(
+        "UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
+        "status_id = $5, priority = $6, updated_at = NOW() WHERE id = $7 "
+        "RETURNING EXTRACT(EPOCH FROM updated_at)::bigint",
+        task.board_id_, task.title_, task.description_,
+        task.deadline_ != 0 ? time_to_string(task.deadline_) : nullptr, task.status_id_,
+        task.priority_, task.id_);
+
     txn.commit();
+    Task updated_task = task;
+    if (!r.empty()) {
+        updated_task.updated_at_ = static_cast<std::time_t>(r[0][0].as<long>());
+    }
+    return updated_task;
 }
 
-void TaskRepository::save(Task& task) {
+Task TaskRepository::save(const Task& task) {
     try {
         if (task.id_ < 0) {
             throw std::domain_error("Task ID cannot be negative (id: " + std::to_string(task.id_) +
                                     ")");
         } else if (task.id_ == 0) {
-            insert(task);
+            return insert(task);
         } else {
-            update(task);
+            return update(task);
         }
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Failed to save Task: ") + e.what());
@@ -69,7 +77,7 @@ std::optional<Task> TaskRepository::find_by_id(int task_id) {
         pqxx::result r = txn.exec_params(
             "SELECT id, board_id, title, description, EXTRACT(EPOCH FROM deadline)::bigint AS "
             "deadline_sec, "
-            "status, priority, EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+            "status_id, priority, EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
             "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
             "FROM tasks WHERE id = $1",
             task_id);
@@ -79,18 +87,15 @@ std::optional<Task> TaskRepository::find_by_id(int task_id) {
         }
 
         const auto& row = r[0];
-        Task t;
-        t.id_ = row["id"].as<int>();
-        t.board_id_ = row["board_id"].as<int>();
-        t.title_ = row["title"].as<std::string>();
-        t.description_ = row["description"].as<std::string>();
-        t.status_ = row["status"].as<std::string>();
-        t.priority_ = row["priority"].as<int>();
-        t.deadline_ = row["deadline_sec"].is_null() ? 0 : row["deadline_sec"].as<long>();
-        t.created_at_ = row["created_sec"].as<long>();
-        t.updated_at_ = row["updated_sec"].as<long>();
+
         txn.commit();
-        return t;
+
+        return Task(row["id"].as<int>(), row["board_id"].as<int>(), row["title"].as<std::string>(),
+                    row["description"].as<std::string>(),
+                    row["deadline_sec"].is_null() ? 0 : row["deadline_sec"].as<long>(),
+                    row["status_id"].as<int>(), row["priority"].as<int>(),
+                    static_cast<std::time_t>(row["created_sec"].as<long>()),
+                    static_cast<std::time_t>(row["updated_sec"].as<long>()));
 
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Failed to find Task: ") + e.what());

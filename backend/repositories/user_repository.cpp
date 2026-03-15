@@ -7,7 +7,7 @@ UserRepository::UserRepository(ConnectionPool& pool)
     : pool_(pool) {
 }
 
-void UserRepository::insert(User& user) {
+User UserRepository::insert(const User& user) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
@@ -15,8 +15,8 @@ void UserRepository::insert(User& user) {
         "INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id",
         user.email_, user.name_, user.password_hash_);
 
-    user.id_ = r[0][0].as<int>();
     txn.commit();
+    return User(r[0][0].as<int>(), user.email_, user.name_, user.password_hash_);
 }
 
 void UserRepository::update(const User& user) {
@@ -28,16 +28,17 @@ void UserRepository::update(const User& user) {
     txn.commit();
 }
 
-void UserRepository::save(User& user) {
+User UserRepository::save(const User& user) {
     try {
         if (user.id_ < 0) {
             throw std::domain_error("User ID cannot be negative (id: " + std::to_string(user.id_) +
                                     ")");
         }
         if (user.id_ == 0) {
-            insert(user);
+            return insert(user);
         } else {
             update(user);
+            return user;
         }
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("User::save failed: ") + e.what());
