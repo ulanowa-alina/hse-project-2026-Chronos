@@ -3,6 +3,8 @@
 
 #include <optional>
 #include <string>
+#include <ctime>
+#include <stdexcept>
 
 class Board {
   public:

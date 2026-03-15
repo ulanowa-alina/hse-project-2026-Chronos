@@ -4,6 +4,7 @@
 #include <ctime>
 #include <optional>
 #include <string>
+#include <stdexcept>
 
 class Task {
   public:

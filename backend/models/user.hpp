@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <stdexcept>
 
 class User {
   public:
