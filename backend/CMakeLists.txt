@@ -30,6 +30,7 @@ target_include_directories(chronos_backend PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/models"
         "${CMAKE_CURRENT_SOURCE_DIR}/repositories"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/server"
         ${Boost_INCLUDE_DIRS}
         ${PostgreSQL_INCLUDE_DIRS}
         ${PQXX_INCLUDE_DIRS}
