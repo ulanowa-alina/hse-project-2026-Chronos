@@ -44,5 +44,6 @@ target_link_libraries(chronos_backend PRIVATE
         Threads::Threads
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
+        boost_json
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
