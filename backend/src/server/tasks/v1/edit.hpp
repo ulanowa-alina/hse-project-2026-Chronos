@@ -1,15 +1,11 @@
 #ifndef TASKS_V1_EDIT_HPP
 #define TASKS_V1_EDIT_HPP
 
+#include "../../../../repositories/task_repository.hpp"
+
 #include <boost/beast/http.hpp>
 
-//TODO: расскоментить, когда замержим
-// #include "../../repositories/task_repository.hpp"
-
 namespace http = boost::beast::http;
-
-//TODO: убрать после мержа
-class TaskRepository;
 
 namespace tasks::v1 {
 
