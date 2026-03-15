@@ -10,7 +10,8 @@ find_package(Boost 1.74 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(PQXX REQUIRED libpqxx)
+pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
+
 
 
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
@@ -41,8 +42,7 @@ target_compile_definitions(chronos_backend PRIVATE
 target_link_libraries(chronos_backend PRIVATE
         Boost::boost
         Threads::Threads
-        pqxx::pqxx
-        ${PQXX_LIBRARIES}
+        PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})

@@ -49,7 +49,6 @@ std::optional<User> UserRepository::find_by_id(int user_id) {
         auto handle = pool_.acquire();
         pqxx::work txn(handle.conn());
 
-
         pqxx::result r = txn.exec_params(
             "SELECT id, email, name, password_hash FROM users WHERE id = $1", user_id);
 

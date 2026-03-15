@@ -4,8 +4,8 @@
 #include <stdexcept>
 
 TaskRepository::TaskRepository(ConnectionPool& pool)
-    : pool_(pool)
-{}
+    : pool_(pool) {
+}
 
 std::string TaskRepository::time_to_string(std::time_t t) {
     char buffer[20];
