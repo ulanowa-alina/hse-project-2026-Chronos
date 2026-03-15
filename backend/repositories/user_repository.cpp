@@ -30,10 +30,6 @@ void UserRepository::update(const User& user) {
 
 User UserRepository::save(const User& user) {
     try {
-        if (user.id_ < 0) {
-            throw std::domain_error("User ID cannot be negative (id: " + std::to_string(user.id_) +
-                                    ")");
-        }
         if (user.id_ == 0) {
             return insert(user);
         } else {
