@@ -10,6 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   backend:
     build:
@@ -21,6 +22,8 @@ services:
     ports:
       - "8080:8080"
     command: ["./build/chronos_backend", "0.0.0.0", "8080"]
+    env_file:
+      - .env
 
 volumes:
   postgres_data:

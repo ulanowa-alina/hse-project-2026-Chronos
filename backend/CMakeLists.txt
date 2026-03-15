@@ -7,6 +7,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Boost 1.74 REQUIRED)
 find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(PQXX REQUIRED libpqxx)
 
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
@@ -21,6 +24,7 @@ add_executable(chronos_backend ${BACKEND_SOURCES})
 target_include_directories(chronos_backend PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     ${Boost_INCLUDE_DIRS}
+    ${PQXX_INCLUDE_DIRS}
 )
 
 target_compile_definitions(chronos_backend PRIVATE
@@ -30,4 +34,7 @@ target_compile_definitions(chronos_backend PRIVATE
 target_link_libraries(chronos_backend PRIVATE
     Boost::boost
     Threads::Threads
+    ${PQXX_LIBRARIES}
 )
+
+target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
