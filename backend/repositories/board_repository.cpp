@@ -3,12 +3,13 @@
 #include <optional>
 #include <stdexcept>
 
-BoardRepository::BoardRepository(pqxx::connection& conn)
-    : conn_(conn) {
+BoardRepository::BoardRepository(ConnectionPool& pool)
+    : pool_(pool) {
 }
 
 void BoardRepository::insert(Board& board) {
-    pqxx::work txn(conn_);
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
 
     pqxx::result r =
         txn.exec_params("INSERT INTO boards (user_id, title) VALUES ($1, $2) RETURNING id",
@@ -19,7 +20,8 @@ void BoardRepository::insert(Board& board) {
 }
 
 void BoardRepository::update(const Board& board) {
-    pqxx::work txn(conn_);
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
 
     txn.exec_params("UPDATE boards SET user_id = $1, title = $2 WHERE id = $3", board.user_id_,
                     board.title_, board.id_);
@@ -45,7 +47,9 @@ void BoardRepository::save(Board& board) {
 
 std::optional<Board> BoardRepository::find_by_id(int board_id) {
     try {
-        pqxx::work txn(conn_);
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
         pqxx::result r =
             txn.exec_params("SELECT id, user_id, title FROM boards WHERE id = $1", board_id);
 

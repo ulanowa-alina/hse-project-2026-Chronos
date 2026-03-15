@@ -3,12 +3,14 @@
 #include <optional>
 #include <stdexcept>
 
-UserRepository::UserRepository(pqxx::connection& conn)
-    : conn_(conn) {
+UserRepository::UserRepository(ConnectionPool& pool)
+    : pool_(pool) {
 }
 
 void UserRepository::insert(User& user) {
-    pqxx::work txn(conn_);
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
+
     pqxx::result r = txn.exec_params(
         "INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id",
         user.email_, user.name_, user.password_hash_);
@@ -18,7 +20,9 @@ void UserRepository::insert(User& user) {
 }
 
 void UserRepository::update(const User& user) {
-    pqxx::work txn(conn_);
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
+
     txn.exec_params("UPDATE users SET email = $1, name = $2, password_hash = $3 WHERE id = $4",
                     user.email_, user.name_, user.password_hash_, user.id_);
     txn.commit();
@@ -42,7 +46,9 @@ void UserRepository::save(User& user) {
 
 std::optional<User> UserRepository::find_by_id(int user_id) {
     try {
-        pqxx::work txn(conn_);
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
 
         pqxx::result r = txn.exec_params(
             "SELECT id, email, name, password_hash FROM users WHERE id = $1", user_id);

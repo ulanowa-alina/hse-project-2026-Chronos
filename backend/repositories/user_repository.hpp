@@ -2,6 +2,7 @@
 #define USER_REPOSITORY_HPP
 
 #include "../models/user.hpp"
+#include "../src/db/connection_pool.hpp"
 
 #include <optional>
 #include <pqxx/pqxx>
@@ -9,13 +10,13 @@
 
 class UserRepository {
   public:
-    explicit UserRepository(pqxx::connection& conn);
+    explicit UserRepository(ConnectionPool& pool);
 
     void save(User& user);
     std::optional<User> find_by_id(int user_id);
 
   private:
-    pqxx::connection& conn_;
+    ConnectionPool& pool_;
 
     void insert(User& user);
     void update(const User& user);

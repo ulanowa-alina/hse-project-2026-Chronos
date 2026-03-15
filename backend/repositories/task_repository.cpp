@@ -3,9 +3,9 @@
 #include <optional>
 #include <stdexcept>
 
-TaskRepository::TaskRepository(pqxx::connection& conn)
-    : conn_(conn) {
-}
+TaskRepository::TaskRepository(ConnectionPool& pool)
+    : pool_(pool)
+{}
 
 std::string TaskRepository::time_to_string(std::time_t t) {
     char buffer[20];
@@ -14,7 +14,9 @@ std::string TaskRepository::time_to_string(std::time_t t) {
 }
 
 void TaskRepository::insert(Task& task) {
-    pqxx::work txn(conn_);
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
+
     pqxx::result r = txn.exec_params("INSERT INTO tasks (board_id, title, description, deadline, "
                                      "status, priority, created_at, updated_at) "
                                      "VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) "
@@ -33,7 +35,9 @@ void TaskRepository::insert(Task& task) {
 }
 
 void TaskRepository::update(const Task& task) {
-    pqxx::work txn(conn_);
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
+
     txn.exec_params("UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
                     "status = $5, priority = $6, updated_at = NOW() WHERE id = $7",
                     task.board_id_, task.title_, task.description_,
@@ -59,7 +63,9 @@ void TaskRepository::save(Task& task) {
 
 std::optional<Task> TaskRepository::find_by_id(int task_id) {
     try {
-        pqxx::work txn(conn_);
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
         pqxx::result r = txn.exec_params(
             "SELECT id, board_id, title, description, EXTRACT(EPOCH FROM deadline)::bigint AS "
             "deadline_sec, "

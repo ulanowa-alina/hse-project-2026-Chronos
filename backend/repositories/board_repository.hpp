@@ -1,6 +1,8 @@
 #ifndef BOARD_REPOSITORY_HPP
 #define BOARD_REPOSITORY_HPP
+
 #include "../models/board.hpp"
+#include "../src/db/connection_pool.hpp"
 
 #include <optional>
 #include <pqxx/pqxx>
@@ -8,13 +10,13 @@
 
 class BoardRepository {
   public:
-    explicit BoardRepository(pqxx::connection& conn);
+    explicit BoardRepository(ConnectionPool& pool);
 
     void save(Board& board);
     std::optional<Board> find_by_id(int board_id);
 
   private:
-    pqxx::connection& conn_;
+    ConnectionPool& pool_;
 
     void insert(Board& board);
     void update(const Board& board);

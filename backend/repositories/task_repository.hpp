@@ -2,6 +2,7 @@
 #define TASK_REPOSITORY_HPP
 
 #include "../models/task.hpp"
+#include "../src/db/connection_pool.hpp"
 
 #include <optional>
 #include <pqxx/pqxx>
@@ -9,13 +10,13 @@
 
 class TaskRepository {
   public:
-    explicit TaskRepository(pqxx::connection& conn);
+    explicit TaskRepository(ConnectionPool& pool);
 
     void save(Task& task);
     std::optional<Task> find_by_id(int task_id);
 
   private:
-    pqxx::connection& conn_;
+    ConnectionPool& pool_;
     std::string time_to_string(std::time_t t);
 
     void insert(Task& task);
