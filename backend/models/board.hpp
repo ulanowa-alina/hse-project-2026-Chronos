@@ -1,10 +1,10 @@
 #ifndef BOARD_HPP
 #define BOARD_HPP
 
-#include <optional>
-#include <string>
 #include <ctime>
+#include <optional>
 #include <stdexcept>
+#include <string>
 
 class Board {
   public:

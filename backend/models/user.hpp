@@ -2,8 +2,8 @@
 #define USER_H
 
 #include <optional>
-#include <string>
 #include <stdexcept>
+#include <string>
 
 class User {
   public:
