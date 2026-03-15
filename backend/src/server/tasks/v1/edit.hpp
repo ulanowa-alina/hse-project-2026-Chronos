@@ -9,10 +9,8 @@ namespace http = boost::beast::http;
 
 namespace tasks::v1 {
 
-auto handleEdit(
-    const http::request<http::string_body>& req,
-    TaskRepository* repository
-    )-> http::response<http::string_body>;
+auto handleEdit(const http::request<http::string_body>& req, TaskRepository* repository)
+    -> http::response<http::string_body>;
 
 } // namespace tasks::v1
 
