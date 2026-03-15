@@ -2,6 +2,7 @@
 #define BOARD_V1_EDIT_HPP
 
 #include "board_repository.hpp"
+
 #include <boost/beast/http.hpp>
 
 namespace http = boost::beast::http;
