@@ -16,8 +16,10 @@ std::string time_to_string_iso8601(std::time_t t) {
     return "";
 }
 
-auto handleEdit(const http::request<http::string_body>& req, TaskRepository* repository)
-    -> http::response<http::string_body> {
+auto handleEdit(
+    const http::request<http::string_body>& req,
+    TaskRepository* repository
+    ) -> http::response<http::string_body> {
 
     http::response<http::string_body> res{http::status::ok, req.version()};
     res.set(http::field::content_type, "application/json");
