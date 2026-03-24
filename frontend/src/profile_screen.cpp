@@ -10,12 +10,12 @@ ProfileScreen::ProfileScreen(QWidget* parent)
     setupLayout();
 }
 
-void ProfileScreen::set_network_manager(NetworkManager* manager) {
+void ProfileScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
 
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
-                &ProfileScreen::on_network_response);
+                &ProfileScreen::onNetworkResponse);
     }
 }
 
@@ -28,7 +28,7 @@ void ProfileScreen::showEvent(QShowEvent* event) {
     }
 }
 
-void ProfileScreen::on_network_response(const QString& endpoint, const QByteArray& data, int code) {
+void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
     if (endpoint != network_manager_->info_url_)
         return;
 

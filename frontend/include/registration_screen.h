@@ -17,15 +17,15 @@ class RegistrationScreen : public QWidget {
   public:
     explicit RegistrationScreen(QWidget* parent = nullptr);
 
-    void set_network_manager(NetworkManager* manager);
+    void setNetworkManager(NetworkManager* manager);
 
   signals:
     void loginRequested();
     void registrationRequested();
 
   private slots:
-    void on_network_response(const QString& endpoint, const QByteArray& data, int code);
-    void on_register_request();
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onRegisterRequest();
 
   private:
     NetworkManager* network_manager_{nullptr};

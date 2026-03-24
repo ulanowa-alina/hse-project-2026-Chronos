@@ -9,17 +9,17 @@ RegistrationScreen::RegistrationScreen(QWidget* parent)
     setupLayout();
 }
 
-void RegistrationScreen::set_network_manager(NetworkManager* manager) {
+void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
 
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
-                &RegistrationScreen::on_network_response);
+                &RegistrationScreen::onNetworkResponse);
     }
 }
 
-void RegistrationScreen::on_network_response(const QString& endpoint, const QByteArray& data,
-                                             int code) {
+void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
+                                           int code) {
     if (endpoint != network_manager_->register_url_)
         return;
     if (code == 200) {
@@ -31,7 +31,7 @@ void RegistrationScreen::on_network_response(const QString& endpoint, const QByt
     }
 }
 
-void RegistrationScreen::on_register_request() {
+void RegistrationScreen::onRegisterRequest() {
     if (!network_manager_)
         return;
 
@@ -152,7 +152,7 @@ void RegistrationScreen::setupLayout() {
     main_layout->addWidget(registration_button_);
 
     connect(registration_button_, &QPushButton::clicked, this,
-            &RegistrationScreen::on_register_request);
+            &RegistrationScreen::onRegisterRequest);
     connect(login_button_, &QPushButton::clicked, this, &RegistrationScreen::loginRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

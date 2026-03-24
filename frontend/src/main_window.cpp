@@ -15,9 +15,9 @@ MainWindow::MainWindow(QWidget* parent)
     profile_screen_ = new ProfileScreen(this);
     registration_screen_ = new RegistrationScreen(this);
 
-    login_screen_->set_network_manager(network_manager_);
-    profile_screen_->set_network_manager(network_manager_);
-    registration_screen_->set_network_manager(network_manager_);
+    login_screen_->setNetworkManager(network_manager_);
+    profile_screen_->setNetworkManager(network_manager_);
+    registration_screen_->setNetworkManager(network_manager_);
 
     stacked_widget_->addWidget(login_screen_);
     stacked_widget_->addWidget(profile_screen_);

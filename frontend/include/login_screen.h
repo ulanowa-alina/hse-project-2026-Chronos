@@ -17,14 +17,14 @@ class LoginScreen : public QWidget {
   public:
     explicit LoginScreen(QWidget* parent = nullptr);
 
-    void set_network_manager(NetworkManager* manager);
+    void setNetworkManager(NetworkManager* manager);
 
   signals:
     void loginRequested();
     void registrationRequested();
 
   private slots:
-    void on_network_response(const QString& endpoint, const QByteArray& data, int code);
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
 
   private:
     NetworkManager* network_manager_{nullptr};

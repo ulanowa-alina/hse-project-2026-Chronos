@@ -36,7 +36,7 @@ class NetworkManager : public QObject {
     void responseReceived(const QString& endpoint, const QByteArray& data, int statusCode);
 
   private slots:
-    void on_result(QNetworkReply* reply);
+    void onResult(QNetworkReply* reply);
 
   private:
     QNetworkAccessManager* manager_;
@@ -47,6 +47,6 @@ class NetworkManager : public QObject {
     const QString base_url_ = "http://51.250.114.15:8080";
     const int MAX_RETRIES_ = 3;
 
-    void send_request(const RequestData& req_data);
+    void sendRequest(const RequestData& req_data);
 };
 #endif // NETWORK_MANAGER_H

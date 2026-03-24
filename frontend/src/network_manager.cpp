@@ -20,14 +20,14 @@ NetworkManager::~NetworkManager() {
 }
 
 void NetworkManager::GET(const QString& endpoint) {
-    send_request({endpoint, "GET", QJsonObject(), 0});
+    sendRequest({endpoint, "GET", QJsonObject(), 0});
 }
 
 void NetworkManager::POST(const QString& endpoint, const QJsonObject& data) {
-    send_request({endpoint, "POST", data, 0});
+    sendRequest({endpoint, "POST", data, 0});
 }
 
-void NetworkManager::send_request(const RequestData& req_data) {
+void NetworkManager::sendRequest(const RequestData& req_data) {
     QUrl url(base_url_ + req_data.endpoint_);
     QNetworkRequest request(url);
     QNetworkReply* reply = nullptr;
@@ -42,12 +42,12 @@ void NetworkManager::send_request(const RequestData& req_data) {
     if (reply) {
         request_storage_.insert(reply, req_data);
 
-        connect(reply, &QNetworkReply::finished, this, [this, reply]() { on_result(reply); });
+        connect(reply, &QNetworkReply::finished, this, [this, reply]() { onResult(reply); });
         qDebug() << "NetworkManager: Отправлен" << req_data.method_ << "на" << req_data.endpoint_;
     }
 }
 
-void NetworkManager::on_result(QNetworkReply* reply) {
+void NetworkManager::onResult(QNetworkReply* reply) {
     if (!reply)
         return;
 
@@ -62,7 +62,7 @@ void NetworkManager::on_result(QNetworkReply* reply) {
         req.retry_count++;
         qDebug() << "NetworkManager: Попытка №" << req.retry_count << " для " << req.endpoint_;
 
-        QTimer::singleShot(1000, this, [this, req]() { send_request(req); });
+        QTimer::singleShot(1000, this, [this, req]() { sendRequest(req); });
 
         reply->deleteLater();
         return;
