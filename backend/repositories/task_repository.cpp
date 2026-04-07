@@ -30,8 +30,7 @@ Task TaskRepository::insert(const Task& task) {
     txn.commit();
 
     return Task(r[0][0].as<int>(), task.board_id_, task.title_, task.description_, task.deadline_,
-                task.status_id_, task.priority_color_,
-                static_cast<std::time_t>(r[0][1].as<long>()),
+                task.status_id_, task.priority_color_, static_cast<std::time_t>(r[0][1].as<long>()),
                 static_cast<std::time_t>(r[0][2].as<long>()));
 }
 

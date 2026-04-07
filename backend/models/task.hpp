@@ -21,8 +21,8 @@ class Task {
 
     Task() = default;
     Task(int id, int board_id, std::string title, std::string description,
-         std::optional<std::time_t> deadline,
-         int status_id, std::string priority_color, std::time_t created_at, std::time_t updated_at)
+         std::optional<std::time_t> deadline, int status_id, std::string priority_color,
+         std::time_t created_at, std::time_t updated_at)
         : id_(id)
         , board_id_(board_id)
         , title_(std::move(title))

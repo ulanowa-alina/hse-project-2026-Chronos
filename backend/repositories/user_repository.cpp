@@ -49,11 +49,10 @@ std::optional<User> UserRepository::find_by_id(int user_id) {
         auto handle = pool_.acquire();
         pqxx::work txn(handle.conn());
 
-        pqxx::result r = txn.exec_params(
-            "SELECT id, email, name, status, password_hash, "
-            "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
-            "FROM users WHERE id = $1",
-            user_id);
+        pqxx::result r = txn.exec_params("SELECT id, email, name, status, password_hash, "
+                                         "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
+                                         "FROM users WHERE id = $1",
+                                         user_id);
 
         if (r.empty()) {
             return std::nullopt;
