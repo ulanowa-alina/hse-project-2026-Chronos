@@ -14,14 +14,23 @@ Board BoardRepository::insert(const Board& board) {
     pqxx::result r =
         txn.exec_params("INSERT INTO boards (user_id, title, description, is_private) "
                         "VALUES ($1, $2, $3, $4) "
-                        "RETURNING id, EXTRACT(EPOCH FROM created_at)::bigint",
+                        "RETURNING id, "
+                        "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+                        "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec",
                         board.user_id_, board.title_, board.description_, board.is_private_);
+
+    const int board_id = r[0][0].as<int>();
+    txn.exec_params("INSERT INTO statuses (board_id, name, position) VALUES "
+                    "($1, 'todo', 0), "
+                    "($1, 'in_progress', 1), "
+                    "($1, 'done', 2)",
+                    board_id);
 
     txn.commit();
 
-    return Board(r[0][0].as<int>(), board.user_id_, board.title_, board.description_,
-                 board.is_private_, static_cast<std::time_t>(r[0][1].as<long>()),
-                 static_cast<std::time_t>(r[0][1].as<long>()));
+    return Board(board_id, board.user_id_, board.title_, board.description_, board.is_private_,
+                 static_cast<std::time_t>(r[0]["created_sec"].as<long>()),
+                 static_cast<std::time_t>(r[0]["updated_sec"].as<long>()));
 }
 
 Board BoardRepository::update(const Board& board) {

@@ -31,13 +31,16 @@ class Board {
             throw std::invalid_argument("Board ID cannot be negative");
         }
         if (user_id_ <= 0) {
-            throw std::invalid_argument("Owner ID must be positive");
+            throw std::invalid_argument("User ID must be positive");
         }
         if (title_.empty() || title_.length() > 100) {
             throw std::invalid_argument("Board title must be between 1 and 100 characters");
         }
         if (description_.length() > 1000) {
             throw std::invalid_argument("Board description cannot exceed 1000 characters");
+        }
+        if (created_at_ < 0 || updated_at_ < 0) {
+            throw std::invalid_argument("Board timestamps cannot be negative");
         }
     }
 };

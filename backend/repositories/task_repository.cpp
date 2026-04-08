@@ -18,19 +18,19 @@ Task TaskRepository::insert(const Task& task) {
     pqxx::work txn(handle.conn());
 
     pqxx::result r = txn.exec_params("INSERT INTO tasks (board_id, title, description, deadline, "
-                                     "status_id, priority, created_at, updated_at) "
+                                     "status_id, priority_color, created_at, updated_at) "
                                      "VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) "
                                      "RETURNING id, "
                                      "EXTRACT(EPOCH FROM created_at)::bigint, "
                                      "EXTRACT(EPOCH FROM updated_at)::bigint",
                                      task.board_id_, task.title_, task.description_,
-                                     task.deadline_ ? time_to_string(task.deadline_) : nullptr,
-                                     task.status_id_, task.priority_);
+                                     task.deadline_ ? time_to_string(*task.deadline_) : nullptr,
+                                     task.status_id_, task.priority_color_);
 
     txn.commit();
 
     return Task(r[0][0].as<int>(), task.board_id_, task.title_, task.description_, task.deadline_,
-                task.status_id_, task.priority_, static_cast<std::time_t>(r[0][1].as<long>()),
+                task.status_id_, task.priority_color_, static_cast<std::time_t>(r[0][1].as<long>()),
                 static_cast<std::time_t>(r[0][2].as<long>()));
 }
 
@@ -40,11 +40,11 @@ Task TaskRepository::update(const Task& task) {
 
     pqxx::result r = txn.exec_params(
         "UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
-        "status_id = $5, priority = $6, updated_at = NOW() WHERE id = $7 "
+        "status_id = $5, priority_color = $6, updated_at = NOW() WHERE id = $7 "
         "RETURNING EXTRACT(EPOCH FROM updated_at)::bigint",
         task.board_id_, task.title_, task.description_,
-        task.deadline_ != 0 ? time_to_string(task.deadline_) : nullptr, task.status_id_,
-        task.priority_, task.id_);
+        task.deadline_ ? time_to_string(*task.deadline_) : nullptr, task.status_id_,
+        task.priority_color_, task.id_);
 
     txn.commit();
     Task updated_task = task;
@@ -74,7 +74,7 @@ std::optional<Task> TaskRepository::find_by_id(int task_id) {
         pqxx::result r = txn.exec_params(
             "SELECT id, board_id, title, description, EXTRACT(EPOCH FROM deadline)::bigint AS "
             "deadline_sec, "
-            "status_id, priority, EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+            "status_id, priority_color, EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
             "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
             "FROM tasks WHERE id = $1",
             task_id);
@@ -89,8 +89,10 @@ std::optional<Task> TaskRepository::find_by_id(int task_id) {
 
         return Task(row["id"].as<int>(), row["board_id"].as<int>(), row["title"].as<std::string>(),
                     row["description"].as<std::string>(),
-                    row["deadline_sec"].is_null() ? 0 : row["deadline_sec"].as<long>(),
-                    row["status_id"].as<int>(), row["priority"].as<int>(),
+                    row["deadline_sec"].is_null()
+                        ? std::optional<std::time_t>{}
+                        : std::optional<std::time_t>{row["deadline_sec"].as<long>()},
+                    row["status_id"].as<int>(), row["priority_color"].as<std::string>(),
                     static_cast<std::time_t>(row["created_sec"].as<long>()),
                     static_cast<std::time_t>(row["updated_sec"].as<long>()));
 
