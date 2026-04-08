@@ -1,6 +1,8 @@
 #ifndef REGISTRATION_SCREEN_H
 #define REGISTRATION_SCREEN_H
 
+#include "network_manager.h"
+
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -14,11 +16,20 @@ class RegistrationScreen : public QWidget {
 
   public:
     explicit RegistrationScreen(QWidget* parent = nullptr);
+
+    void setNetworkManager(NetworkManager* manager);
+
   signals:
     void loginRequested();
     void registrationRequested();
 
+  private slots:
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onRegisterRequest();
+
   private:
+    NetworkManager* network_manager_{nullptr};
+
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};
     QPushButton* avatar_button_{nullptr};

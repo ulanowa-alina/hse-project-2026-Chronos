@@ -1,9 +1,27 @@
 #include "login_screen.h"
+
+#include <QDebug>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+
 LoginScreen::LoginScreen(QWidget* parent)
     : QWidget(parent) {
     setupLayout();
+}
+
+void LoginScreen::setNetworkManager(NetworkManager* manager) {
+    network_manager_ = manager;
+
+    if (network_manager_) {
+        connect(network_manager_, &NetworkManager::responseReceived, this,
+                &LoginScreen::onNetworkResponse);
+    }
+}
+
+void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
+    if (endpoint != network_manager_->info_url_ && endpoint != network_manager_->register_url_) {
+        qDebug() << "Пока не реализовано";
+    }
 }
 
 void LoginScreen::setupLayout() {
