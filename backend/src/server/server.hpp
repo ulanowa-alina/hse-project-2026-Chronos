@@ -1,7 +1,7 @@
 #ifndef SERVER_SERVER_HPP
 #define SERVER_SERVER_HPP
 
-#include "db/connection_pool.hpp"
+#include "../db/connection_pool.hpp"
 #include "session.hpp"
 
 #include <boost/asio.hpp>
