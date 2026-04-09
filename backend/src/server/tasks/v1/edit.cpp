@@ -92,8 +92,8 @@ json model_to_json(const Task& task, const std::string& status_name) {
 
 } // namespace
 
-auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool)
-    -> http::response<http::string_body> {
+auto handleEdit(const http::request<http::string_body>& req,
+                ConnectionPool& pool) -> http::response<http::string_body> {
     try {
         TaskRepository task_repository(pool);
         StatusRepository status_repository(pool);
