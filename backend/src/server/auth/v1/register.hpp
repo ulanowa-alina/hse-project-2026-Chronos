@@ -5,9 +5,9 @@
 
 namespace http = boost::beast::http;
 
-namespace users {
+namespace auth::v1 {
 
-auto handleCreate(const http::request<http::string_body>& req,
+auto handleRegister(const http::request<http::string_body>& req,
                   ConnectionPool& pool) -> http::response<http::string_body>;
 
-} // namespace users
+} // namespace auth::v1
