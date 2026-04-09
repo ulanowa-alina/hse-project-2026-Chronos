@@ -9,8 +9,8 @@ namespace http = boost::beast::http;
 
 namespace personal::v1 {
 
-auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool)
-    -> http::response<http::string_body> {
+auto handleEdit(const http::request<http::string_body>& req,
+                ConnectionPool& pool) -> http::response<http::string_body> {
     (void) pool;
 
     using nlohmann::json;
