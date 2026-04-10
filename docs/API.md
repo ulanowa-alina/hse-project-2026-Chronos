@@ -28,21 +28,21 @@
 ### Входные параметры
 ##### Endpoints
 
-| Метод  | Endpoint         | Описание                           | Request body                                                                                       | Response            |
-| ------ | ---------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
-| POST   | /auth/v1/login   | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                             | `data.token + user` |
-| POST   | /auth/v1/register| Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
-| PUT    | /personal/v1/edit| Обновление данных пользователя     | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
-| GET    | /personal/v1/info| Получить информацию о пользователе | —                                                                                                  | `data: User`        |
-| GET    | /board/v1/get-all| Получить список досок пользователя | —                                                                                                  | `data: Board[]`     |
-| POST   | /board/v1/create | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
-| PATCH  | /board/v1/edit   | Обновить доску                     | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"is_private": false}           | `data: Board`       |
-| GET    | /board/v1/get    | Получить доску по id               | {"board_id": "id"}                                                                                 | `data: Board`       |
-| DELETE | /board/v1/delete | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
-| GET    | /board/v1/tasks  | Получить задачи доски              | {"board_id": "id"}                                                                                 | `data: Task[]`      |
-| POST   | /task/v1/create  | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| PATCH  | /task/v1/edit    | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| DELETE | /task/v1/delete  | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
+| Метод  | Endpoint          | Описание                           | Request body                                                                                       | Response            |
+| ------ |-------------------| ---------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
+| POST   | /auth/v1/login    | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                             | `data.token + user` |
+| POST   | /auth/v1/register | Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| PUT    | /personal/v1/edit | Обновление данных пользователя     | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| GET    | /personal/v1/info | Получить информацию о пользователе | —                                                                                                  | `data: User`        |
+| GET    | /board/v1/get_all | Получить список досок пользователя | —                                                                                                  | `data: Board[]`     |
+| POST   | /board/v1/create  | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
+| PATCH  | /board/v1/edit    | Обновить доску                     | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"is_private": false}           | `data: Board`       |
+| GET    | /board/v1/get     | Получить доску по id               | {"board_id": "id"}                                                                                 | `data: Board`       |
+| DELETE | /board/v1/delete  | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
+| GET    | /board/v1/tasks   | Получить задачи доски              | {"board_id": "id"}                                                                                 | `data: Task[]`      |
+| POST   | /task/v1/create   | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
+| PATCH  | /task/v1/edit     | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
+| DELETE | /task/v1/delete   | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
 
 ##### Модели
 1. User (Пользователь)
@@ -198,19 +198,19 @@ HTTP 204 No Content
 
 Связь с входными параметрами:
 
-| Endpoint              | Тип успешного ответа     |
-| --------------------- | ------------------------ |
-| POST /auth/v1/login   | `data.token + data.user` |
-| POST /auth/v1/register| `data: User`             |
-| PUT /personal/v1/edit | `data: User`             |
-| GET /personal/v1/info | `data: User`             |
-| GET /board/v1/get-all | `data: Board[]`          |
-| POST /board/v1/create | `data: Board`            |
-| PATCH /board/v1/edit  | `data: Board`            |
-| GET /board/v1/get     | `data: Board`            |
-| GET /board/v1/tasks   | `data: Task[]`           |
-| POST /task/v1/create  | `data: Task`             |
-| PATCH /task/v1/edit   | `data: Task`             |
+| Endpoint               | Тип успешного ответа     |
+|------------------------| ------------------------ |
+| POST /auth/v1/login    | `data.token + data.user` |
+| POST /auth/v1/register | `data: User`             |
+| PUT /personal/v1/edit  | `data: User`             |
+| GET /personal/v1/info  | `data: User`             |
+| GET /board/v1/get_all  | `data: Board[]`          |
+| POST /board/v1/create  | `data: Board`            |
+| PATCH /board/v1/edit   | `data: Board`            |
+| GET /board/v1/get      | `data: Board`            |
+| GET /board/v1/tasks    | `data: Task[]`           |
+| POST /task/v1/create   | `data: Task`             |
+| PATCH /task/v1/edit    | `data: Task`             |
 
 ##### Ответ с ошибками
 
@@ -316,7 +316,7 @@ Content-Type: application/json
 2. Получение списка досок пользователя
    Запрос
 ```bash
-GET /api/board/v1/get-all
+GET /api/board/v1/get_all
 Authorization: Bearer <JWT>
 ```
 Ответ:
