@@ -1,8 +1,8 @@
 #include "server.hpp"
 
+#include "auth/v1/register.hpp"
 #include "auth/v1/update.hpp"
 #include "personal/v1/info.hpp"
-#include "auth/v1/register.hpp"
 
 #include <memory>
 

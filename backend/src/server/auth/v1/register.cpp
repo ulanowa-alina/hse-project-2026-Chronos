@@ -1,17 +1,13 @@
 #include "register.hpp"
 
-#include "repositories/user_repository.hpp"
-
 #include "models/user.hpp"
-
-#include <nlohmann/json.hpp>
-
-#include <pqxx/pqxx>
+#include "repositories/user_repository.hpp"
 
 #include <ctime>
 #include <iomanip>
+#include <nlohmann/json.hpp>
+#include <pqxx/pqxx>
 #include <sstream>
-
 
 namespace auth::v1 {
 
@@ -31,12 +27,9 @@ auto build_json_response(const http::request<http::string_body>& req, http::stat
 }
 
 auto build_api_error(const http::request<http::string_body>& req, http::status status,
-                         const std::string& code, const std::string& message,
-                         const json& details = nullptr) -> http::response<http::string_body> {
-    json error_obj{
-            {"code", code},
-            {"message", message}
-    };
+                     const std::string& code, const std::string& message,
+                     const json& details = nullptr) -> http::response<http::string_body> {
+    json error_obj{{"code", code}, {"message", message}};
 
     if (!details.is_null()) {
         error_obj["details"] = details;
@@ -44,8 +37,6 @@ auto build_api_error(const http::request<http::string_body>& req, http::status s
 
     return build_json_response(req, status, json{{"error", error_obj}});
 }
-
-
 
 auto to_iso8601(std::time_t t) -> std::string {
     std::ostringstream ss;
@@ -87,11 +78,9 @@ User parse_new_user(const json& body) {
         throw std::length_error("password_too_short");
     }
 
-
     const std::string password_hash = "hash:" + password; // временно, до реального хеша
     return User(0, email, name, status, password_hash, std::time(nullptr));
 }
-
 
 User createUser(ConnectionPool& pool, const User& user) {
     UserRepository repo(pool);
@@ -101,51 +90,50 @@ User createUser(ConnectionPool& pool, const User& user) {
 } // namespace
 
 auto handleRegister(const http::request<http::string_body>& req,
-                      ConnectionPool& pool) -> http::response<http::string_body> {
+                    ConnectionPool& pool) -> http::response<http::string_body> {
     try {
         const json body = parse_body(req);
         const User new_user = parse_new_user(body);
         const User created = createUser(pool, new_user);
         return build_create_response(req, created);
     } catch (const nlohmann::json::exception&) {
-        return build_api_error(req, http::status::bad_request,
-                               "INVALID_FORMAT", "Invalid JSON format");
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid JSON format");
     } catch (const std::invalid_argument& e) {
         const std::string reason = e.what();
 
         if (reason == "missing_fields") {
-            return build_api_error(req, http::status::bad_request,
-                                   "MISSING_FIELD", "Missing required fields",
-                                   json{{"missing_fields", {"email", "name", "status", "password"}}});
+            return build_api_error(
+                req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
+                json{{"missing_fields", {"email", "name", "status", "password"}}});
         }
 
         if (reason == "Invalid email format") {
-            return build_api_error(req, http::status::bad_request,
-                                   "INVALID_FORMAT", "Invalid email format",
-                                   json{{"email", "Invalid email format"}});
+            return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                   "Invalid email format", json{{"email", "Invalid email format"}});
         }
 
-        return build_api_error(req, http::status::bad_request,
-                               "VALIDATION_ERROR", "Validation failed",
-                               json{{"name_or_status", reason}});
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed", json{{"name_or_status", reason}});
 
     } catch (const std::length_error&) {
-        return build_api_error(req, http::status::bad_request,
-                               "VALIDATION_ERROR", "Validation failed",
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed",
                                json{{"password", "Minimum length is 8 symbols"}});
     } catch (const pqxx::sql_error& e) {
         const std::string msg = e.what();
-        if (msg.find("users_email_key") != std::string::npos || msg.find("duplicate key") != std::string::npos) {
-            return build_api_error(req, static_cast<http::status>(405),
-                       "EMAIL_ALREADY_EXISTS", "User with this email already exists",
-                       json{{"email", "already exists"}});
+        if (msg.find("users_email_key") != std::string::npos ||
+            msg.find("duplicate key") != std::string::npos) {
+            return build_api_error(req, static_cast<http::status>(405), "EMAIL_ALREADY_EXISTS",
+                                   "User with this email already exists",
+                                   json{{"email", "already exists"}});
         }
 
-        return build_api_error(req, http::status::internal_server_error,
-                               "DATABASE_ERROR", "Database error");
+        return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
+                               "Database error");
     } catch (const std::exception&) {
-        return build_api_error(req, http::status::internal_server_error,
-                               "DATABASE_ERROR", "Database error");
+        return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
+                               "Database error");
     }
 }
 
