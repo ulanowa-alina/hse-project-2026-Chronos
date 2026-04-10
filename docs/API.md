@@ -23,25 +23,27 @@
 | 1.1    | 15.02.2026 | Обновлены Endpoints(обновлены примеры запросов и ответов).                                                                                                                                                               |
 | 1.2    | 28.02.2026 | Добавлены ручки:<br>1. Регистрация пользователя <br>2. Получение информации о пользователе<br>3. Обновление информации о пользователе<br><br>Обновление информации о ручках (уточнение):<br>1. Авторизация пользователя |
 | 1.3    | 07.04.2026 | Документ приведён к единому стилю:<br>1. Названия полей переведены в `snake_case`<br>2. Форматы успешных ответов унифицированы через `data`<br>3. Примеры запросов и ответов синхронизированы с текущими endpoint'ами `.../v1/...`<br>4. Удалены упоминания `Tag/tags` |
-
+| 1.4 | 10.04.2026 | Обновлены endpoint’ы board/task и personal API: унифицированы пути для досок, добавлены /board/v1/edit и task endpoint’ы /task/v1/create, /task/v1/edit, /task/v1/delete; обновлены примеры запросов и таблица успешных ответов. |
 
 ### Входные параметры
 ##### Endpoints
 
-| Метод  | Endpoint          | Описание                           | Request body                                                                                       | Response            |
-| ------ |-------------------| ---------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
-| POST   | /auth/v1/login    | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                             | `data.token + user` |
-| GET    | /boards/v1/get    | Получить список досок пользователя | —                                                                                                  | `data: Board[]`     |
-| POST   | /boards/v1/create | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
-| GET    | /board/v1/get     | Получить доску по id               | —                                                                                                  | `data: Board`       |
-| DELETE | /board/v1/delete  | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
-| GET    | /board/v1/tasks   | Получить задачи доски              | —                                                                                                  | `data: Task[]`      |
-| POST   | /board/v1/tasks/create | Создать задачу                     | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| PATCH  | /tasks/v1/edit    | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| DELETE | /tasks/v1/delete  | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
-| GET    | /personal/v1/info | Получить информацию о пользователе | —                                                                                                  | `data: User`        |
-| POST   | /auth/v1/register | Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
-| PUT    | /auth/v1/update   | Обновление данных о пользователе   | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| Метод  | Endpoint         | Описание                           | Request body                                                                                       | Response            |
+| ------ | ---------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
+| POST   | /auth/v1/login   | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                             | `data.token + user` |
+| POST   | /auth/v1/register| Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| PUT    | /personal/v1/edit| Обновление данных пользователя     | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| GET    | /personal/v1/info| Получить информацию о пользователе | —                                                                                                  | `data: User`        |
+| GET    | /board/v1/get-all| Получить список досок пользователя | —                                                                                                  | `data: Board[]`     |
+| POST   | /board/v1/create | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
+| PATCH  | /board/v1/edit   | Обновить доску                     | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"is_private": false}           | `data: Board`       |
+| GET    | /board/v1/get    | Получить доску по id               | {"board_id": "id"}                                                                                 | `data: Board`       |
+| DELETE | /board/v1/delete | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
+| GET    | /board/v1/tasks  | Получить задачи доски              | {"board_id": "id"}                                                                                 | `data: Task[]`      |
+| POST   | /task/v1/create  | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
+| PATCH  | /task/v1/edit    | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
+| DELETE | /task/v1/delete  | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
+
 ##### Модели
 1. User (Пользователь)
    User object
@@ -72,13 +74,13 @@
    Task object
 
 | №   | Параметр      | Тип данных        | Обязательность | Описание                      | Пример               |
-| --- | ------------- | ----------------- | -------------- | ----------------------------- | -------------------- |
+| --- | ------------- | ----------------- | -------------- |-------------------------------| -------------------- |
 | 1   | id            | integer           | да             | Идентификатор карточки задачи | 101                  |
 | 2   | board_id       | integer           | да             | id доски                      | 10                   |
 | 3   | title         | string            | да             | Название карточки задачи      | Оформить README      |
-| 4   | description   | string            | нет            | Описание задчи                | Финальная версия     |
+| 4   | description   | string            | нет            | Описание задачи               | Финальная версия     |
 | 5   | status        | string            | да             | Статус задачи                 | In progress          |
-| 6   | priority_color | string            | да             | Цвет приорита                 | red                  |
+| 6   | priority_color | string            | да             | Цвет приоритета               | red                  |
 | 7   | created_at    | string (ISO 8601) | да             | Дата создания карточки        | 2026-01-10T12:00:00Z |
 | 8   | updated_at    | string (ISO 8601) | да             | Дата обновления карточки      | 2026-01-10T12:00:00Z |
 | 9   | deadline      | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
@@ -196,19 +198,23 @@ HTTP 204 No Content
 
 Связь с входными параметрами:
 
-| Endpoint                     | Тип успешного ответа     |
-| ---------------------------- | ------------------------ |
-| POST /auth/v1/login          | `data.token + data.user` |
-| GET /boards/v1/get           | `data: Board[]`          |
-| POST /boards/v1/create       | `data: Board`            |
-| GET /board/v1/get            | `data: Board`            |
-| GET /board/v1/tasks          | `data: Task[]`           |
-| POST /board/v1/tasks/create  | `data: Task`             |
-| PATCH /tasks/v1/update       | `data: Task`             |
+| Endpoint              | Тип успешного ответа     |
+| --------------------- | ------------------------ |
+| POST /auth/v1/login   | `data.token + data.user` |
+| POST /auth/v1/register| `data: User`             |
+| PUT /personal/v1/edit | `data: User`             |
+| GET /personal/v1/info | `data: User`             |
+| GET /board/v1/get-all | `data: Board[]`          |
+| POST /board/v1/create | `data: Board`            |
+| PATCH /board/v1/edit  | `data: Board`            |
+| GET /board/v1/get     | `data: Board`            |
+| GET /board/v1/tasks   | `data: Task[]`           |
+| POST /task/v1/create  | `data: Task`             |
+| PATCH /task/v1/edit   | `data: Task`             |
 
 ##### Ответ с ошибками
 
-Общий формат ответа с ответа с ошибкой:
+Общий формат ответа с ошибкой:
 ```json
 {
   "error": {
@@ -226,7 +232,7 @@ HTTP 204 No Content
 
 | Код | Описание                       | Виды                                                  |
 | --- | ------------------------------ | ----------------------------------------------------- |
-| 400 | Ошибки входных данных          | VALIDATION_ERROR<br> NVALID_FORMAT<br> MISSING_FIELD  |
+| 400 | Ошибки входных данных          | VALIDATION_ERROR<br> INVALID_FORMAT<br> MISSING_FIELD  |
 | 401 | Ошибки авторизации             | UNAUTHORIZED<br> INVALID_TOKEN                        |
 | 403 | Ошибки доступа                 | FORBIDDEN<br> RESOURCE_NOT_OWNED                      |
 | 404 | Запрашиваемый ресурс не найден | USER_NOT_FOUND<br> BOARD_NOT_FOUND<br> TASK_NOT_FOUND |
@@ -310,7 +316,7 @@ Content-Type: application/json
 2. Получение списка досок пользователя
    Запрос
 ```bash
-GET /api/boards/v1/get
+GET /api/board/v1/get-all
 Authorization: Bearer <JWT>
 ```
 Ответ:
@@ -333,7 +339,7 @@ Authorization: Bearer <JWT>
 3. Создание новой доски
    Запрос:
 ```bash
-POST /api/boards/v1/create
+POST /api/board/v1/create
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
@@ -361,7 +367,7 @@ Content-Type: application/json
 4. Создание задачи в доске
    Запрос:
 ```bash
-POST /api/board/v1/tasks/create
+POST /api/task/v1/create
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
@@ -391,7 +397,7 @@ Content-Type: application/json
 
 Запрос:
 ```bash
-POST /api/boards/v1/create
+POST /api/board/v1/create
 Authorization: Bearer <JWT>
 Content-Type: application/json
 
