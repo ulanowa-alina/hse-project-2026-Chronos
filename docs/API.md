@@ -28,20 +28,20 @@
 ### Входные параметры
 ##### Endpoints
 
-| Метод  | Endpoint               | Описание                           | Request body                                                                                       | Response            |
-| ------ | ---------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
-| POST   | /auth/v1/login         | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                             | `data.token + user` |
-| GET    | /boards/v1/get         | Получить список досок пользователя | —                                                                                                  | `data: Board[]`     |
-| POST   | /boards/v1/create      | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
-| GET    | /board/v1/get          | Получить доску по id               | —                                                                                                  | `data: Board`       |
-| DELETE | /board/v1/delete       | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
-| GET    | /board/v1/tasks        | Получить задачи доски              | —                                                                                                  | `data: Task[]`      |
+| Метод  | Endpoint          | Описание                           | Request body                                                                                       | Response            |
+| ------ |-------------------| ---------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------- |
+| POST   | /auth/v1/login    | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                             | `data.token + user` |
+| GET    | /boards/v1/get    | Получить список досок пользователя | —                                                                                                  | `data: Board[]`     |
+| POST   | /boards/v1/create | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
+| GET    | /board/v1/get     | Получить доску по id               | —                                                                                                  | `data: Board`       |
+| DELETE | /board/v1/delete  | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
+| GET    | /board/v1/tasks   | Получить задачи доски              | —                                                                                                  | `data: Task[]`      |
 | POST   | /board/v1/tasks/create | Создать задачу                     | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| PATCH  | /tasks/v1/update       | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| DELETE | /tasks/v1/delete       | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
-| GET    | /personal/v1/info      | Получить информацию о пользователе | —                                                                                                  | `data: User`        |
-| POST   | /auth/v1/register      | Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
-| PUT    | /auth/v1/update        | Обновление данных о пользователе   | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| PATCH  | /tasks/v1/edit    | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
+| DELETE | /tasks/v1/delete  | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
+| GET    | /personal/v1/info | Получить информацию о пользователе | —                                                                                                  | `data: User`        |
+| POST   | /auth/v1/register | Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
+| PUT    | /auth/v1/update   | Обновление данных о пользователе   | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                      | `data: User`        |
 ##### Модели
 1. User (Пользователь)
    User object
