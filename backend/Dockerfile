@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     pkg-config \
     libboost-dev \
+    libboost-json-dev \
     libpq-dev \
     libpqxx-dev \
     nlohmann-json3-dev \

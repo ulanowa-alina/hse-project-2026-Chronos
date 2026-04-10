@@ -1,5 +1,6 @@
 #include "server.hpp"
 
+#include "board/v1/tasks.hpp"
 #include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
 #include "users/create_user.hpp"
@@ -12,6 +13,19 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
     , pool_(pool) {
     router_["/personal/v1/info"] = [this](const http::request<http::string_body>& req) {
         return personal::v1::handleInfo(req, pool_);
+    };
+    router_["/board/v1/tasks"] = [this](const http::request<http::string_body>& req) {
+        if (req.method() == http::verb::get) {
+            return board::v1::handleTasks(req, pool_);
+        }
+
+        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+        res.set(http::field::content_type, "application/json");
+        res.set(http::field::access_control_allow_origin, "*");
+        res.keep_alive(req.keep_alive());
+        res.body() = R"({"error":"method_not_allowed"})";
+        res.prepare_payload();
+        return res;
     };
     router_["/personal/v1/edit"] = [this](const http::request<http::string_body>& req) {
         if (req.method() == http::verb::post || req.method() == http::verb::patch) {

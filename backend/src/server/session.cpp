@@ -29,7 +29,10 @@ void Session::doRead() {
 
 void Session::handleRequest() {
     const std::string target{req_.target()};
-    auto it = router_.find(target);
+    const std::size_t query_pos = target.find('?');
+    const std::string route = target.substr(0, query_pos);
+
+    auto it = router_.find(route);
     if (it != router_.end()) {
         sendResponse(it->second(req_));
     } else {
