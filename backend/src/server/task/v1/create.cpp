@@ -5,6 +5,7 @@
 #include "../../../../repositories/task_repository.hpp"
 
 #include <array>
+#include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <limits>
@@ -49,13 +50,12 @@ auto build_error_response(const http::request<http::string_body>& req, http::sta
 }
 
 std::time_t parse_iso8601_utc(const std::string& value) {
-    if (value.size() != 20 || value[4] != '-' || value[7] != '-' || value[10] != 'T' ||
-        value[13] != ':' || value[16] != ':' || value[19] != 'Z') {
+    if (value.empty() || value.back() != 'Z') {
         throw std::invalid_argument("value:deadline");
     }
 
     std::tm tm = {};
-    std::istringstream stream(value.substr(0, 19));
+    std::istringstream stream(value.substr(0, value.size() - 1));
     stream >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
     if (stream.fail() || !stream.eof()) {
         throw std::invalid_argument("value:deadline");
@@ -66,56 +66,61 @@ std::time_t parse_iso8601_utc(const std::string& value) {
         throw std::invalid_argument("value:deadline");
     }
 
-    return parsed;
+    const auto tp = std::chrono::system_clock::from_time_t(parsed);
+    return std::chrono::system_clock::to_time_t(tp);
 }
 
 int require_int_field(const json& body, const std::string& key) {
-    if (!body.contains(key)) {
+    try {
+        const int value = body.at(key).get<int>();
+        if (value <= 0) {
+            throw std::invalid_argument("value:" + key);
+        }
+
+        return value;
+    } catch (const json::out_of_range&) {
         throw std::invalid_argument("missing:" + key);
-    }
-    if (!body.at(key).is_number_integer()) {
+    } catch (const json::type_error&) {
         throw std::invalid_argument("type:" + key);
     }
-
-    const auto value = body.at(key).get<long long>();
-    if (value <= 0 || value > std::numeric_limits<int>::max()) {
-        throw std::invalid_argument("value:" + key);
-    }
-
-    return static_cast<int>(value);
 }
 
 std::string require_string_field(const json& body, const std::string& key) {
-    if (!body.contains(key)) {
+    try {
+        return body.at(key).get<std::string>();
+    } catch (const json::out_of_range&) {
         throw std::invalid_argument("missing:" + key);
-    }
-    if (!body.at(key).is_string()) {
+    } catch (const json::type_error&) {
         throw std::invalid_argument("type:" + key);
     }
-
-    return body.at(key).get<std::string>();
 }
 
 std::string optional_string_field(const json& body, const std::string& key) {
-    if (!body.contains(key) || body.at(key).is_null()) {
+    try {
+        if (body.at(key).is_null()) {
+            return "";
+        }
+
+        return body.at(key).get<std::string>();
+    } catch (const json::out_of_range&) {
         return "";
-    }
-    if (!body.at(key).is_string()) {
+    } catch (const json::type_error&) {
         throw std::invalid_argument("type:" + key);
     }
-
-    return body.at(key).get<std::string>();
 }
 
 std::optional<std::time_t> optional_deadline_field(const json& body) {
-    if (!body.contains("deadline") || body.at("deadline").is_null()) {
+    try {
+        if (body.at("deadline").is_null()) {
+            return std::nullopt;
+        }
+
+        return parse_iso8601_utc(body.at("deadline").get<std::string>());
+    } catch (const json::out_of_range&) {
         return std::nullopt;
-    }
-    if (!body.at("deadline").is_string()) {
+    } catch (const json::type_error&) {
         throw std::invalid_argument("type:deadline");
     }
-
-    return parse_iso8601_utc(body.at("deadline").get<std::string>());
 }
 
 json model_to_json(const Task& task) {
