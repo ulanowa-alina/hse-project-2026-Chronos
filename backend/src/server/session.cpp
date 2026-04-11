@@ -2,6 +2,7 @@
 
 #include "personal/v1/info.hpp"
 
+#include <boost/url.hpp>
 #include <iostream>
 
 Session::Session(tcp::socket socket, Router router)
@@ -28,8 +29,11 @@ void Session::doRead() {
 }
 
 void Session::handleRequest() {
-    const std::string target{req_.target()};
-    auto it = router_.find(target);
+    const auto url_view_result = boost::urls::parse_origin_form(req_.target());
+    const std::string route =
+        url_view_result ? std::string(url_view_result->encoded_path()) : std::string(req_.target());
+
+    auto it = router_.find(route);
     if (it != router_.end()) {
         sendResponse(it->second(req_));
     } else {
