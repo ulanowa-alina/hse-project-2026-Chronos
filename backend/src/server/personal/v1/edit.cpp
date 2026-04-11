@@ -1,23 +1,51 @@
-#include "update.hpp"
+#include "edit.hpp"
 
 #include "models/user.hpp"
 #include "repositories/user_repository.hpp"
+#include "server/auth/jwt.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <pqxx/pqxx>
 #include <sstream>
 #include <string>
 
 namespace http = boost::beast::http;
 
-namespace auth::v1 {
+namespace personal::v1 {
 
 namespace {
 
 using nlohmann::json;
+
+auto is_valid_email(const std::string& email) -> bool {
+    if (email.empty() || email.size() > 255) {
+        return false;
+    }
+
+    if (email.find(' ') != std::string::npos) {
+        return false;
+    }
+
+    const auto at_pos = email.find('@');
+    if (at_pos == std::string::npos || at_pos == 0 || at_pos + 1 >= email.size()) {
+        return false;
+    }
+
+    const auto dot_pos = email.find('.', at_pos + 1);
+    if (dot_pos == std::string::npos || dot_pos == at_pos + 1 || dot_pos + 1 >= email.size()) {
+        return false;
+    }
+
+    return true;
+}
+
+auto is_valid_name(const std::string& name) -> bool {
+    return !name.empty() && name.size() <= 50;
+}
 
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
                          const json& body) -> http::response<http::string_body> {
@@ -61,10 +89,8 @@ auto build_update_response(const http::request<http::string_body>& req,
 
 } // namespace
 
-auto handleUpdate(const http::request<http::string_body>& req,
-                  ConnectionPool& pool) -> http::response<http::string_body> {
-    (void) pool;
-
+auto handleEdit(const http::request<http::string_body>& req,
+                ConnectionPool& pool) -> http::response<http::string_body> {
     json body;
     try {
         body = json::parse(req.body());
@@ -73,21 +99,69 @@ auto handleUpdate(const http::request<http::string_body>& req,
                                "Invalid JSON format");
     }
 
-    const bool has_email = body.contains("email") && body["email"].is_string();
-    const bool has_name = body.contains("name") && body["name"].is_string();
-    const bool has_status = body.contains("status") && body["status"].is_string();
-    const bool has_password = body.contains("password") && body["password"].is_string();
+    const bool has_email = body.contains("email");
+    const bool has_name = body.contains("name");
+    const bool has_status = body.contains("status");
+    const bool has_password = body.contains("password");
 
-    if (!has_email && !has_name && !has_status && !has_password) {
+    if (has_email && !body["email"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid email format", json{{"email", "Invalid email format"}});
+    }
+    if (has_name && !body["name"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid name format", json{{"name", "Invalid name format"}});
+    }
+    if (has_status && !body["status"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid status format", json{{"status", "Invalid status format"}});
+    }
+    if (has_password && !body["password"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid password format",
+                               json{{"password", "Invalid password format"}});
+    }
+
+    json missing_fields = json::array();
+
+    if (!has_name) {
+        missing_fields.push_back("name");
+    }
+    if (!has_email) {
+        missing_fields.push_back("email");
+    }
+    if (!has_status) {
+        missing_fields.push_back("status");
+    }
+    if (!has_password) {
+        missing_fields.push_back("password");
+    }
+
+    if (!missing_fields.empty()) {
         return build_api_error(req, http::status::bad_request, "MISSING_FIELD",
-                               "Missing required fields",
-                               json{{"missing_fields", {"name", "email", "status", "password"}}});
+                               "Missing required fields", json{{"missing_fields", missing_fields}});
     }
 
     const std::string email = has_email ? body["email"].get<std::string>() : "";
     const std::string name = has_name ? body["name"].get<std::string>() : "";
     const std::string status = has_status ? body["status"].get<std::string>() : "";
     const std::string password = has_password ? body["password"].get<std::string>() : "";
+
+    if (has_email && !is_valid_email(email)) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid email format", json{{"email", "Invalid email format"}});
+    }
+
+    if (has_name && !is_valid_name(name)) {
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed",
+                               json{{"name", "Name length must be between 1 and 50 symbols"}});
+    }
+
+    if (status.empty()) {
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed", json{{"status", "Status cannot be empty"}});
+    }
 
     if (has_password && password.size() < 8) {
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
@@ -98,9 +172,34 @@ auto handleUpdate(const http::request<http::string_body>& req,
     const std::string password_hash = has_password ? ("hash:" + password) : "";
 
     try {
+        const auto auth_header = req[http::field::authorization];
+        if (auth_header.empty()) {
+            return build_api_error(req, http::status::unauthorized, "UNAUTHORIZED",
+                                   "User is not authorized");
+        }
+
+        const std::string auth_value = std::string(auth_header);
+        const std::string prefix = "Bearer ";
+        if (auth_value.rfind(prefix, 0) != 0) {
+            return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
+                                   "Invalid token");
+        }
+
+        auth::TokenPayload payload;
+        auth::TokenError token_error = auth::TokenError::InvalidToken;
+        if (!auth::parse_and_validate_token(auth_value.substr(prefix.size()), payload,
+                                            token_error)) {
+            if (token_error == auth::TokenError::ExpiredToken) {
+                return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
+                                       "Token is expired");
+            }
+            return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
+                                   "Invalid token");
+        }
+
         UserRepository repo(pool);
 
-        const auto existing = repo.find_by_id(1);
+        const auto existing = repo.find_by_id(payload.user_id);
         if (!existing.has_value()) {
             return build_api_error(req, static_cast<http::status>(404), "USER_NOT_FOUND",
                                    "User not found");
@@ -151,4 +250,4 @@ auto handleUpdate(const http::request<http::string_body>& req,
     }
 }
 
-} // namespace auth::v1
+} // namespace personal::v1

@@ -1,7 +1,7 @@
 #include "server.hpp"
 
 #include "auth/v1/register.hpp"
-#include "auth/v1/update.hpp"
+#include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
 
 #include <memory>
@@ -24,9 +24,9 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         return res;
     };
 
-    router_["/auth/v1/update"] = [this](const http::request<http::string_body>& req) {
+    router_["/personal/v1/edit"] = [this](const http::request<http::string_body>& req) {
         if (req.method() == http::verb::put) {
-            return auth::v1::handleUpdate(req, pool_);
+            return personal::v1::handleEdit(req, pool_);
         }
 
         http::response<http::string_body> res{http::status::method_not_allowed, req.version()};

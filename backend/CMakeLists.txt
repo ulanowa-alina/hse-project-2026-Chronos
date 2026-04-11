@@ -9,6 +9,7 @@ find_package(PostgreSQL REQUIRED)
 find_package(Boost 1.74 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
 
@@ -44,5 +45,6 @@ target_link_libraries(chronos_backend PRIVATE
         Threads::Threads
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
+        OpenSSL::Crypto
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})

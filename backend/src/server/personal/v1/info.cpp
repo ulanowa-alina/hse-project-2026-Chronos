@@ -1,6 +1,7 @@
 #include "info.hpp"
 
 #include "repositories/user_repository.hpp"
+#include "server/auth/jwt.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
@@ -60,14 +61,50 @@ auto build_not_found_response(const http::request<http::string_body>& req)
     return res;
 }
 
+auto build_error_code_response(const http::request<http::string_body>& req, http::status status,
+                               const std::string& code,
+                               const std::string& message) -> http::response<http::string_body> {
+    http::response<http::string_body> res{status, req.version()};
+    res.set(http::field::content_type, "application/json");
+    res.set(http::field::access_control_allow_origin, "*");
+    res.keep_alive(req.keep_alive());
+    res.body() = nlohmann::json{{"error", {{"code", code}, {"message", message}}}}.dump();
+    res.prepare_payload();
+    return res;
+}
+
 } // namespace
 
 auto handleInfo(const http::request<http::string_body>& req,
                 ConnectionPool& pool) -> http::response<http::string_body> {
     try {
-        UserRepository repo(pool);
+        const auto auth_header = req[http::field::authorization];
+        if (auth_header.empty()) {
+            return build_error_code_response(req, http::status::unauthorized, "UNAUTHORIZED",
+                                             "User is not authorized");
+        }
 
-        const auto user = repo.find_by_id(1);
+        const std::string auth_value = std::string(auth_header);
+        const std::string prefix = "Bearer ";
+        if (auth_value.rfind(prefix, 0) != 0) {
+            return build_error_code_response(req, http::status::unauthorized, "INVALID_TOKEN",
+                                             "Invalid token");
+        }
+
+        auth::TokenPayload payload;
+        auth::TokenError token_error = auth::TokenError::InvalidToken;
+        if (!auth::parse_and_validate_token(auth_value.substr(prefix.size()), payload,
+                                            token_error)) {
+            if (token_error == auth::TokenError::ExpiredToken) {
+                return build_error_code_response(req, http::status::unauthorized, "INVALID_TOKEN",
+                                                 "Token is expired");
+            }
+            return build_error_code_response(req, http::status::unauthorized, "INVALID_TOKEN",
+                                             "Invalid token");
+        }
+
+        UserRepository repo(pool);
+        const auto user = repo.find_by_id(payload.user_id);
 
         if (!user.has_value()) {
             return build_not_found_response(req);
