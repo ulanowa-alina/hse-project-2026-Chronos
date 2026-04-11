@@ -20,7 +20,7 @@ std::string time_to_string_iso8601(std::time_t t) {
     if (std::strftime(buffer.data(), buffer.size(), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&t))) {
         return {buffer.data()};
     }
-    return "";
+    throw std::runtime_error("Failed to format timestamp");
 }
 
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
@@ -47,34 +47,35 @@ auto build_error_response(const http::request<http::string_body>& req, http::sta
     return build_json_response(req, status, json{{"error", error}});
 }
 
-int parse_board_id(const http::request<http::string_body>& req) {
+int require_int_field(const http::request<http::string_body>& req, const std::string& key) {
     const auto url_view_result = boost::urls::parse_origin_form(req.target());
     if (!url_view_result) {
-        throw std::invalid_argument("request target is invalid");
+        throw std::invalid_argument("type:" + key);
     }
 
     const auto params = url_view_result->params();
-    const auto board_id_param = params.find("board_id");
-    if (board_id_param == params.end()) {
-        throw std::invalid_argument("board_id is required");
+    const auto param = params.find(key);
+    if (param == params.end()) {
+        throw std::invalid_argument("missing:" + key);
     }
 
-    int board_id = 0;
     try {
         std::size_t parsed_chars = 0;
-        const std::string board_id_value((*board_id_param).value);
-        board_id = std::stoi(board_id_value, &parsed_chars);
-        if (parsed_chars != board_id_value.size()) {
-            throw std::invalid_argument("board_id must be an integer");
+        const std::string value((*param).value);
+        const auto parsed = std::stoll(value, &parsed_chars);
+        if (parsed_chars != value.size()) {
+            throw std::invalid_argument("type:" + key);
         }
-    } catch (const std::exception&) {
-        throw std::invalid_argument("board_id must be an integer");
-    }
-    if (board_id <= 0) {
-        throw std::invalid_argument("board_id must be positive");
-    }
+        if (parsed <= 0 || parsed > std::numeric_limits<int>::max()) {
+            throw std::invalid_argument("value:" + key);
+        }
 
-    return board_id;
+        return static_cast<int>(parsed);
+    } catch (const std::invalid_argument&) {
+        throw;
+    } catch (const std::exception&) {
+        throw std::invalid_argument("type:" + key);
+    }
 }
 
 json model_to_json(const Task& task) {
@@ -108,7 +109,7 @@ auto handleTasks(const http::request<http::string_body>& req,
     }
 
     try {
-        const int board_id = parse_board_id(req);
+        const int board_id = require_int_field(req, "board_id");
 
         BoardRepository board_repository(pool);
         if (!board_repository.find_by_id(board_id)) {
@@ -127,14 +128,25 @@ auto handleTasks(const http::request<http::string_body>& req,
         return build_json_response(req, http::status::ok, json{{"data", data}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
-        std::string error_code = "INVALID_FORMAT";
-        if (message == "board_id is required") {
-            error_code = "MISSING_FIELD";
-        } else if (message == "board_id must be positive") {
-            error_code = "VALIDATION_ERROR";
+        if (message.rfind("missing:", 0) == 0) {
+            const std::string field = message.substr(8);
+            return build_error_response(req, http::status::bad_request, "MISSING_FIELD",
+                                        "Missing required field",
+                                        json{{field, "Field " + field + " is required"}});
         }
-        return build_error_response(req, http::status::bad_request, error_code, message,
-                                    json{{"board_id", message}});
+        if (message.rfind("type:", 0) == 0) {
+            const std::string field = message.substr(5);
+            return build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
+                                        "Invalid field format",
+                                        json{{field, "Field " + field + " has invalid type"}});
+        }
+        if (message.rfind("value:", 0) == 0) {
+            const std::string field = message.substr(6);
+            return build_error_response(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
+                json{{field, "Field " + field + " must be a positive integer"}});
+        }
+        return build_error_response(req, http::status::bad_request, "VALIDATION_ERROR", message);
     } catch (const std::runtime_error& e) {
         return build_error_response(req, http::status::internal_server_error, "DATABASE_ERROR",
                                     e.what());
