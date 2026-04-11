@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(PostgreSQL REQUIRED)
-find_package(Boost 1.74 REQUIRED)
+find_package(Boost 1.74 REQUIRED COMPONENTS json url)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
@@ -42,9 +42,10 @@ target_compile_definitions(chronos_backend PRIVATE
 
 target_link_libraries(chronos_backend PRIVATE
         Boost::boost
+        Boost::json
+        Boost::url
         Threads::Threads
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
-        boost_json
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})

@@ -4,11 +4,10 @@
 #include "../../../../repositories/task_repository.hpp"
 
 #include <array>
+#include <boost/url.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>
-#include <optional>
 #include <string>
-#include <string_view>
 
 using json = nlohmann::json;
 
@@ -48,45 +47,24 @@ auto build_error_response(const http::request<http::string_body>& req, http::sta
     return build_json_response(req, status, json{{"error", error}});
 }
 
-std::optional<std::string> get_query_param(std::string_view target, std::string_view key) {
-    const std::size_t query_pos = target.find('?');
-    if (query_pos == std::string_view::npos) {
-        return std::nullopt;
-    }
-
-    std::string_view query = target.substr(query_pos + 1);
-    std::size_t start = 0;
-    while (start < query.size()) {
-        const std::size_t end = query.find('&', start);
-        const std::string_view part =
-            query.substr(start, end == std::string_view::npos ? query.size() - start : end - start);
-        const std::size_t equals = part.find('=');
-
-        if (equals != std::string_view::npos && part.substr(0, equals) == key) {
-            return std::string(part.substr(equals + 1));
-        }
-
-        if (end == std::string_view::npos) {
-            break;
-        }
-        start = end + 1;
-    }
-
-    return std::nullopt;
-}
-
 int parse_board_id(const http::request<http::string_body>& req) {
-    const std::string target(req.target());
-    const auto board_id_param = get_query_param(target, "board_id");
-    if (!board_id_param) {
+    const auto url_view_result = boost::urls::parse_origin_form(req.target());
+    if (!url_view_result) {
+        throw std::invalid_argument("request target is invalid");
+    }
+
+    const auto params = url_view_result->params();
+    const auto board_id_param = params.find("board_id");
+    if (board_id_param == params.end()) {
         throw std::invalid_argument("board_id is required");
     }
 
     int board_id = 0;
     try {
         std::size_t parsed_chars = 0;
-        board_id = std::stoi(*board_id_param, &parsed_chars);
-        if (parsed_chars != board_id_param->size()) {
+        const std::string board_id_value((*board_id_param).value);
+        board_id = std::stoi(board_id_value, &parsed_chars);
+        if (parsed_chars != board_id_value.size()) {
             throw std::invalid_argument("board_id must be an integer");
         }
     } catch (const std::exception&) {
