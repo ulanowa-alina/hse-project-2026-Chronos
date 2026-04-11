@@ -143,9 +143,9 @@ auto handleDelete(const http::request<http::string_body>& req,
         }
         if (message.rfind("value:", 0) == 0) {
             const std::string field = message.substr(6);
-            return build_error_response(req, http::status::bad_request, "VALIDATION_ERROR",
-                                        "Invalid field value",
-                                        json{{field, "Field " + field + " must be a positive integer"}});
+            return build_error_response(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
+                json{{field, "Field " + field + " must be a positive integer"}});
         }
         return build_error_response(req, http::status::bad_request, "VALIDATION_ERROR", e.what());
     } catch (const std::runtime_error& e) {
