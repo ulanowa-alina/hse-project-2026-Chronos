@@ -25,6 +25,7 @@ class LoginScreen : public QWidget {
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onLoginRequest();
 
   private:
     NetworkManager* network_manager_{nullptr};

@@ -19,9 +19,46 @@ void LoginScreen::setNetworkManager(NetworkManager* manager) {
 }
 
 void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->info_url_ && endpoint != network_manager_->register_url_) {
-        qDebug() << "Пока не реализовано";
+    if (endpoint != network_manager_->login_url_)
+        return;
+
+    if (code == 200) {
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject data_obj = doc.object()["data"].toObject();
+
+        QString token = data_obj["token"].toString();
+        network_manager_->setToken(token);
+
+        qDebug() << "LoginScreen: успешный вход";
+        emit loginRequested();
+    } else {
+        qDebug() << "LoginScreen: Ошибка входа:" << code;
     }
+}
+/*
+void LoginScreen::onLoginRequest() {
+    qDebug() << "DEBUG MODE: Пропускаю авторизацию...";
+    emit loginRequested();
+}
+*/
+
+void LoginScreen::onLoginRequest() {
+    if (!network_manager_)
+        return;
+
+    QString email = email_input_->text().trimmed();
+    QString password = password_input_->text();
+
+    if (email.isEmpty() || password.isEmpty()) {
+        qDebug() << "LoginScreen: Email и пароль не могут быть пустыми";
+        return;
+    }
+
+    QJsonObject json;
+    json["email"] = email;
+    json["password"] = password;
+
+    network_manager_->POST(network_manager_->login_url_, json);
 }
 
 void LoginScreen::setupLayout() {
@@ -127,7 +164,7 @@ void LoginScreen::setupLayout() {
                                  "}");
     main_layout->addWidget(login_button_);
 
-    connect(login_button_, &QPushButton::clicked, this, &LoginScreen::loginRequested);
+    connect(login_button_, &QPushButton::clicked, this, &LoginScreen::onLoginRequest);
     connect(reg_btn, &QPushButton::clicked, this, &LoginScreen::registrationRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

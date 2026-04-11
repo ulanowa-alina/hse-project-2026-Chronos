@@ -20,14 +20,30 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
 
 void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
                                            int code) {
-    if (endpoint != network_manager_->register_url_)
+    if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_)
         return;
-    if (code == 200) {
-        qDebug() << "RegistrationScreen: Успешная регистрация";
-        emit registrationRequested();
-    } else {
-        // TODO: прописать вывод для других ошибок
-        qDebug() << "RegistrationScreen: Ошибка регистрации. Ответ сервера: " << code;
+    if (endpoint == network_manager_->register_url_) {
+        if (code == 200) {
+            qDebug() << "RegistrationScreen: Успешная регистрация. Входим в аккаунт...";
+            QJsonObject login_json;
+            login_json["email"] = email_input_->text();
+            login_json["password"] = password_input_->text();
+
+            network_manager_->POST(network_manager_->login_url_, login_json);
+        } else {
+            qDebug() << "RegistrationScreen: Ошибка регистрации. Ответ сервера: " << code;
+        }
+    } else if (endpoint == network_manager_->login_url_) {
+        if (code == 200) {
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject data_obj = doc.object()["data"].toObject();
+
+            QString token = data_obj["token"].toString();
+            network_manager_->setToken(token);
+
+            qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен, перехожу на доску";
+            emit registrationRequested();
+        }
     }
 }
 

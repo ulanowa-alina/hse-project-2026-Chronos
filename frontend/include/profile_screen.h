@@ -20,6 +20,7 @@ class ProfileScreen : public QWidget {
 
   signals:
     void logoutRequested();
+    void boardRequested();
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
@@ -29,12 +30,12 @@ class ProfileScreen : public QWidget {
 
     QPushButton* edit_button_{nullptr};
     QPushButton* logout_button_{nullptr};
+    QPushButton* logo_button_{nullptr};
 
     QLabel* avatar_label_{nullptr};
     QLabel* name_label_{nullptr};
     QLabel* status_label_{nullptr};
     QLabel* email_label_{nullptr};
-    QLabel* logo_label_{nullptr};
 
     void setupLayout();
     void showEvent(QShowEvent* event) override;

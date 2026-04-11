@@ -27,9 +27,17 @@ void NetworkManager::POST(const QString& endpoint, const QJsonObject& data) {
     sendRequest({endpoint, "POST", data, 0});
 }
 
+void NetworkManager::PATCH(const QString& endpoint, const QJsonObject& data) {
+    sendRequest({endpoint, "PATCH", data, 0});
+}
+
 void NetworkManager::sendRequest(const RequestData& req_data) {
     QUrl url(base_url_ + req_data.endpoint_);
     QNetworkRequest request(url);
+
+    if (!JWT_token_.isEmpty()) {
+        request.setRawHeader("Authorization", ("Bearer " + JWT_token_).toUtf8());
+    }
     QNetworkReply* reply = nullptr;
 
     if (req_data.method_ == "POST") {
@@ -37,7 +45,11 @@ void NetworkManager::sendRequest(const RequestData& req_data) {
         reply = manager_->post(request, QJsonDocument(req_data.body_).toJson());
     } else if (req_data.method_ == "GET") {
         reply = manager_->get(request);
-    } // потом даполнится
+    } else if (req_data.method_ == "PATCH") {
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        QByteArray body_data = QJsonDocument(req_data.body_).toJson();
+        reply = manager_->sendCustomRequest(request, "PATCH", body_data);
+    } // потом дополнится
 
     if (reply) {
         request_storage_.insert(reply, req_data);
@@ -53,7 +65,8 @@ void NetworkManager::onResult(QNetworkReply* reply) {
 
     RequestData req = request_storage_.take(reply);
 
-    QString endpoint = reply->url().path();
+    QString endpoint = req.endpoint_;
+
     int status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     bool is_retryable =
         retryable_codes_.contains(status_code) || (reply->error() == QNetworkReply::TimeoutError);
@@ -68,11 +81,12 @@ void NetworkManager::onResult(QNetworkReply* reply) {
         return;
     }
 
+    QByteArray data = reply->readAll();
+
     if (reply->error() != QNetworkReply::NoError) {
         qDebug() << "Ошибка сервера на " << endpoint << ":" << reply->errorString();
     }
 
-    QByteArray data = reply->readAll();
     qDebug() << "--- Получен ответ ---";
     qDebug() << "Endpoint:" << endpoint;
     qDebug() << "Status:" << status_code;

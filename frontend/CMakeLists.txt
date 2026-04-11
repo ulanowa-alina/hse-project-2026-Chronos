@@ -23,6 +23,12 @@ add_executable(ChronosClient
         include/registration_screen.h
         include/main_window.h
         include/network_manager.h
+        include/board_screen.h
+        src/board_screen.cpp
+        include/status_window.h
+        src/status_window.cpp
+        include/task_card.h
+        src/task_card.cpp
 )
 
 

@@ -27,10 +27,23 @@ class NetworkManager : public QObject {
     ~NetworkManager();
 
     const QString register_url_ = "/auth/v1/register";
-    const QString info_url_ = "/personal/v1/info";
+    const QString user_info_url_ = "/personal/v1/info";
+    const QString tasks_edit_url_ = "/task/v1/edit";
+    const QString tasks_create_url_ = "/board/v1/tasks/create";
+    const QString statuses_edit_url_ = "/status/v1/edit";
+    const QString statuses_create_url_ = "/status/v1/create";
+    const QString login_url_ = "/auth/v1/login";
 
     void GET(const QString& endpoint);
     void POST(const QString& endpoint, const QJsonObject& data);
+    void PATCH(const QString& endpoint, const QJsonObject& data);
+
+    void setToken(const QString& new_token) {
+        JWT_token_ = new_token;
+    }
+    void clearToken() {
+        JWT_token_.clear();
+    }
 
   signals:
     void responseReceived(const QString& endpoint, const QByteArray& data, int statusCode);
@@ -41,6 +54,7 @@ class NetworkManager : public QObject {
   private:
     QNetworkAccessManager* manager_;
     QMap<QNetworkReply*, RequestData> request_storage_;
+    QString JWT_token_;
 
     const QSet<int> retryable_codes_ = {500};
 
