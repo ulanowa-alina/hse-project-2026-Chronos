@@ -17,14 +17,16 @@ Task TaskRepository::insert(const Task& task) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
+    const std::optional<std::string> deadline =
+        task.deadline_ ? std::optional<std::string>{time_to_string(*task.deadline_)} : std::nullopt;
+
     pqxx::result r = txn.exec_params("INSERT INTO tasks (board_id, title, description, deadline, "
                                      "status_id, priority_color, created_at, updated_at) "
                                      "VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) "
                                      "RETURNING id, "
                                      "EXTRACT(EPOCH FROM created_at)::bigint, "
                                      "EXTRACT(EPOCH FROM updated_at)::bigint",
-                                     task.board_id_, task.title_, task.description_,
-                                     task.deadline_ ? time_to_string(*task.deadline_) : nullptr,
+                                     task.board_id_, task.title_, task.description_, deadline,
                                      task.status_id_, task.priority_color_);
 
     txn.commit();
@@ -38,12 +40,14 @@ Task TaskRepository::update(const Task& task) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
+    const std::optional<std::string> deadline =
+        task.deadline_ ? std::optional<std::string>{time_to_string(*task.deadline_)} : std::nullopt;
+
     pqxx::result r = txn.exec_params(
         "UPDATE tasks SET board_id = $1, title = $2, description = $3, deadline = $4, "
         "status_id = $5, priority_color = $6, updated_at = NOW() WHERE id = $7 "
         "RETURNING EXTRACT(EPOCH FROM updated_at)::bigint",
-        task.board_id_, task.title_, task.description_,
-        task.deadline_ ? time_to_string(*task.deadline_) : nullptr, task.status_id_,
+        task.board_id_, task.title_, task.description_, deadline, task.status_id_,
         task.priority_color_, task.id_);
 
     txn.commit();
