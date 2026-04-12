@@ -11,4 +11,4 @@ namespace personal::v1 {
 auto handleEdit(const http::request<http::string_body>& req,
                 ConnectionPool& pool) -> http::response<http::string_body>;
 
-}
+} // namespace personal::v1

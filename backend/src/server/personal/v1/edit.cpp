@@ -1,144 +1,252 @@
 #include "edit.hpp"
 
+#include "models/user.hpp"
+#include "repositories/user_repository.hpp"
+#include "server/auth/jwt.hpp"
+
 #include <boost/beast/http.hpp>
+#include <ctime>
+#include <iomanip>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <pqxx/pqxx>
+#include <sstream>
 #include <string>
 
 namespace http = boost::beast::http;
 
 namespace personal::v1 {
 
+namespace {
+
+using nlohmann::json;
+
+auto is_valid_email(const std::string& email) -> bool {
+    if (email.empty() || email.size() > 255) {
+        return false;
+    }
+
+    if (email.find(' ') != std::string::npos) {
+        return false;
+    }
+
+    const auto at_pos = email.find('@');
+    if (at_pos == std::string::npos || at_pos == 0 || at_pos + 1 >= email.size()) {
+        return false;
+    }
+
+    const auto dot_pos = email.find('.', at_pos + 1);
+    if (dot_pos == std::string::npos || dot_pos == at_pos + 1 || dot_pos + 1 >= email.size()) {
+        return false;
+    }
+
+    return true;
+}
+
+auto is_valid_name(const std::string& name) -> bool {
+    return !name.empty() && name.size() <= 50;
+}
+
+auto build_json_response(const http::request<http::string_body>& req, http::status status,
+                         const json& body) -> http::response<http::string_body> {
+    http::response<http::string_body> res{status, req.version()};
+    res.set(http::field::content_type, "application/json");
+    res.set(http::field::access_control_allow_origin, "*");
+    res.keep_alive(req.keep_alive());
+    res.body() = body.dump();
+    res.prepare_payload();
+    return res;
+}
+
+auto build_api_error(const http::request<http::string_body>& req, http::status status,
+                     const std::string& code, const std::string& message,
+                     const json& details = nullptr) -> http::response<http::string_body> {
+    json error_obj{{"code", code}, {"message", message}};
+
+    if (!details.is_null()) {
+        error_obj["details"] = details;
+    }
+
+    return build_json_response(req, status, json{{"error", error_obj}});
+}
+
+auto to_iso8601(std::time_t t) -> std::string {
+    std::ostringstream ss;
+    ss << std::put_time(std::gmtime(&t), "%Y-%m-%dT%H:%M:%SZ");
+    return ss.str();
+}
+
+auto build_update_response(const http::request<http::string_body>& req,
+                           const User& user) -> http::response<http::string_body> {
+    json out{{"id", user.id_},
+             {"email", user.email_},
+             {"name", user.name_},
+             {"status", user.status_},
+             {"created_at", to_iso8601(user.created_at_)}};
+
+    return build_json_response(req, http::status::ok, json{{"data", out}});
+}
+
+} // namespace
+
 auto handleEdit(const http::request<http::string_body>& req,
                 ConnectionPool& pool) -> http::response<http::string_body> {
-    (void) pool;
-
-    using nlohmann::json;
-
     json body;
     try {
         body = json::parse(req.body());
     } catch (...) {
-        http::response<http::string_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"bad_json"})";
-        res.prepare_payload();
-        return res;
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid JSON format");
     }
 
-    if (!body.contains("id") || !body["id"].is_number_integer()) {
-        http::response<http::string_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"missing_or_bad_id"})";
-        res.prepare_payload();
-        return res;
+    const bool has_email = body.contains("email");
+    const bool has_name = body.contains("name");
+    const bool has_status = body.contains("status");
+    const bool has_password = body.contains("password");
+
+    if (has_email && !body["email"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid email format", json{{"email", "Invalid email format"}});
+    }
+    if (has_name && !body["name"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid name format", json{{"name", "Invalid name format"}});
+    }
+    if (has_status && !body["status"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid status format", json{{"status", "Invalid status format"}});
+    }
+    if (has_password && !body["password"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid password format",
+                               json{{"password", "Invalid password format"}});
     }
 
-    const bool has_email = body.contains("email") && body["email"].is_string();
-    const bool has_name = body.contains("name") && body["name"].is_string();
-    const bool has_password = body.contains("password") && body["password"].is_string();
+    json missing_fields = json::array();
 
-    if (!has_email && !has_name && !has_password) {
-        http::response<http::string_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"no_fields_to_update"})";
-        res.prepare_payload();
-        return res;
+    if (!has_name) {
+        missing_fields.push_back("name");
+    }
+    if (!has_email) {
+        missing_fields.push_back("email");
+    }
+    if (!has_status) {
+        missing_fields.push_back("status");
+    }
+    if (!has_password) {
+        missing_fields.push_back("password");
     }
 
-    const int id = body["id"].get<int>();
+    if (!missing_fields.empty()) {
+        return build_api_error(req, http::status::bad_request, "MISSING_FIELD",
+                               "Missing required fields", json{{"missing_fields", missing_fields}});
+    }
 
     const std::string email = has_email ? body["email"].get<std::string>() : "";
     const std::string name = has_name ? body["name"].get<std::string>() : "";
+    const std::string status = has_status ? body["status"].get<std::string>() : "";
     const std::string password = has_password ? body["password"].get<std::string>() : "";
+
+    if (has_email && !is_valid_email(email)) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid email format", json{{"email", "Invalid email format"}});
+    }
+
+    if (has_name && !is_valid_name(name)) {
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed",
+                               json{{"name", "Name length must be between 1 and 50 symbols"}});
+    }
+
+    if (status.empty()) {
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed", json{{"status", "Status cannot be empty"}});
+    }
+
+    if (has_password && password.size() < 8) {
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed",
+                               json{{"password", "Minimum length is 8 symbols"}});
+    }
 
     const std::string password_hash = has_password ? ("hash:" + password) : "";
 
     try {
-        auto h = pool.acquire();
-        pqxx::work tx(h.conn());
+        const auto auth_header = req[http::field::authorization];
+        if (auth_header.empty()) {
+            return build_api_error(req, http::status::unauthorized, "UNAUTHORIZED",
+                                   "User is not authorized");
+        }
 
-        std::string sql = "UPDATE users SET ";
-        std::vector<std::string> sets;
-        std::vector<std::string> params;
+        const std::string auth_value = std::string(auth_header);
+        const std::string prefix = "Bearer ";
+        if (auth_value.rfind(prefix, 0) != 0) {
+            return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
+                                   "Invalid token");
+        }
+
+        auth::TokenPayload payload;
+        auth::TokenError token_error = auth::TokenError::InvalidToken;
+        if (!auth::parse_and_validate_token(auth_value.substr(prefix.size()), payload,
+                                            token_error)) {
+            if (token_error == auth::TokenError::ExpiredToken) {
+                return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
+                                       "Token is expired");
+            }
+            return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
+                                   "Invalid token");
+        }
+
+        UserRepository repo(pool);
+
+        const auto existing = repo.find_by_id(payload.user_id);
+        if (!existing.has_value()) {
+            return build_api_error(req, static_cast<http::status>(404), "USER_NOT_FOUND",
+                                   "User not found");
+        }
+
+        User updated = *existing;
 
         if (has_email) {
-            sets.push_back("email = $" + std::to_string(params.size() + 1));
-            params.push_back(email);
+            updated.email_ = email;
         }
         if (has_name) {
-            sets.push_back("name = $" + std::to_string(params.size() + 1));
-            params.push_back(name);
+            updated.name_ = name;
+        }
+        if (has_status) {
+            updated.status_ = status;
         }
         if (has_password) {
-            sets.push_back("password_hash = $" + std::to_string(params.size() + 1));
-            params.push_back(password_hash);
+            updated.password_hash_ = password_hash;
         }
 
-        for (std::size_t i = 0; i < sets.size(); ++i) {
-            if (i)
-                sql += ", ";
-            sql += sets[i];
+        const User saved = repo.save(updated);
+        return build_update_response(req, saved);
+
+    } catch (const std::invalid_argument& e) {
+        const std::string reason = e.what();
+
+        if (reason == "Invalid email format") {
+            return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                   "Invalid email format", json{{"email", "Invalid email format"}});
         }
 
-        sql += " WHERE id = $" + std::to_string(params.size() + 1);
-        params.push_back(std::to_string(id));
-
-        sql += " RETURNING id, email, name, created_at";
-
-        pqxx::params p;
-        for (const auto& s : params)
-            p.append(s);
-
-        pqxx::result r = tx.exec_params(sql, p);
-        tx.commit();
-
-        if (r.empty()) {
-            http::response<http::string_body> res{http::status::not_found, req.version()};
-            res.set(http::field::content_type, "application/json");
-            res.set(http::field::access_control_allow_origin, "*");
-            res.keep_alive(req.keep_alive());
-            res.body() = R"({"error":"user_not_found"})";
-            res.prepare_payload();
-            return res;
-        }
-
-        nlohmann::json out;
-        out["id"] = r[0][0].as<int>();
-        out["email"] = r[0][1].as<std::string>();
-        out["name"] = r[0][2].as<std::string>();
-        out["created_at"] = std::string(r[0][3].c_str());
-
-        http::response<http::string_body> res{http::status::ok, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = out.dump();
-        res.prepare_payload();
-        return res;
-
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed", json{{"validation", reason}});
     } catch (const pqxx::sql_error& e) {
-        http::response<http::string_body> res{http::status::conflict, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = std::string(R"({"error":"conflict","details":")") + e.what() + R"("})";
-        res.prepare_payload();
-        return res;
-    } catch (const std::exception& e) {
-        http::response<http::string_body> res{http::status::internal_server_error, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = std::string(R"({"error":"db_error","details":")") + e.what() + R"("})";
-        res.prepare_payload();
-        return res;
+        const std::string msg = e.what();
+        if (msg.find("users_email_key") != std::string::npos ||
+            msg.find("duplicate key") != std::string::npos) {
+            return build_api_error(req, static_cast<http::status>(405), "EMAIL_ALREADY_EXISTS",
+                                   "User with this email already exists",
+                                   json{{"email", "already exists"}});
+        }
+
+        return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
+                               "Database error");
+    } catch (const std::exception&) {
+        return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
+                               "Database error");
     }
 }
 

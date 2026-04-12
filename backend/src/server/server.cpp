@@ -1,10 +1,10 @@
 #include "server.hpp"
 
+#include "auth/v1/register.hpp"
 #include "board/v1/tasks.hpp"
 #include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
 #include "task/v1/create.hpp"
-#include "users/create_user.hpp"
 
 #include <memory>
 
@@ -13,7 +13,17 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
     : acceptor_(ioc, {asio::ip::make_address(host), port})
     , pool_(pool) {
     router_["/personal/v1/info"] = [this](const http::request<http::string_body>& req) {
-        return personal::v1::handleInfo(req, pool_);
+        if (req.method() == http::verb::get) {
+            return personal::v1::handleInfo(req, pool_);
+        }
+
+        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+        res.set(http::field::content_type, "application/json");
+        res.set(http::field::access_control_allow_origin, "*");
+        res.keep_alive(req.keep_alive());
+        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+        res.prepare_payload();
+        return res;
     };
     router_["/board/v1/tasks"] = [this](const http::request<http::string_body>& req) {
         if (req.method() == http::verb::get) {
@@ -42,7 +52,7 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         return res;
     };
     router_["/personal/v1/edit"] = [this](const http::request<http::string_body>& req) {
-        if (req.method() == http::verb::post || req.method() == http::verb::patch) {
+        if (req.method() == http::verb::put) {
             return personal::v1::handleEdit(req, pool_);
         }
 
@@ -50,19 +60,20 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         res.set(http::field::content_type, "application/json");
         res.set(http::field::access_control_allow_origin, "*");
         res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"method_not_allowed"})";
+        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
         res.prepare_payload();
         return res;
     };
-    router_["/users"] = [this](const http::request<http::string_body>& req) {
+
+    router_["/auth/v1/register"] = [this](const http::request<http::string_body>& req) {
         if (req.method() == http::verb::post) {
-            return users::handleCreate(req, pool_);
+            return auth::v1::handleRegister(req, pool_);
         }
         http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
         res.set(http::field::content_type, "application/json");
         res.set(http::field::access_control_allow_origin, "*");
         res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"method_not_allowed"})";
+        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
         res.prepare_payload();
         return res;
     };

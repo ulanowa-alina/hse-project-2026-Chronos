@@ -40,7 +40,7 @@ void Session::handleRequest() {
         http::response<http::string_body> res{http::status::not_found, req_.version()};
         res.set(http::field::content_type, "application/json");
         res.keep_alive(req_.keep_alive());
-        res.body() = R"({"error":"not found"})";
+        res.body() = R"({"error":{"code":"BOARD_NOT_FOUND","message":"Resource not found"}})";
         res.prepare_payload();
         sendResponse(std::move(res));
     }
