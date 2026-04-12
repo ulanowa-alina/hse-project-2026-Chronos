@@ -3,6 +3,7 @@
 #include "../../../../repositories/board_repository.hpp"
 #include "../../../../repositories/status_repository.hpp"
 #include "../../../../repositories/task_repository.hpp"
+#include "../../utils/response_utils.hpp"
 
 #include <array>
 #include <chrono>
@@ -26,27 +27,6 @@ std::string time_to_string_iso8601(std::time_t t) {
         return {buffer.data()};
     }
     throw std::runtime_error("Failed to format timestamp");
-}
-
-auto build_json_response(const http::request<http::string_body>& req, http::status status,
-                         const json& body) -> http::response<http::string_body> {
-    http::response<http::string_body> res{status, req.version()};
-    res.set(http::field::content_type, "application/json");
-    res.set(http::field::access_control_allow_origin, "*");
-    res.keep_alive(req.keep_alive());
-    res.body() = body.dump();
-    res.prepare_payload();
-    return res;
-}
-
-auto build_error_response(const http::request<http::string_body>& req, http::status status,
-                          const std::string& code, const std::string& message,
-                          const json& details = json()) -> http::response<http::string_body> {
-    json error = {{"code", code}, {"message", message}};
-    if (!details.is_null() && !details.empty()) {
-        error["details"] = details;
-    }
-    return build_json_response(req, status, json{{"error", error}});
 }
 
 std::time_t parse_iso8601_utc(const std::string& value) {
@@ -149,21 +129,22 @@ json model_to_json(const Task& task) {
 auto handleCreate(const http::request<http::string_body>& req,
                   ConnectionPool& pool) -> http::response<http::string_body> {
     if (req.method() != http::verb::post) {
-        return build_error_response(req, http::status::method_not_allowed, "METHOD_NOT_ALLOWED",
-                                    "Only POST is supported for this endpoint");
+        return server::utils::build_error_response(req, http::status::method_not_allowed,
+                                                   "METHOD_NOT_ALLOWED",
+                                                   "Only POST is supported for this endpoint");
     }
 
     json body;
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
-        return build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
-                                    "Request body contains invalid JSON");
+        return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
+                                                   "Request body contains invalid JSON");
     }
 
     if (!body.is_object()) {
-        return build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
-                                    "Request body must be a JSON object");
+        return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
+                                                   "Request body must be a JSON object");
     }
 
     try {
@@ -175,31 +156,31 @@ auto handleCreate(const http::request<http::string_body>& req,
         const std::optional<std::time_t> deadline = optional_deadline_field(body);
 
         if (title.empty() || title.size() > 100) {
-            return build_error_response(
+            return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"title", "Title must be between 1 and 100 characters"}});
         }
         if (description.size() > 1000) {
-            return build_error_response(
+            return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"description", "Description cannot exceed 1000 characters"}});
         }
         if (priority_color.empty() || priority_color.size() > 50) {
-            return build_error_response(
+            return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"priority_color", "Priority color must be between 1 and 50 characters"}});
         }
 
         BoardRepository board_repository(pool);
         if (!board_repository.find_by_id(board_id).has_value()) {
-            return build_error_response(req, http::status::not_found, "BOARD_NOT_FOUND",
-                                        "Board not found");
+            return server::utils::build_error_response(req, http::status::not_found,
+                                                       "BOARD_NOT_FOUND", "Board not found");
         }
 
         StatusRepository status_repository(pool);
         const auto status = status_repository.find_by_id(status_id);
         if (!status.has_value() || status->board_id_ != board_id) {
-            return build_error_response(
+            return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"status_id", "status_id must reference a status from this board"}});
         }
@@ -209,37 +190,40 @@ auto handleCreate(const http::request<http::string_body>& req,
                             0);
         const Task created = task_repository.save(new_task);
 
-        return build_json_response(req, http::status::ok, json{{"data", model_to_json(created)}});
+        return server::utils::build_json_response(req, http::status::ok,
+                                                  json{{"data", model_to_json(created)}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
             const std::string field = message.substr(8);
-            return build_error_response(req, http::status::bad_request, "MISSING_FIELD",
-                                        "Missing required field",
-                                        json{{field, "Field " + field + " is required"}});
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
+                json{{field, "Field " + field + " is required"}});
         }
         if (message.rfind("type:", 0) == 0) {
             const std::string field = message.substr(5);
-            return build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
-                                        "Invalid field format",
-                                        json{{field, "Field " + field + " has invalid type"}});
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
+                json{{field, "Field " + field + " has invalid type"}});
         }
         if (message.rfind("value:", 0) == 0) {
             const std::string field = message.substr(6);
             const std::string detail = field == "deadline"
                                            ? "Field deadline must be a valid ISO 8601 UTC datetime"
                                            : "Field " + field + " must be a positive integer";
-            return build_error_response(req, http::status::bad_request, "VALIDATION_ERROR",
-                                        "Invalid field value", json{{field, detail}});
+            return server::utils::build_error_response(req, http::status::bad_request,
+                                                       "VALIDATION_ERROR", "Invalid field value",
+                                                       json{{field, detail}});
         }
-        return build_error_response(req, http::status::bad_request, "VALIDATION_ERROR", e.what());
+        return server::utils::build_error_response(req, http::status::bad_request,
+                                                   "VALIDATION_ERROR", e.what());
     } catch (const std::runtime_error& e) {
-        return build_error_response(req, http::status::internal_server_error, "DATABASE_ERROR",
-                                    e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "DATABASE_ERROR", e.what());
     } catch (const std::exception& e) {
-        return build_error_response(req, http::status::internal_server_error, "INTERNAL_ERROR",
-                                    e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "INTERNAL_ERROR", e.what());
     }
 }
 

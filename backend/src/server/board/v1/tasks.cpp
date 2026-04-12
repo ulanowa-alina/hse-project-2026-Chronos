@@ -2,6 +2,7 @@
 
 #include "../../../../repositories/board_repository.hpp"
 #include "../../../../repositories/task_repository.hpp"
+#include "../../utils/response_utils.hpp"
 
 #include <array>
 #include <boost/url.hpp>
@@ -21,30 +22,6 @@ std::string time_to_string_iso8601(std::time_t t) {
         return {buffer.data()};
     }
     throw std::runtime_error("Failed to format timestamp");
-}
-
-auto build_json_response(const http::request<http::string_body>& req, http::status status,
-                         const json& body) -> http::response<http::string_body> {
-    http::response<http::string_body> res{status, req.version()};
-    res.set(http::field::content_type, "application/json");
-    res.set(http::field::access_control_allow_origin, "*");
-    res.keep_alive(req.keep_alive());
-    res.body() = body.dump();
-    res.prepare_payload();
-    return res;
-}
-
-auto build_error_response(const http::request<http::string_body>& req, http::status status,
-                          const std::string& code, const std::string& message,
-                          const json& details = json()) -> http::response<http::string_body> {
-    json error = {
-        {"code", code},
-        {"message", message},
-    };
-    if (!details.is_null() && !details.empty()) {
-        error["details"] = details;
-    }
-    return build_json_response(req, status, json{{"error", error}});
 }
 
 int require_int_field(const http::request<http::string_body>& req, const std::string& key) {
@@ -104,8 +81,9 @@ json model_to_json(const Task& task) {
 auto handleTasks(const http::request<http::string_body>& req,
                  ConnectionPool& pool) -> http::response<http::string_body> {
     if (req.method() != http::verb::get) {
-        return build_error_response(req, http::status::method_not_allowed, "METHOD_NOT_ALLOWED",
-                                    "Only GET is supported for this endpoint");
+        return server::utils::build_error_response(req, http::status::method_not_allowed,
+                                                   "METHOD_NOT_ALLOWED",
+                                                   "Only GET is supported for this endpoint");
     }
 
     try {
@@ -113,8 +91,8 @@ auto handleTasks(const http::request<http::string_body>& req,
 
         BoardRepository board_repository(pool);
         if (!board_repository.find_by_id(board_id)) {
-            return build_error_response(req, http::status::not_found, "BOARD_NOT_FOUND",
-                                        "Board not found");
+            return server::utils::build_error_response(req, http::status::not_found,
+                                                       "BOARD_NOT_FOUND", "Board not found");
         }
 
         TaskRepository task_repository(pool);
@@ -125,34 +103,35 @@ auto handleTasks(const http::request<http::string_body>& req,
             data.push_back(model_to_json(task));
         }
 
-        return build_json_response(req, http::status::ok, json{{"data", data}});
+        return server::utils::build_json_response(req, http::status::ok, json{{"data", data}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
         if (message.rfind("missing:", 0) == 0) {
             const std::string field = message.substr(8);
-            return build_error_response(req, http::status::bad_request, "MISSING_FIELD",
-                                        "Missing required field",
-                                        json{{field, "Field " + field + " is required"}});
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
+                json{{field, "Field " + field + " is required"}});
         }
         if (message.rfind("type:", 0) == 0) {
             const std::string field = message.substr(5);
-            return build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
-                                        "Invalid field format",
-                                        json{{field, "Field " + field + " has invalid type"}});
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
+                json{{field, "Field " + field + " has invalid type"}});
         }
         if (message.rfind("value:", 0) == 0) {
             const std::string field = message.substr(6);
-            return build_error_response(
+            return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{field, "Field " + field + " must be a positive integer"}});
         }
-        return build_error_response(req, http::status::bad_request, "VALIDATION_ERROR", message);
+        return server::utils::build_error_response(req, http::status::bad_request,
+                                                   "VALIDATION_ERROR", message);
     } catch (const std::runtime_error& e) {
-        return build_error_response(req, http::status::internal_server_error, "DATABASE_ERROR",
-                                    e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "DATABASE_ERROR", e.what());
     } catch (const std::exception& e) {
-        return build_error_response(req, http::status::internal_server_error, "INTERNAL_ERROR",
-                                    e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "INTERNAL_ERROR", e.what());
     }
 }
 
