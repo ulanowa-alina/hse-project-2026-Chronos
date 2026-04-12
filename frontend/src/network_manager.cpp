@@ -31,6 +31,10 @@ void NetworkManager::PATCH(const QString& endpoint, const QJsonObject& data) {
     sendRequest({endpoint, "PATCH", data, 0});
 }
 
+void NetworkManager::DELETE(const QString& endpoint, const QJsonObject& data) {
+    sendRequest({endpoint, "DELETE", data, 0});
+}
+
 void NetworkManager::sendRequest(const RequestData& req_data) {
     QUrl url(base_url_ + req_data.endpoint_);
     QNetworkRequest request(url);
@@ -49,7 +53,11 @@ void NetworkManager::sendRequest(const RequestData& req_data) {
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         QByteArray body_data = QJsonDocument(req_data.body_).toJson();
         reply = manager_->sendCustomRequest(request, "PATCH", body_data);
-    } // потом дополнится
+    } else if (req_data.method_ == "DELETE") {
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        QByteArray body_data = QJsonDocument(req_data.body_).toJson();
+        reply = manager_->sendCustomRequest(request, "DELETE", body_data);
+    }
 
     if (reply) {
         request_storage_.insert(reply, req_data);

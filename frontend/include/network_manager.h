@@ -33,10 +33,13 @@ class NetworkManager : public QObject {
     const QString statuses_edit_url_ = "/status/v1/edit";
     const QString statuses_create_url_ = "/status/v1/create";
     const QString login_url_ = "/auth/v1/login";
+    const QString tasks_delete_url_ = "/tasks/v1/delete";
+    const QString statuses_delete_url_ = "/status/v1/delete";
 
     void GET(const QString& endpoint);
     void POST(const QString& endpoint, const QJsonObject& data);
     void PATCH(const QString& endpoint, const QJsonObject& data);
+    void DELETE(const QString& endpoint, const QJsonObject& data);
 
     void setToken(const QString& new_token) {
         JWT_token_ = new_token;

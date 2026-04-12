@@ -33,10 +33,12 @@ class StatusWindow : public QFrame {
     void onCreateTaskRequest();
     void onOpenSettings();
     void onStatusEditRequest();
+    void onStatusDeleteRequest();
 
   private:
     int status_id_;
     int board_id_;
+    bool should_be_delete_{false};
 
     NetworkManager* network_manager_{nullptr};
 

@@ -20,8 +20,20 @@ void StatusWindow::setNetworkManager(NetworkManager* manager) {
 }
 
 void StatusWindow::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->statuses_edit_url_)
+    if (endpoint != network_manager_->statuses_edit_url_ &&
+        endpoint != network_manager_->statuses_delete_url_)
         return;
+
+    if (endpoint == network_manager_->statuses_delete_url_) {
+        if (should_be_delete_ && code == 204) {
+            qDebug() << "StatusWindow: Статус успешно удален";
+            deleteLater();
+        } else if (should_be_delete_) {
+            qDebug() << "StatusWindow: Ошибка удаления. Ответ сервера:" << code;
+            should_be_delete_ = false;
+        }
+        return;
+    }
 
     if (code == 200) {
         qDebug() << "StatusWindow: Успешное обновление статуса";
@@ -49,12 +61,15 @@ void StatusWindow::onOpenSettings() {
         "QMenu::item:selected { background: #f4f5f7; }");
 
     QAction* rename_action = menu.addAction("✏️ Переименовать");
+    QAction* delete_action = menu.addAction("🗑️ Удалить");
 
     QAction* selected =
         menu.exec(settings_button_->mapToGlobal(QPoint(0, settings_button_->height())));
 
     if (selected == rename_action) {
         onStatusEditRequest();
+    } else if (selected == delete_action) {
+        onStatusDeleteRequest();
     }
 }
 
@@ -69,6 +84,19 @@ void StatusWindow::onStatusEditRequest() {
     status_name_->selectAll();
 }
 
+void StatusWindow::onStatusDeleteRequest() {
+    if (status_id_ == -1 || !network_manager_) {
+        deleteLater();
+        return;
+    }
+
+    should_be_delete_ = true;
+
+    QJsonObject json;
+    json["status_id"] = status_id_;
+    network_manager_->DELETE(network_manager_->statuses_delete_url_, json);
+}
+
 void StatusWindow::setupLayout(const QString& name) {
     this->setMinimumHeight(150);
     this->setFixedWidth(280);
@@ -81,7 +109,6 @@ void StatusWindow::setupLayout(const QString& name) {
     main_layout->setContentsMargins(10, 10, 10, 10);
     main_layout->setSpacing(8);
 
-    // --- Заголовок ---
     auto* header_layout = new QHBoxLayout();
     status_name_ = new QLineEdit(name, this);
     status_name_->setReadOnly(true);
@@ -96,7 +123,6 @@ void StatusWindow::setupLayout(const QString& name) {
     header_layout->addWidget(settings_button_);
     main_layout->addLayout(header_layout);
 
-    // --- Кнопка добавления ---
     create_task_button_ = new QPushButton("+ Добавить задачу", this);
     create_task_button_->setStyleSheet(
         "QPushButton { text-align: left; padding: 8px; border: none; border-radius: 6px; "
@@ -129,7 +155,7 @@ void StatusWindow::setupLayout(const QString& name) {
     tasks_scroll_area_->setWidget(tasks_container);
     main_layout->addWidget(tasks_scroll_area_, 1);
 
-    connect(status_name_, &QLineEdit::editingFinished, this, [this]() { /*...*/ });
+    connect(status_name_, &QLineEdit::editingFinished, this, [this]() {});
     connect(create_task_button_, &QPushButton::clicked, this, &StatusWindow::onCreateTaskRequest);
     connect(settings_button_, &QPushButton::clicked, this, &StatusWindow::onOpenSettings);
 }

@@ -22,6 +22,10 @@ class TaskCard : public QFrame {
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onTaskSaveRequest();
+    void onOpenSettings();
+    void onTitleEditRequest();
+    void onDescriptionEditRequest();
+    void onDeleteTaskRequest();
 
   protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -30,11 +34,13 @@ class TaskCard : public QFrame {
     int task_id_;
     int board_id_;
     int status_id_;
+    bool should_be_delete_{false};
 
     NetworkManager* network_manager_{nullptr};
 
     QLineEdit* title_{nullptr};
     QTextEdit* description_edit_{nullptr};
+    QPushButton* settings_button_{nullptr};
 
     void setupLayout();
 };
