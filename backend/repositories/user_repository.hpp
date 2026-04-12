@@ -6,6 +6,7 @@
 
 #include <optional>
 #include <pqxx/pqxx>
+#include <string>
 #include <vector>
 
 class UserRepository {
@@ -14,6 +15,7 @@ class UserRepository {
 
     User save(const User& user);
     std::optional<User> find_by_id(int user_id);
+    std::optional<User> find_by_email(const std::string& email);
 
   private:
     ConnectionPool& pool_;
