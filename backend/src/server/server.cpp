@@ -2,6 +2,7 @@
 
 #include "auth/v1/login.hpp"
 #include "auth/v1/register.hpp"
+#include "auth/with_auth.hpp"
 #include "board/v1/tasks.hpp"
 #include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
@@ -26,32 +27,7 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         res.prepare_payload();
         return res;
     };
-    router_["/board/v1/tasks"] = [this](const http::request<http::string_body>& req) {
-        if (req.method() == http::verb::get) {
-            return board::v1::handleTasks(req, pool_);
-        }
 
-        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"method_not_allowed"})";
-        res.prepare_payload();
-        return res;
-    };
-    router_["/task/v1/create"] = [this](const http::request<http::string_body>& req) {
-        if (req.method() == http::verb::post) {
-            return task::v1::handleCreate(req, pool_);
-        }
-
-        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":"method_not_allowed"})";
-        res.prepare_payload();
-        return res;
-    };
     router_["/personal/v1/edit"] = [this](const http::request<http::string_body>& req) {
         if (req.method() == http::verb::put) {
             return personal::v1::handleEdit(req, pool_);

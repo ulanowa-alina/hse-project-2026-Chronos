@@ -2,13 +2,11 @@
 
 #include "models/user.hpp"
 #include "repositories/user_repository.hpp"
-#include "server/auth/jwt.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
-#include <optional>
 #include <pqxx/pqxx>
 #include <sstream>
 #include <string>
@@ -89,8 +87,8 @@ auto build_update_response(const http::request<http::string_body>& req,
 
 } // namespace
 
-auto handleEdit(const http::request<http::string_body>& req,
-                ConnectionPool& pool) -> http::response<http::string_body> {
+auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool,
+                int user_id) -> http::response<http::string_body> {
     json body;
     try {
         body = json::parse(req.body());
@@ -172,34 +170,10 @@ auto handleEdit(const http::request<http::string_body>& req,
     const std::string password_hash = has_password ? ("hash:" + password) : "";
 
     try {
-        const auto auth_header = req[http::field::authorization];
-        if (auth_header.empty()) {
-            return build_api_error(req, http::status::unauthorized, "UNAUTHORIZED",
-                                   "User is not authorized");
-        }
-
-        const std::string auth_value = std::string(auth_header);
-        const std::string prefix = "Bearer ";
-        if (auth_value.rfind(prefix, 0) != 0) {
-            return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
-                                   "Invalid token");
-        }
-
-        auth::TokenPayload payload;
-        auth::TokenError token_error = auth::TokenError::InvalidToken;
-        if (!auth::parse_and_validate_token(auth_value.substr(prefix.size()), payload,
-                                            token_error)) {
-            if (token_error == auth::TokenError::ExpiredToken) {
-                return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
-                                       "Token is expired");
-            }
-            return build_api_error(req, http::status::unauthorized, "INVALID_TOKEN",
-                                   "Invalid token");
-        }
-
         UserRepository repo(pool);
 
-        const auto existing = repo.find_by_id(payload.user_id);
+        const auto existing = repo.find_by_id(user_id);
+
         if (!existing.has_value()) {
             return build_api_error(req, static_cast<http::status>(404), "USER_NOT_FOUND",
                                    "User not found");
