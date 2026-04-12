@@ -1,5 +1,4 @@
 #include "server.hpp"
-
 #include "auth/v1/register.hpp"
 #include "board/v1/tasks.hpp"
 #include "personal/v1/edit.hpp"
