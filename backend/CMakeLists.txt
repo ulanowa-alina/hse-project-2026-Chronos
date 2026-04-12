@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(PostgreSQL REQUIRED)
-find_package(Boost 1.74 REQUIRED)
+find_package(Boost 1.74 REQUIRED COMPONENTS json url)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -31,6 +31,7 @@ target_include_directories(chronos_backend PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/models"
         "${CMAKE_CURRENT_SOURCE_DIR}/repositories"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/server"
         ${Boost_INCLUDE_DIRS}
         ${PostgreSQL_INCLUDE_DIRS}
         ${PQXX_INCLUDE_DIRS}
@@ -42,6 +43,8 @@ target_compile_definitions(chronos_backend PRIVATE
 
 target_link_libraries(chronos_backend PRIVATE
         Boost::boost
+        Boost::json
+        Boost::url
         Threads::Threads
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}

@@ -14,6 +14,7 @@ class TaskRepository {
 
     Task save(const Task& task);
     std::optional<Task> find_by_id(int task_id);
+    std::vector<Task> find_by_board_id(int board_id);
 
   private:
     ConnectionPool& pool_;
