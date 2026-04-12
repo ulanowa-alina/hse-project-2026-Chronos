@@ -1,4 +1,3 @@
-
 #include "server.hpp"
 
 #include "auth/v1/register.hpp"
@@ -6,7 +5,6 @@
 #include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
 #include "task/v1/create.hpp"
-
 
 #include <memory>
 
