@@ -6,5 +6,5 @@
 
 namespace auth {
 using AuthorizedHandler = std::function<Response(const Request&, int user_id)>;
-auto with_auth(AuthorizedHandler handler) -> RequestHandler;
+RequestHandler with_auth(AuthorizedHandler handler);
 } // namespace auth

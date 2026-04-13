@@ -23,7 +23,7 @@ auto build_auth_error(const Request& req, http::status status, const std::string
 
 } // namespace
 
-auto with_auth(AuthorizedHandler handler) -> RequestHandler {
+RequestHandler with_auth(AuthorizedHandler handler) {
     return [handler = std::move(handler)](const Request& req) -> Response {
         const auto auth_header = req[http::field::authorization];
         if (auth_header.empty()) {

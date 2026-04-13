@@ -60,19 +60,30 @@ json parse_body(const http::request<http::string_body>& req) {
     return json::parse(req.body());
 }
 
-User parse_new_user(const json& body) {
-    auto has_str = [&](const char* key) {
-        return body.contains(key) && body[key].is_string() && !body[key].get<std::string>().empty();
-    };
+auto collect_missing_fields(const json& body) -> json {
+    json missing = json::array();
 
-    if (!has_str("email") || !has_str("name") || !has_str("status") || !has_str("password")) {
-        throw std::invalid_argument("missing_fields");
+    if (!body.contains("email")) {
+        missing.push_back("email");
+    }
+    if (!body.contains("name")) {
+        missing.push_back("name");
+    }
+    if (!body.contains("status")) {
+        missing.push_back("status");
+    }
+    if (!body.contains("password")) {
+        missing.push_back("password");
     }
 
-    const std::string email = body["email"].get<std::string>();
-    const std::string name = body["name"].get<std::string>();
-    const std::string status = body["status"].get<std::string>();
-    const std::string password = body["password"].get<std::string>();
+    return missing;
+}
+
+User parse_new_user(const json& body) {
+    const std::string email = body.at("email").get<std::string>();
+    const std::string name = body.at("name").get<std::string>();
+    const std::string status = body.at("status").get<std::string>();
+    const std::string password = body.at("password").get<std::string>();
 
     if (password.size() < 8) {
         throw std::length_error("password_too_short");
@@ -93,6 +104,12 @@ auto handleRegister(const http::request<http::string_body>& req,
                     ConnectionPool& pool) -> http::response<http::string_body> {
     try {
         const json body = parse_body(req);
+        const json missing_fields = collect_missing_fields(body);
+        if (!missing_fields.empty()) {
+            return build_api_error(req, http::status::bad_request, "MISSING_FIELD",
+                                   "Missing required fields",
+                                   json{{"missing_fields", missing_fields}});
+        }
         const User new_user = parse_new_user(body);
         const User created = createUser(pool, new_user);
         return build_create_response(req, created);
@@ -101,12 +118,6 @@ auto handleRegister(const http::request<http::string_body>& req,
                                "Invalid JSON format");
     } catch (const std::invalid_argument& e) {
         const std::string reason = e.what();
-
-        if (reason == "missing_fields") {
-            return build_api_error(
-                req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
-                json{{"missing_fields", {"email", "name", "status", "password"}}});
-        }
 
         if (reason == "Invalid email format") {
             return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
