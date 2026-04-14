@@ -61,7 +61,7 @@ class NetworkManager : public QObject {
 
     const QSet<int> retryable_codes_ = {500};
 
-    const QString base_url_ = "http://51.250.114.15:8080";
+    const QString base_url_ = "http://127.0.0.1:8080";
     const int MAX_RETRIES_ = 3;
 
     void sendRequest(const RequestData& req_data);
