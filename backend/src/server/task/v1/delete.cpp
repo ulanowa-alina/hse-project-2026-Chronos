@@ -2,10 +2,10 @@
 
 #include "../../../../repositories/board_repository.hpp"
 #include "../../../../repositories/task_repository.hpp"
+#include "../../auth/jwt.hpp"
 #include "../../utils/response_utils.hpp"
 
 #include <nlohmann/json.hpp>
-#include <cctype>
 #include <stdexcept>
 #include <string>
 
@@ -45,113 +45,16 @@ std::string extract_bearer_token(const http::request<http::string_body>& req) {
     return header.substr(prefix.size());
 }
 
-int decode_base64_char(char c) {
-    if (c >= 'A' && c <= 'Z') {
-        return c - 'A';
-    }
-    if (c >= 'a' && c <= 'z') {
-        return c - 'a' + 26;
-    }
-    if (c >= '0' && c <= '9') {
-        return c - '0' + 52;
-    }
-    if (c == '+') {
-        return 62;
-    }
-    if (c == '/') {
-        return 63;
-    }
-    return -1;
-}
-
-std::string decode_base64url(const std::string& value) {
-    std::string base64 = value;
-    for (char& c : base64) {
-        if (c == '-') {
-            c = '+';
-        } else if (c == '_') {
-            c = '/';
-        }
-    }
-
-    while (base64.size() % 4 != 0) {
-        base64.push_back('=');
-    }
-
-    std::string decoded;
-    int buffer = 0;
-    int bits_in_buffer = 0;
-
-    for (const char c : base64) {
-        if (c == '=') {
-            break;
-        }
-
-        const int decoded_char = decode_base64_char(c);
-        if (decoded_char < 0) {
-            throw std::runtime_error("unauthorized");
-        }
-
-        buffer = (buffer << 6) | decoded_char;
-        bits_in_buffer += 6;
-
-        while (bits_in_buffer >= 8) {
-            bits_in_buffer -= 8;
-            decoded.push_back(static_cast<char>((buffer >> bits_in_buffer) & 0xFF));
-        }
-    }
-
-    return decoded;
-}
-
-json parse_jwt_payload(const std::string& token) {
-    const std::size_t first_dot = token.find('.');
-    const std::size_t second_dot = token.find('.', first_dot == std::string::npos ? 0 : first_dot + 1);
-    if (first_dot == std::string::npos || second_dot == std::string::npos || second_dot <= first_dot + 1) {
-        throw std::runtime_error("unauthorized");
-    }
-
-    const std::string payload_part = token.substr(first_dot + 1, second_dot - first_dot - 1);
-    const std::string decoded_payload = decode_base64url(payload_part);
-
-    try {
-        const json payload = json::parse(decoded_payload);
-        if (!payload.is_object()) {
-            throw std::runtime_error("unauthorized");
-        }
-        return payload;
-    } catch (const json::exception&) {
-        throw std::runtime_error("unauthorized");
-    }
-}
-
-int require_user_id_from_payload(const json& payload, const std::string& key) {
-    try {
-        const int value = payload.at(key).get<int>();
-        if (value <= 0) {
-            throw std::runtime_error("unauthorized");
-        }
-        return value;
-    } catch (const json::exception&) {
-        throw std::runtime_error("unauthorized");
-    }
-}
-
 int require_authorized_user_id(const http::request<http::string_body>& req) {
     const std::string token = extract_bearer_token(req);
-    const json payload = parse_jwt_payload(token);
 
-    try {
-        if (payload.contains("user_id")) {
-            return require_user_id_from_payload(payload, "user_id");
-        }
-        if (payload.contains("id")) {
-            return require_user_id_from_payload(payload, "id");
-        }
-        throw std::runtime_error("unauthorized");
-    } catch (const std::exception&) {
+    auth::TokenPayload payload;
+    auth::TokenError error = auth::TokenError::InvalidToken;
+    if (!auth::parse_and_validate_token(token, payload, error) || payload.user_id <= 0) {
         throw std::runtime_error("unauthorized");
     }
+
+    return payload.user_id;
 }
 
 } // namespace
