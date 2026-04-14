@@ -6,6 +6,8 @@
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMouseEvent>
+#include <QPoint>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QTextEdit>
@@ -18,6 +20,16 @@ class TaskCard : public QFrame {
     explicit TaskCard(int task_id, int board_id, int status_id, QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    int getId() const {
+        return task_id_;
+    }
+    int getTaskId() const {
+        return task_id_;
+    }
+    void setStatusId(int new_status_id) {
+        status_id_ = new_status_id;
+    }
+    void updateTaskStatus();
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
@@ -29,11 +41,13 @@ class TaskCard : public QFrame {
 
   protected:
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
 
   private:
     int task_id_;
     int board_id_;
     int status_id_;
+    QPoint drag_start_position_;
     bool should_be_delete_{false};
 
     NetworkManager* network_manager_{nullptr};

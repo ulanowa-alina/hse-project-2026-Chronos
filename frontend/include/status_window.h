@@ -4,6 +4,10 @@
 #include "network_manager.h"
 #include "task_card.h"
 
+#include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFrame>
 #include <QJsonObject>
 #include <QLabel>
@@ -28,6 +32,13 @@ class StatusWindow : public QFrame {
         return status_id_ = id;
     }
 
+  protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
+
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onCreateTaskRequest();
@@ -39,6 +50,7 @@ class StatusWindow : public QFrame {
     int status_id_;
     int board_id_;
     bool should_be_delete_{false};
+    bool should_be_highlighted_{false};
 
     NetworkManager* network_manager_{nullptr};
 
@@ -48,8 +60,12 @@ class StatusWindow : public QFrame {
     QPushButton* settings_button_{nullptr};
 
     QScrollArea* tasks_scroll_area_{nullptr};
+    QWidget* tasks_container_{nullptr};
     QVBoxLayout* tasks_layout_{nullptr};
 
+    void insertTaskCard(TaskCard* card);
+    void removeTaskCard(TaskCard* card);
+    void processHighlight();
     void setupLayout(const QString& name);
 };
 #endif // STATUS_WINDOW_H

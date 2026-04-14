@@ -1,13 +1,17 @@
 #include "status_window.h"
 
+#include <QDataStream>
 #include <QDebug>
+#include <QEvent>
 #include <QMenu>
+#include <QMimeData>
 
 StatusWindow::StatusWindow(int status_id, int board_id, const QString& name, QWidget* parent)
     : QFrame(parent)
     , status_id_(status_id)
     , board_id_(board_id) {
     setupLayout(name);
+    setAcceptDrops(true);
 }
 
 void StatusWindow::setNetworkManager(NetworkManager* manager) {
@@ -97,13 +101,157 @@ void StatusWindow::onStatusDeleteRequest() {
     network_manager_->DELETE(network_manager_->statuses_delete_url_, json);
 }
 
+void StatusWindow::dragEnterEvent(QDragEnterEvent* event) {
+    auto mime = event->mimeData();
+    if (mime->hasFormat("application/task")) {
+        should_be_highlighted_ = true;
+        processHighlight();
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void StatusWindow::dragMoveEvent(QDragMoveEvent* event) {
+    if (event->mimeData()->hasFormat("application/task")) {
+        if (!should_be_highlighted_) {
+            should_be_highlighted_ = true;
+            processHighlight();
+        }
+        event->acceptProposedAction();
+    } else {
+        if (should_be_highlighted_) {
+            should_be_highlighted_ = false;
+            processHighlight();
+        }
+        event->ignore();
+    }
+}
+
+void StatusWindow::dropEvent(QDropEvent* event) {
+    auto mime = event->mimeData();
+    if (!mime->hasFormat("application/task")) {
+        should_be_highlighted_ = false;
+        processHighlight();
+        event->ignore();
+        return;
+    }
+
+    QByteArray data = mime->data("application/task");
+    QDataStream stream(&data, QIODevice::ReadOnly);
+
+    int task_id = -1;
+    int board_id = -1;
+    int old_status_id = -1;
+    stream >> task_id >> board_id >> old_status_id;
+
+    QList<StatusWindow*> statuses = window()->findChildren<StatusWindow*>();
+    StatusWindow* old_status_window = nullptr;
+
+    for (StatusWindow* status : statuses) {
+        if (status->getId() == old_status_id) {
+            old_status_window = status;
+            break;
+        }
+    }
+
+    if (!old_status_window) {
+        should_be_highlighted_ = false;
+        processHighlight();
+        event->ignore();
+        return;
+    }
+
+    if (old_status_window == this) {
+        should_be_highlighted_ = false;
+        processHighlight();
+        event->acceptProposedAction();
+        return;
+    }
+
+    QList<TaskCard*> cards = old_status_window->findChildren<TaskCard*>();
+    TaskCard* dragged_card = nullptr;
+
+    for (TaskCard* card : cards) {
+        if (card->getTaskId() == task_id) {
+            dragged_card = card;
+            break;
+        }
+    }
+
+    if (!dragged_card) {
+        should_be_highlighted_ = false;
+        processHighlight();
+        event->ignore();
+        return;
+    }
+
+    old_status_window->removeTaskCard(dragged_card);
+    insertTaskCard(dragged_card);
+
+    dragged_card->setStatusId(status_id_);
+    dragged_card->updateTaskStatus();
+
+    should_be_highlighted_ = false;
+    processHighlight();
+    event->acceptProposedAction();
+}
+
+void StatusWindow::dragLeaveEvent(QDragLeaveEvent* event) {
+    should_be_highlighted_ = false;
+    processHighlight();
+    event->accept();
+}
+
+bool StatusWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::DragEnter) {
+        dragEnterEvent(static_cast<QDragEnterEvent*>(event));
+        return event->isAccepted();
+    }
+
+    if (event->type() == QEvent::DragMove) {
+        dragMoveEvent(static_cast<QDragMoveEvent*>(event));
+        return event->isAccepted();
+    }
+
+    if (event->type() == QEvent::Drop) {
+        dropEvent(static_cast<QDropEvent*>(event));
+        return event->isAccepted();
+    }
+
+    if (event->type() == QEvent::DragLeave) {
+        dragLeaveEvent(static_cast<QDragLeaveEvent*>(event));
+        return event->isAccepted();
+    }
+
+    return QFrame::eventFilter(watched, event);
+}
+
+void StatusWindow::insertTaskCard(TaskCard* card) {
+    tasks_layout_->insertWidget(0, card);
+}
+
+void StatusWindow::removeTaskCard(TaskCard* card) {
+    tasks_layout_->removeWidget(card);
+}
+
+void StatusWindow::processHighlight() {
+    if (should_be_highlighted_) {
+        setStyleSheet("#statusWindow { background-color: #D6DFFB; border-radius: 12px; border: 2px "
+                      "solid #3498db; }");
+    } else {
+        setStyleSheet(
+            "#statusWindow { background-color: #D6DFFB; border-radius: 12px; border: none; }");
+    }
+}
+
 void StatusWindow::setupLayout(const QString& name) {
     this->setMinimumHeight(150);
     this->setFixedWidth(280);
     this->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 
     this->setObjectName("statusWindow");
-    this->setStyleSheet("#statusWindow { background-color: #D6DFFB; border-radius: 12px; }");
+    processHighlight();
 
     auto* main_layout = new QVBoxLayout(this);
     main_layout->setContentsMargins(10, 10, 10, 10);
@@ -144,15 +292,25 @@ void StatusWindow::setupLayout(const QString& name) {
     tasks_scroll_area_->viewport()->setStyleSheet("background: transparent; border: none;");
     tasks_scroll_area_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-    auto* tasks_container = new QWidget(this);
-    tasks_container->setStyleSheet("background: transparent; border: none;");
+    tasks_container_ = new QWidget(this);
+    tasks_container_->setStyleSheet("background: transparent; border: none;");
+    tasks_container_->setAcceptDrops(true);
+    tasks_container_->installEventFilter(this);
 
-    tasks_layout_ = new QVBoxLayout(tasks_container);
+    tasks_layout_ = new QVBoxLayout(tasks_container_);
     tasks_layout_->setContentsMargins(0, 0, 4, 0);
     tasks_layout_->setSpacing(10);
     tasks_layout_->addStretch();
 
-    tasks_scroll_area_->setWidget(tasks_container);
+    tasks_scroll_area_->setAcceptDrops(true);
+    tasks_scroll_area_->viewport()->setAcceptDrops(true);
+    tasks_scroll_area_->installEventFilter(this);
+    tasks_scroll_area_->viewport()->installEventFilter(this);
+    status_name_->installEventFilter(this);
+    settings_button_->installEventFilter(this);
+    create_task_button_->installEventFilter(this);
+
+    tasks_scroll_area_->setWidget(tasks_container_);
     main_layout->addWidget(tasks_scroll_area_, 1);
 
     connect(status_name_, &QLineEdit::editingFinished, this, [this]() {});

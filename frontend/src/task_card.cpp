@@ -1,7 +1,14 @@
 #include "task_card.h"
 
+#include <QApplication>
+#include <QDataStream>
 #include <QDebug>
+#include <QDrag>
+#include <QLineF>
 #include <QMenu>
+#include <QMimeData>
+#include <QMouseEvent>
+#include <QPixmap>
 #include <QVBoxLayout>
 
 TaskCard::TaskCard(int task_id, int board_id, int status_id, QWidget* parent)
@@ -60,6 +67,43 @@ void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data
 void TaskCard::mousePressEvent(QMouseEvent* event) {
     title_->setFocus();
     QFrame::mousePressEvent(event);
+
+    if (event->button() == Qt::LeftButton) {
+        drag_start_position_ = event->pos();
+    }
+}
+
+void TaskCard::mouseMoveEvent(QMouseEvent* event) {
+    if (!(event->buttons() & Qt::LeftButton))
+        return;
+
+    if (QLineF(event->pos(), drag_start_position_).length() > QApplication::startDragDistance()) {
+        QMimeData* mime = new QMimeData;
+
+        QByteArray data;
+        QDataStream stream(&data, QIODevice::WriteOnly);
+        stream << task_id_ << board_id_ << status_id_;
+        mime->setData("application/task", data);
+
+        QDrag* drag = new QDrag(this);
+        drag->setMimeData(mime);
+
+        QPixmap task_image = grab();
+        drag->setPixmap(task_image);
+        drag->setHotSpot(event->pos());
+        drag->exec(Qt::MoveAction);
+    }
+}
+
+void TaskCard::updateTaskStatus() {
+    if (task_id_ == -1 || !network_manager_)
+        return;
+
+    QJsonObject json;
+    json["task_id"] = task_id_;
+    json["status_id"] = status_id_;
+
+    network_manager_->PATCH(network_manager_->tasks_edit_url_, json);
 }
 
 void TaskCard::onTaskSaveRequest() {
