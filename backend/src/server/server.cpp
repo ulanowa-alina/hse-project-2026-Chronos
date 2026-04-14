@@ -6,6 +6,7 @@
 #include "board/v1/tasks.hpp"
 #include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
+#include "status/v1/create.hpp"
 #include "task/v1/create.hpp"
 
 #include <memory>
@@ -100,6 +101,23 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         res.prepare_payload();
         return res;
     };
+
+    router_["/status/v1/create"] =
+        auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
+            if (req.method() == http::verb::post) {
+                return status::v1::handleCreate(req, pool_, user_id);
+            }
+
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
+
     doAccept();
 }
 
