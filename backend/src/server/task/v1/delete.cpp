@@ -29,27 +29,23 @@ int require_int_field(const json& body, const std::string& key) {
 
 } // namespace
 
-auto handleDelete(const http::request<http::string_body>& req,
-                  ConnectionPool& pool,
+auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& pool,
                   int user_id) -> http::response<http::string_body> {
     if (req.method() != http::verb::delete_) {
         return server::utils::build_error_response(req, http::status::method_not_allowed,
-                                                   "DUPLICATE_RESOURCE",
-                                                   "Method not allowed");
+                                                   "DUPLICATE_RESOURCE", "Method not allowed");
     }
 
     json body;
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
-        return server::utils::build_error_response(req, http::status::bad_request,
-                                                   "INVALID_FORMAT",
+        return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body contains invalid JSON");
     }
 
     if (!body.is_object()) {
-        return server::utils::build_error_response(req, http::status::bad_request,
-                                                   "INVALID_FORMAT",
+        return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body must be a JSON object");
     }
 
