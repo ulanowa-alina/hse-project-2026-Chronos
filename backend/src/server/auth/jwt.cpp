@@ -197,7 +197,7 @@ auto timing_safe_equal(const std::string& lhs, const std::string& rhs) -> bool {
 
 } // namespace
 
-auto create_token(int user_id) -> std::string {
+std::string create_token(int user_id) {
     const std::time_t now = std::time(nullptr);
     const std::time_t exp = now + get_jwt_ttl_seconds();
 
@@ -214,8 +214,7 @@ auto create_token(int user_id) -> std::string {
     return signing_input + "." + encoded_signature;
 }
 
-auto parse_and_validate_token(const std::string& token, TokenPayload& payload,
-                              TokenError& error) -> bool {
+bool parse_and_validate_token(const std::string& token, TokenPayload& payload, TokenError& error) {
     const std::size_t first_dot = token.find('.');
     const std::size_t second_dot =
         token.find('.', first_dot == std::string::npos ? 0 : first_dot + 1);

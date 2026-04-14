@@ -1,7 +1,6 @@
 #include "user_repository.hpp"
 
 #include <optional>
-#include <stdexcept>
 
 UserRepository::UserRepository(ConnectionPool& pool)
     : pool_(pool) {
@@ -32,39 +31,49 @@ void UserRepository::update(const User& user) {
 }
 
 User UserRepository::save(const User& user) {
-    try {
-        if (user.id_ == 0) {
-            return insert(user);
-        } else {
-            update(user);
-            return user;
-        }
-    } catch (const std::exception& e) {
-        throw std::runtime_error(std::string("User::save failed: ") + e.what());
+    if (user.id_ == 0) {
+        return insert(user);
     }
+    update(user);
+    return user;
 }
 
 std::optional<User> UserRepository::find_by_id(int user_id) {
-    try {
-        auto handle = pool_.acquire();
-        pqxx::work txn(handle.conn());
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
 
-        pqxx::result r = txn.exec_params("SELECT id, email, name, status, password_hash, "
-                                         "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
-                                         "FROM users WHERE id = $1",
-                                         user_id);
+    pqxx::result r = txn.exec_params("SELECT id, email, name, status, password_hash, "
+                                     "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
+                                     "FROM users WHERE id = $1",
+                                     user_id);
 
-        if (r.empty()) {
-            return std::nullopt;
-        }
-
-        txn.commit();
-        const auto& row = r[0];
-        return User(row["id"].as<int>(), row["email"].as<std::string>(),
-                    row["name"].as<std::string>(), row["status"].as<std::string>(),
-                    row["password_hash"].as<std::string>(), row["created_sec"].as<long>());
-
-    } catch (const std::exception& e) {
-        throw std::runtime_error(std::string("User::find_by_id failed: ") + e.what());
+    if (r.empty()) {
+        return std::nullopt;
     }
+
+    txn.commit();
+    const auto& row = r[0];
+    return User(row["id"].as<int>(), row["email"].as<std::string>(), row["name"].as<std::string>(),
+                row["status"].as<std::string>(), row["password_hash"].as<std::string>(),
+                row["created_sec"].as<long>());
+}
+
+std::optional<User> UserRepository::find_by_email(const std::string& email) {
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
+
+    pqxx::result r = txn.exec_params("SELECT id, email, name, status, password_hash, "
+                                     "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
+                                     "FROM users WHERE email = $1",
+                                     email);
+
+    if (r.empty()) {
+        return std::nullopt;
+    }
+
+    txn.commit();
+    const auto& row = r[0];
+    return User(row["id"].as<int>(), row["email"].as<std::string>(), row["name"].as<std::string>(),
+                row["status"].as<std::string>(), row["password_hash"].as<std::string>(),
+                row["created_sec"].as<long>());
 }

@@ -1,0 +1,16 @@
+#ifndef LOGIN_HPP
+#define LOGIN_HPP
+
+#include <boost/beast/http.hpp>
+#include <db/connection_pool.hpp>
+
+namespace http = boost::beast::http;
+
+namespace auth::v1 {
+
+auto handleLogin(const http::request<http::string_body>& req,
+                 ConnectionPool& pool) -> http::response<http::string_body>;
+
+} // namespace auth::v1
+
+#endif
