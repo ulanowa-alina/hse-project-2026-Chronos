@@ -1,6 +1,8 @@
 #include "register.hpp"
 
+#include "models/board.hpp"
 #include "models/user.hpp"
+#include "repositories/board_repository.hpp"
 #include "repositories/user_repository.hpp"
 
 #include <ctime>
@@ -97,6 +99,13 @@ User createUser(ConnectionPool& pool, const User& user) {
     UserRepository repo(pool);
     return repo.save(user);
 }
+// TODO: после предзащит норм ручку сделать
+void create_board(ConnectionPool& pool, int user_id) {
+    BoardRepository repo(pool);
+    const std::time_t now = std::time(nullptr);
+    const Board b(0, user_id, "My board", "", false, now, now);
+    (void) repo.save(b);
+}
 
 } // namespace
 
@@ -112,6 +121,7 @@ auto handleRegister(const http::request<http::string_body>& req,
         }
         const User new_user = parse_new_user(body);
         const User created = createUser(pool, new_user);
+        create_board(pool, created.id_);
         return build_create_response(req, created);
     } catch (const nlohmann::json::exception&) {
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
