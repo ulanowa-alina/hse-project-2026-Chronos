@@ -43,6 +43,9 @@
 | POST   | /task/v1/create   | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
 | PATCH  | /task/v1/edit     | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
 | DELETE | /task/v1/delete   | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
+| POST   | /status/v1/create    | Создать статус доски    | {"board_id": "id",<br>"name": "...",<br>"position": 0}           | `data: Status`   |
+| PATCH  | /status/v1/edit      | Обновить статус доски   | {"status_id": "id",<br>"name": "...",<br>"position": 0}          | `data: Status`   |
+| DELETE | /status/v1/delete    | Удалить статус доски    | {"status_id": "id"}                                              | 204 No Content   |
 
 ##### Модели
 1. User (Пользователь)
@@ -79,19 +82,23 @@
 | 2   | board_id       | integer           | да             | id доски                      | 10                   |
 | 3   | title         | string            | да             | Название карточки задачи      | Оформить README      |
 | 4   | description   | string            | нет            | Описание задачи               | Финальная версия     |
-| 5   | status        | string            | да             | Статус задачи                 | In progress          |
+| 5 | status_id | integer | да | Идентификатор статуса | 2 |
 | 6   | priority_color | string            | да             | Цвет приоритета               | red                  |
 | 7   | created_at    | string (ISO 8601) | да             | Дата создания карточки        | 2026-01-10T12:00:00Z |
 | 8   | updated_at    | string (ISO 8601) | да             | Дата обновления карточки      | 2026-01-10T12:00:00Z |
 | 9   | deadline      | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
 
-Примечание:
-Поле `status` в API передаётся как строка и означает имя статуса задачи.
-На уровне базы данных это значение соответствует записи в таблице `statuses`, привязанной к конкретной доске.
-Для одной доски значение `status` должно совпадать с `statuses.name` для этой доски.
+4. Status (Статус доски)
+   Status object
 
+| № | Параметр | Тип данных | Обязательность | Описание             | Пример           |
+|---|----------|------------|----------------|----------------------|------------------|
+| 1 | id       | integer    | да             | Идентификатор статуса| 1                |
+| 2 | board_id | integer    | да             | id доски             | 10               |
+| 3 | name     | string     | да             | Название статуса     | В работе         |
+| 4 | position | integer    | да             | Позиция на доске     | 1                |
 
-4. Post (Авторизация)
+5. Post (Авторизация)
    LoginRequest
 
 | №   | Параметр | Тип данных | Обязательность | Описание            |
@@ -131,6 +138,13 @@ LoginResponse
 | board_id       | Существующий id доски       |
 | priority_color | Строка, допустимый CSS-цвет |
 
+4. Status
+
+| Параметр | Ограничения |
+| -------- | ----------- |
+| board_id | Существующий id доски |
+| name     | 1–50 символов |
+| position | Целое число, не меньше 0 |
 
 ### Выходные параметры
 
