@@ -40,8 +40,8 @@
 | GET    | /board/v1/get     | Получить доску по id               | {"board_id": "id"}                                                                                 | `data: Board`       |
 | DELETE | /board/v1/delete  | Удалить доску                      | {"board_id": "id"}                                                                                 | 204 No Content      |
 | GET    | /board/v1/tasks   | Получить задачи доски              | {"board_id": "id"}                                                                                 | `data: Task[]`      |
-| POST   | /task/v1/create   | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
-| PATCH  | /task/v1/edit     | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status": "...",<br>"priority_color": "..."} | `data: Task`        |
+| POST   | /task/v1/create   | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."} | `data: Task`        |
+| PATCH  | /task/v1/edit     | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."} | `data: Task`        |
 | DELETE | /task/v1/delete   | Удалить задачу                     | {"task_id": "id"}                                                                                  | 204 No Content      |
 | POST   | /status/v1/create    | Создать статус доски    | {"board_id": "id",<br>"name": "...",<br>"position": 0}           | `data: Status`   |
 | PATCH  | /status/v1/edit      | Обновить статус доски   | {"status_id": "id",<br>"name": "...",<br>"position": 0}          | `data: Status`   |
@@ -120,6 +120,7 @@ LoginResponse
 | email    | Валидный email, уникальный |
 | name     | 1–50 символов              |
 | password | Минимум 8 символов         |
+
 2. Board
 
 | Параметр    | Ограничения                  |
@@ -131,11 +132,12 @@ LoginResponse
 
 3. Task
 
-| Параметр      | Ограничения                 |
-| ------------- | --------------------------- |
-| title         | 1–100 символов              |
-| description   | До 1000 символов            |
+| Параметр       | Ограничения                 |
+| -------------- | --------------------------- |
+| title          | 1–100 символов              |
+| description    | До 1000 символов            |
 | board_id       | Существующий id доски       |
+| status_id      | Существующий id статуса     |
 | priority_color | Строка, допустимый CSS-цвет |
 
 4. Status
@@ -212,19 +214,24 @@ HTTP 204 No Content
 
 Связь с входными параметрами:
 
-| Endpoint               | Тип успешного ответа     |
-|------------------------| ------------------------ |
-| POST /auth/v1/login    | `data.token + data.user` |
-| POST /auth/v1/register | `data: User`             |
-| PUT /personal/v1/edit  | `data: User`             |
-| GET /personal/v1/info  | `data: User`             |
-| GET /board/v1/get_all  | `data: Board[]`          |
-| POST /board/v1/create  | `data: Board`            |
-| PATCH /board/v1/edit   | `data: Board`            |
-| GET /board/v1/get      | `data: Board`            |
-| GET /board/v1/tasks    | `data: Task[]`           |
-| POST /task/v1/create   | `data: Task`             |
-| PATCH /task/v1/edit    | `data: Task`             |
+| Endpoint                 | Тип успешного ответа     |
+|--------------------------|--------------------------|
+| POST /auth/v1/login      | `data.token + data.user` |
+| POST /auth/v1/register   | `data: User`             |
+| PUT /personal/v1/edit    | `data: User`             |
+| GET /personal/v1/info    | `data: User`             |
+| GET /board/v1/get_all    | `data: Board[]`          |
+| POST /board/v1/create    | `data: Board`            |
+| PATCH /board/v1/edit     | `data: Board`            |
+| GET /board/v1/get        | `data: Board`            |
+| DELETE /board/v1/delete  | `204 No Content`         |
+| GET /board/v1/tasks      | `data: Task[]`           |
+| POST /task/v1/create     | `data: Task`             |
+| PATCH /task/v1/edit      | `data: Task`             |
+| DELETE /task/v1/delete   | `204 No Content`         |
+| POST /status/v1/create   | `data: Status`           |
+| PATCH /status/v1/edit    | `data: Status`           |
+| DELETE /status/v1/delete | `204 No Content`         |
 
 ##### Ответ с ошибками
 
@@ -303,6 +310,7 @@ HTTP 204 No Content
 ### Примеры запросов и ответов
 
 1. Авторизация пользователя
+
    Запрос:
 ```bash
 POST /api/auth/v1/login
@@ -328,6 +336,7 @@ Content-Type: application/json
 ```
 
 2. Получение списка досок пользователя
+
    Запрос
 ```bash
 GET /api/board/v1/get_all
@@ -351,6 +360,7 @@ Authorization: Bearer <JWT>
 ```
 
 3. Создание новой доски
+   
    Запрос:
 ```bash
 POST /api/board/v1/create
@@ -388,7 +398,7 @@ Content-Type: application/json
 {
   "board_id": 10,
   "title": "Оформить README",
-  "status": "todo",
+  "status_id": 1,
   "priority_color": "red"
 }
 ```
@@ -399,7 +409,7 @@ Content-Type: application/json
     "id": 101,
     "board_id": 10,
     "title": "Оформить README",
-    "status": "todo",
+    "status_id": 1,
     "priority_color": "red",
     "created_at": "2026-02-07T10:30:00Z",
     "updated_at": "2026-02-07T10:30:00Z"
