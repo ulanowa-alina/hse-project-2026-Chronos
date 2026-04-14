@@ -24,29 +24,28 @@ void ProfileScreen::showEvent(QShowEvent* event) {
 
     if (network_manager_) {
         qDebug() << "ProfileScreen: Окно открыто, запрашиваю данные аккаунта...";
-        network_manager_->GET(network_manager_->info_url_);
+        network_manager_->GET(network_manager_->user_info_url_);
     }
 }
 
 void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->info_url_)
+    if (endpoint != network_manager_->user_info_url_)
         return;
 
     if (code == 200) {
         QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject root = doc.object();
+        QJsonObject data_obj = root["data"].toObject();
 
-        if (!doc.isNull()) {
-            qDebug() << "data - не JSON";
-            QJsonObject root = doc.object();
+        QString name = data_obj["name"].toString();
+        QString email = data_obj["email"].toString();
+        QString status = data_obj["status"].toString();
 
-            QString fullName = root["full_name"].toString();
-            QString email = root["email"].toString();
-            QString username = root["username"].toString();
+        name_label_->setText(name);
+        email_label_->setText(email);
+        status_label_->setText(status);
 
-            name_label_->setText(fullName);
-            email_label_->setText(email);
-            qDebug() << "Данные профиля получены";
-        }
+        qDebug() << "ProfileScreen: Данные получены";
     } else {
         qDebug() << "Ошибка сервера, код:" << code;
         name_label_->setText("Ошибка загрузки");
@@ -60,26 +59,30 @@ void ProfileScreen::setupLayout() {
 
     auto* top_bar = new QHBoxLayout();
 
-    logo_label_ = new QLabel("Chronos");
-    logo_label_->setStyleSheet(
-        "font-weight: bold; color: #305CDE; font-size: 18px; font-family: 'Arial';");
+    logo_button_ = new QPushButton("Chronos", this);
+    logo_button_->setCursor(Qt::PointingHandCursor);
+    logo_button_->setStyleSheet("QPushButton { "
+                                "   background: transparent; "
+                                "   border: none; "
+                                "   font-weight: bold; "
+                                "   color: #305CDE; "
+                                "   font-size: 18px; "
+                                "   font-family: 'Arial'; "
+                                "   padding: 0px; "
+                                "}"
+                                "QPushButton:hover { "
+                                "   color: #2549B3; "
+                                "}");
+    logout_button_ = new QPushButton("Выход из аккаунта", this);
+    logout_button_->setCursor(Qt::PointingHandCursor);
+    logout_button_->setStyleSheet(
+        "QPushButton { "
+        "   background: transparent; color: #C03438; border: none; "
+        "   font-size: 16px; font-weight: 400; padding: 0px; "
+        "}"
+        "QPushButton:hover { color: #e74c3c; text-decoration: underline; }");
 
-    logout_button_ = new QPushButton("Выход из аккаунта");
-    logout_button_->setStyleSheet("QPushButton { "
-                                  "   background: transparent; "
-                                  "   color: #C03438; "
-                                  "   border: none; "
-                                  "   font-size: 16px; "
-                                  "   font-weight: 400; "
-                                  "   padding: 0px; "
-                                  "   text-align: right; "
-                                  "}"
-                                  "QPushButton:hover { "
-                                  "   color: #e74c3c; "
-                                  "   text-decoration: underline; "
-                                  "}");
-
-    top_bar->addWidget(logo_label_);
+    top_bar->addWidget(logo_button_);
     top_bar->addStretch();
     top_bar->addWidget(logout_button_);
     main_layout->addLayout(top_bar);
@@ -124,6 +127,7 @@ void ProfileScreen::setupLayout() {
                                 "}");
     main_layout->addWidget(edit_button_);
 
+    connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::boardRequested);
     connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
