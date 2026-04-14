@@ -10,7 +10,8 @@ namespace http = boost::beast::http;
 namespace task::v1 {
 
 auto handleDelete(const http::request<http::string_body>& req,
-                  ConnectionPool& pool) -> http::response<http::string_body>;
+                  ConnectionPool& pool,
+                  int user_id) -> http::response<http::string_body>;
 
 } // namespace task::v1
 

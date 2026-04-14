@@ -2,11 +2,9 @@
 
 #include "../../../../repositories/board_repository.hpp"
 #include "../../../../repositories/task_repository.hpp"
-#include "../../auth/jwt.hpp"
 #include "../../utils/response_utils.hpp"
 
 #include <nlohmann/json.hpp>
-#include <stdexcept>
 #include <string>
 
 using json = nlohmann::json;
@@ -29,42 +27,15 @@ int require_int_field(const json& body, const std::string& key) {
     }
 }
 
-std::string extract_bearer_token(const http::request<http::string_body>& req) {
-    const http::request<http::string_body>::const_iterator auth =
-        req.find(http::field::authorization);
-    if (auth == req.end()) {
-        throw std::runtime_error("unauthorized");
-    }
-
-    const std::string header(auth->value());
-    const std::string prefix = "Bearer ";
-    if (header.rfind(prefix, 0) != 0 || header.size() <= prefix.size()) {
-        throw std::runtime_error("unauthorized");
-    }
-
-    return header.substr(prefix.size());
-}
-
-int require_authorized_user_id(const http::request<http::string_body>& req) {
-    const std::string token = extract_bearer_token(req);
-
-    auth::TokenPayload payload;
-    auth::TokenError error = auth::TokenError::InvalidToken;
-    if (!auth::parse_and_validate_token(token, payload, error) || payload.user_id <= 0) {
-        throw std::runtime_error("unauthorized");
-    }
-
-    return payload.user_id;
-}
-
 } // namespace
 
 auto handleDelete(const http::request<http::string_body>& req,
-                  ConnectionPool& pool) -> http::response<http::string_body> {
+                  ConnectionPool& pool,
+                  int user_id) -> http::response<http::string_body> {
     if (req.method() != http::verb::delete_) {
         return server::utils::build_error_response(req, http::status::method_not_allowed,
-                                                   "METHOD_NOT_ALLOWED",
-                                                   "Only DELETE is supported for this endpoint");
+                                                   "DUPLICATE_RESOURCE",
+                                                   "Method not allowed");
     }
 
     json body;
@@ -83,7 +54,6 @@ auto handleDelete(const http::request<http::string_body>& req,
     }
 
     try {
-        const int user_id = require_authorized_user_id(req);
         const int task_id = require_int_field(body, "task_id");
 
         TaskRepository task_repository(pool);
@@ -137,17 +107,9 @@ auto handleDelete(const http::request<http::string_body>& req,
         }
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", e.what());
-    } catch (const std::runtime_error& e) {
-        if (std::string(e.what()) == "unauthorized") {
-            return server::utils::build_error_response(req, http::status::unauthorized,
-                                                       "UNAUTHORIZED",
-                                                       "User is not authorized");
-        }
-        return server::utils::build_error_response(req, http::status::internal_server_error,
-                                                   "DATABASE_ERROR", e.what());
     } catch (const std::exception& e) {
         return server::utils::build_error_response(req, http::status::internal_server_error,
-                                                   "INTERNAL_ERROR", e.what());
+                                                   "DATABASE_ERROR", e.what());
     }
 }
 
