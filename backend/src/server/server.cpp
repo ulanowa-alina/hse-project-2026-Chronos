@@ -16,33 +16,35 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
     , pool_(pool) {
     router_["/personal/v1/info"] =
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
-        if (req.method() == http::verb::get) {
-            return personal::v1::handleInfo(req, pool_, user_id);
-        }
+            if (req.method() == http::verb::get) {
+                return personal::v1::handleInfo(req, pool_, user_id);
+            }
 
-        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
-        res.prepare_payload();
-        return res;
-    });
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
 
     router_["/personal/v1/edit"] =
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
-        if (req.method() == http::verb::put) {
-            return personal::v1::handleEdit(req, pool_, user_id);
-        }
+            if (req.method() == http::verb::put) {
+                return personal::v1::handleEdit(req, pool_, user_id);
+            }
 
-        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::access_control_allow_origin, "*");
-        res.keep_alive(req.keep_alive());
-        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
-        res.prepare_payload();
-        return res;
-    });
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
 
     router_["/auth/v1/login"] = [this](const http::request<http::string_body>& req) {
         if (req.method() == http::verb::post) {
