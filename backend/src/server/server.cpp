@@ -74,11 +74,31 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
     };
 
     router_["/board/v1/tasks"] = [this](const http::request<http::string_body>& req) {
-        return board::v1::handleTasks(req, pool_);
+        if (req.method() == http::verb::get) {
+            return board::v1::handleTasks(req, pool_);
+        }
+
+        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+        res.set(http::field::content_type, "application/json");
+        res.set(http::field::access_control_allow_origin, "*");
+        res.keep_alive(req.keep_alive());
+        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+        res.prepare_payload();
+        return res;
     };
 
-    router_["/board/v1/tasks/create"] = [this](const http::request<http::string_body>& req) {
-        return task::v1::handleCreate(req, pool_);
+    router_["/task/v1/create"] = [this](const http::request<http::string_body>& req) {
+        if (req.method() == http::verb::post) {
+            return task::v1::handleCreate(req, pool_);
+        }
+
+        http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+        res.set(http::field::content_type, "application/json");
+        res.set(http::field::access_control_allow_origin, "*");
+        res.keep_alive(req.keep_alive());
+        res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+        res.prepare_payload();
+        return res;
     };
     doAccept();
 }
