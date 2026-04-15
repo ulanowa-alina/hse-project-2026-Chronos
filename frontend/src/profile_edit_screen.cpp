@@ -7,7 +7,7 @@
 #include <QVBoxLayout>
 
 ProfileEditScreen::ProfileEditScreen(QWidget* parent)
-: QWidget(parent) {
+    : QWidget(parent) {
     setupLayout();
 }
 
@@ -27,8 +27,10 @@ void ProfileEditScreen::showEvent(QShowEvent* event) {
     }
 }
 
-void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (!network_manager_) return;
+void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
+                                          int code) {
+    if (!network_manager_)
+        return;
 
     if (endpoint == network_manager_->user_info_url_) {
         if (code == 200) {
@@ -55,7 +57,8 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
 }
 
 void ProfileEditScreen::onProfileEditRequest() {
-    if (!network_manager_) return;
+    if (!network_manager_)
+        return;
 
     QJsonObject json;
     json["name"] = name_input_->text();
@@ -83,11 +86,12 @@ void ProfileEditScreen::setupLayout() {
 
     cancel_button_ = new QPushButton("Отмена", this);
     cancel_button_->setCursor(Qt::PointingHandCursor);
-    cancel_button_->setStyleSheet( "QPushButton { "
-                                  "   background: transparent; color: #C03438; border: none; "
-                                  "   font-size: 16px; font-weight: 400; padding: 0px; "
-                                  "}"
-                                  "QPushButton:hover { color: #e74c3c; text-decoration: underline; }");
+    cancel_button_->setStyleSheet(
+        "QPushButton { "
+        "   background: transparent; color: #C03438; border: none; "
+        "   font-size: 16px; font-weight: 400; padding: 0px; "
+        "}"
+        "QPushButton:hover { color: #e74c3c; text-decoration: underline; }");
 
     top_bar->addWidget(logo_label_);
     top_bar->addStretch();
@@ -180,22 +184,21 @@ void ProfileEditScreen::setupLayout() {
 
     main_layout->addSpacing(15);
 
-
     main_layout->addStretch();
     main_layout->addStretch();
 
     save_button_ = new QPushButton("Сохранить изменения");
     save_button_->setMinimumHeight(45);
     save_button_->setStyleSheet("QPushButton { "
-                                 "   background-color: #305CDE; "
-                                 "   color: white; "
-                                 "   border-radius: 10px; "
-                                 "   font-weight: bold; "
-                                 "   font-size: 15px; "
-                                 "}"
-                                 "QPushButton:hover { "
-                                 "   background-color: #2549B3; "
-                                 "}");
+                                "   background-color: #305CDE; "
+                                "   color: white; "
+                                "   border-radius: 10px; "
+                                "   font-weight: bold; "
+                                "   font-size: 15px; "
+                                "}"
+                                "QPushButton:hover { "
+                                "   background-color: #2549B3; "
+                                "}");
     main_layout->addWidget(save_button_);
 
     connect(cancel_button_, &QPushButton::clicked, this, &ProfileEditScreen::profileRequested);

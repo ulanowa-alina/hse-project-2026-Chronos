@@ -39,8 +39,10 @@ MainWindow::MainWindow(QWidget* parent)
     connect(login_screen_, &LoginScreen::registrationRequested, this,
             &MainWindow::switchToRegistration);
     connect(board_screen_, &BoardScreen::openProfileScreen, this, &MainWindow::switchToProfile);
-    connect(profile_screen_, &ProfileScreen::profileEditRequested, this, &MainWindow::switchToProfileEdit);
-    connect(profile_edit_screen_, &ProfileEditScreen::profileRequested, this, &MainWindow::switchToProfile);
+    connect(profile_screen_, &ProfileScreen::profileEditRequested, this,
+            &MainWindow::switchToProfileEdit);
+    connect(profile_edit_screen_, &ProfileEditScreen::profileRequested, this,
+            &MainWindow::switchToProfile);
 
     setWindowTitle("Chronos");
     resize(400, 600);

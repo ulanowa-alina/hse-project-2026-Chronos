@@ -19,7 +19,6 @@ class ProfileEditScreen : public QWidget {
   signals:
     void profileRequested();
 
-
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onProfileEditRequest();
@@ -41,7 +40,6 @@ class ProfileEditScreen : public QWidget {
 
     void setupLayout();
     void showEvent(QShowEvent* event) override;
-
 };
 
 #endif // PROFILE_EDIT_SCREEN_H

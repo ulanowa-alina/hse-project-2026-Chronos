@@ -133,7 +133,6 @@ void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
     QJsonObject root = doc.object();
     QJsonObject data_obj = root["data"].toObject();
 
-
     if (endpoint == network_manager_->statuses_create_url_) {
         int new_id = data_obj["id"].toInt();
         qDebug() << "BoardScreen: Успешное создание статуса";
