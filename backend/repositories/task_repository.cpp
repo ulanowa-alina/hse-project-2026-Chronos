@@ -139,3 +139,18 @@ std::vector<Task> TaskRepository::find_by_board_id(int board_id) {
         throw std::runtime_error(std::string("Failed to find Tasks by board id: ") + e.what());
     }
 }
+
+bool TaskRepository::delete_by_id(int task_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        const pqxx::result r =
+            txn.exec_params("DELETE FROM tasks WHERE id = $1 RETURNING id", task_id);
+
+        txn.commit();
+        return !r.empty();
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to delete Task: ") + e.what());
+    }
+}
