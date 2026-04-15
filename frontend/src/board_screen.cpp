@@ -107,6 +107,7 @@ void BoardScreen::onStatusCreateRequest() {
         json["status_id"] = -1;
         json["board_id"] = board_id_;
         json["name"] = name;
+        json["position"] = 0; //TODO: внедрить эту всю тему
         network_manager_->POST(network_manager_->statuses_create_url_, json);
     }
 }

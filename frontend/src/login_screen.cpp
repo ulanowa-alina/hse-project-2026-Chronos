@@ -50,8 +50,7 @@ void LoginScreen::onLoginRequest() {
     QString password = password_input_->text();
 
     if (email.isEmpty() || password.isEmpty()) {
-        qDebug() << "LoginScreen: Email и пароль не могут быть пустыми";
-        return;
+        qDebug() << "LoginScreen: Email и пароль не могут быть пустыми. Но отправлю запрос, чтобы ошибка нормально обработалась на беке";
     }
 
     QJsonObject json;
