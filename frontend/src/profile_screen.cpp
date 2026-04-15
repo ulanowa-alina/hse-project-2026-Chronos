@@ -129,5 +129,6 @@ void ProfileScreen::setupLayout() {
 
     connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::boardRequested);
     connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
+    connect(edit_button_, &QPushButton::clicked, this, &ProfileScreen::profileEditRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
