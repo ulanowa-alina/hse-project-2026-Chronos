@@ -20,7 +20,7 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
 
 void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
                                            int code) {
-    if (endpointetwork_manager_->register_url_ && endpoint != network_manager_->login_url_)
+    if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_)
         return;
     if (endpoint == network_manager_->register_url_) {
         if (code == 200) {
