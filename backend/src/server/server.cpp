@@ -26,7 +26,8 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
             res.set(http::field::content_type, "application/json");
             res.set(http::field::access_control_allow_origin, "*");
             res.keep_alive(req.keep_alive());
-            res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
             res.prepare_payload();
             return res;
         });
@@ -41,7 +42,8 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
             res.set(http::field::content_type, "application/json");
             res.set(http::field::access_control_allow_origin, "*");
             res.keep_alive(req.keep_alive());
-            res.body() = R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
             res.prepare_payload();
             return res;
         });
