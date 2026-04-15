@@ -14,6 +14,8 @@ class BoardRepository {
 
     Board save(const Board& board);
     std::optional<Board> find_by_id(int board_id);
+    std::optional<Board> find_by_user_id(int user_id);
+    std::vector<Board> find_all_by_user_id(int user_id);
 
   private:
     ConnectionPool& pool_;

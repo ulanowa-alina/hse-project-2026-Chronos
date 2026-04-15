@@ -1,6 +1,7 @@
 #include "tasks.hpp"
 
 #include "../../../../repositories/board_repository.hpp"
+#include "../../../../repositories/status_repository.hpp"
 #include "../../../../repositories/task_repository.hpp"
 #include "../../utils/response_utils.hpp"
 
@@ -8,7 +9,9 @@
 #include <boost/url.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
+#include <unordered_map>
 
 using json = nlohmann::json;
 
@@ -78,8 +81,8 @@ json model_to_json(const Task& task) {
 
 } // namespace
 
-auto handleTasks(const http::request<http::string_body>& req,
-                 ConnectionPool& pool) -> http::response<http::string_body> {
+auto handleTasks(const http::request<http::string_body>& req, ConnectionPool& pool,
+                 int user_id) -> http::response<http::string_body> {
     if (req.method() != http::verb::get) {
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "METHOD_NOT_ALLOWED",
@@ -90,17 +93,44 @@ auto handleTasks(const http::request<http::string_body>& req,
         const int board_id = require_int_field(req, "board_id");
 
         BoardRepository board_repository(pool);
-        if (!board_repository.find_by_id(board_id)) {
+        const std::optional<Board> board = board_repository.find_by_id(board_id);
+        if (!board.has_value()) {
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
+        if (board->user_id_ != user_id) {
+            return server::utils::build_error_response(req, http::status::forbidden,
+                                                       "RESOURCE_NOT_OWNED",
+                                                       "Resource belongs to another user");
+        }
+
         TaskRepository task_repository(pool);
         const auto tasks = task_repository.find_by_board_id(board_id);
+        StatusRepository status_repository(pool);
+        std::unordered_map<int, std::string> status_name_cache;
 
         json data = json::array();
         for (const auto& task : tasks) {
-            data.push_back(model_to_json(task));
+            json task_json = model_to_json(task);
+
+            std::string status_name;
+            auto cache_it = status_name_cache.find(task.status_id_);
+            if (cache_it != status_name_cache.end()) {
+                status_name = cache_it->second;
+            } else {
+                const std::optional<Status> status = status_repository.find_by_id(task.status_id_);
+                if (status.has_value() && status->board_id_ == board_id) {
+                    status_name = status->name_;
+                }
+                status_name_cache.emplace(task.status_id_, status_name);
+            }
+
+            if (!status_name.empty()) {
+                task_json["status_name"] = status_name;
+            }
+
+            data.push_back(task_json);
         }
 
         return server::utils::build_json_response(req, http::status::ok, json{{"data", data}});

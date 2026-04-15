@@ -33,6 +33,9 @@ class NetworkManager : public QObject {
     const QString statuses_edit_url_ = "/status/v1/edit";
     const QString statuses_create_url_ = "/status/v1/create";
     const QString login_url_ = "/auth/v1/login";
+    const QString board_get_url_ = "/board/v1/get";
+    const QString boards_get_all_url_ = "/board/v1/get_all";
+    const QString board_tasks_url_ = "/board/v1/tasks";
     const QString tasks_delete_url_ = "/task/v1/delete";
     const QString statuses_delete_url_ = "/status/v1/delete";
     const QString statieses_edit_url_ = "/status/v1/edit";

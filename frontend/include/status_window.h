@@ -31,6 +31,7 @@ class StatusWindow : public QFrame {
     int setId(int id) {
         return status_id_ = id;
     }
+    void addTaskCard(TaskCard* card);
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;

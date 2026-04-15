@@ -89,3 +89,60 @@ std::optional<Board> BoardRepository::find_by_id(int board_id) {
         throw std::runtime_error(std::string("Failed to find Board: ") + e.what());
     }
 }
+
+std::optional<Board> BoardRepository::find_by_user_id(int user_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, is_private, "
+                                         "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+                                         "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
+                                         "FROM boards WHERE user_id = $1 ORDER BY id ASC LIMIT 1",
+                                         user_id);
+
+        if (r.empty()) {
+            return std::nullopt;
+        }
+
+        const auto& row = r[0];
+        txn.commit();
+        return Board(row["id"].as<int>(), row["user_id"].as<int>(), row["title"].as<std::string>(),
+                     row["description"].is_null() ? "" : row["description"].as<std::string>(),
+                     row["is_private"].as<bool>(), row["created_sec"].as<long>(),
+                     row["updated_sec"].is_null() ? row["created_sec"].as<long>()
+                                                  : row["updated_sec"].as<long>());
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to find Board by user id: ") + e.what());
+    }
+}
+
+std::vector<Board> BoardRepository::find_all_by_user_id(int user_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, is_private, "
+                                         "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+                                         "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
+                                         "FROM boards WHERE user_id = $1 ORDER BY id ASC",
+                                         user_id);
+
+        std::vector<Board> boards;
+        boards.reserve(r.size());
+        for (const auto& row : r) {
+            boards.emplace_back(
+                row["id"].as<int>(), row["user_id"].as<int>(), row["title"].as<std::string>(),
+                row["description"].is_null() ? "" : row["description"].as<std::string>(),
+                row["is_private"].as<bool>(), row["created_sec"].as<long>(),
+                row["updated_sec"].is_null() ? row["created_sec"].as<long>()
+                                             : row["updated_sec"].as<long>());
+        }
+
+        txn.commit();
+        return boards;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to find Boards by user id: ") + e.what());
+    }
+}

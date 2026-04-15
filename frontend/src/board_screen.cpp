@@ -2,6 +2,11 @@
 
 #include <QDebug>
 #include <QInputDialog>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUrl>
+#include <QUrlQuery>
 
 BoardScreen::BoardScreen(int board_id, QWidget* parent)
     : QWidget(parent)
@@ -14,6 +19,87 @@ void BoardScreen::setNetworkManager(NetworkManager* manager) {
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &BoardScreen::onNetworkResponse);
+    }
+}
+
+void BoardScreen::reloadBoardData() {
+    if (!network_manager_ || board_id_ <= 0) {
+        return;
+    }
+
+    clearBoardData();
+    board_name_label_->setText(QString("| Board %1").arg(board_id_));
+
+    network_manager_->GET(network_manager_->board_get_url_ +
+                          "?board_id=" + QString::number(board_id_));
+    network_manager_->GET(network_manager_->board_tasks_url_ +
+                          "?board_id=" + QString::number(board_id_));
+}
+
+void BoardScreen::clearBoardData() {
+    status_windows_.clear();
+    status_names_.clear();
+
+    while (board_layout_ && board_layout_->count() > 1) {
+        QLayoutItem* item = board_layout_->takeAt(0);
+        if (!item) {
+            continue;
+        }
+
+        if (item->widget()) {
+            delete item->widget();
+        }
+        delete item;
+    }
+}
+
+StatusWindow* BoardScreen::ensureStatusWindow(int status_id, const QString& name) {
+    if (status_windows_.contains(status_id)) {
+        return status_windows_.value(status_id);
+    }
+
+    auto* status = new StatusWindow(status_id, board_id_, name, this);
+    status->setNetworkManager(network_manager_);
+    board_layout_->insertWidget(board_layout_->count() - 1, status);
+    status_windows_.insert(status_id, status);
+    return status;
+}
+
+void BoardScreen::loadTasksFromResponse(const QByteArray& data) {
+    clearBoardData();
+
+    const QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        qDebug() << "BoardScreen: Некорректный JSON в ответе /board/v1/tasks";
+        return;
+    }
+
+    const QJsonArray tasks = doc.object()["data"].toArray();
+    for (const QJsonValue& value : tasks) {
+        if (!value.isObject()) {
+            continue;
+        }
+
+        const QJsonObject task = value.toObject();
+        const int status_id = task["status_id"].toInt(-1);
+        const int task_id = task["id"].toInt(-1);
+        if (status_id <= 0 || task_id <= 0) {
+            continue;
+        }
+
+        const QString status_name_from_api = task["status_name"].toString();
+        if (!status_name_from_api.isEmpty()) {
+            status_names_.insert(status_id, status_name_from_api);
+        }
+
+        const QString status_name =
+            status_names_.contains(status_id) ? status_names_.value(status_id) : "Status";
+        StatusWindow* status = ensureStatusWindow(status_id, status_name);
+
+        auto* card = new TaskCard(task_id, board_id_, status_id, status);
+        card->setNetworkManager(network_manager_);
+        card->setData(task["title"].toString(), task["description"].toString());
+        status->addTaskCard(card);
     }
 }
 
@@ -113,16 +199,54 @@ void BoardScreen::onStatusCreateRequest() {
 }
 
 void BoardScreen::onProfileRequest() {
-    if (!network_manager_)
-        return;
-    network_manager_->GET(network_manager_->user_info_url_);
     emit openProfileScreen();
 }
 
 void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
     if (endpoint != network_manager_->statuses_create_url_ &&
-        endpoint != network_manager_->user_info_url_)
+        !endpoint.startsWith(network_manager_->board_get_url_) &&
+        !endpoint.startsWith(network_manager_->board_tasks_url_))
         return;
+
+    if (endpoint.startsWith(network_manager_->board_get_url_) ||
+        endpoint.startsWith(network_manager_->board_tasks_url_)) {
+        if (!isVisible()) {
+            return;
+        }
+
+        const QUrl url("http://localhost" + endpoint);
+        const QUrlQuery query(url);
+        bool ok = false;
+        const int response_board_id = query.queryItemValue("board_id").toInt(&ok);
+        if (!ok || response_board_id != board_id_) {
+            return;
+        }
+    }
+
+    if (endpoint.startsWith(network_manager_->board_get_url_)) {
+        if (code == 200) {
+            const QJsonDocument doc = QJsonDocument::fromJson(data);
+            const QString title = doc.object()["data"].toObject()["title"].toString();
+            if (!title.isEmpty()) {
+                board_name_label_->setText("| " + title);
+            } else {
+                board_name_label_->setText(QString("| Board %1").arg(board_id_));
+            }
+        } else {
+            qDebug() << "BoardScreen: Ошибка получения доски:" << code;
+        }
+        return;
+    }
+
+    if (endpoint.startsWith(network_manager_->board_tasks_url_)) {
+        if (code == 200) {
+            loadTasksFromResponse(data);
+        } else {
+            qDebug() << "BoardScreen: Ошибка получения задач:" << code;
+            clearBoardData();
+        }
+        return;
+    }
 
     if (code < 200 || code >= 300) {
         qDebug() << "BoardScreen: Ошибка сервера" << code << "на" << endpoint;
@@ -135,6 +259,7 @@ void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
 
     if (endpoint == network_manager_->statuses_create_url_) {
         int new_id = data_obj["id"].toInt();
+        const QString created_name = data_obj["name"].toString();
         qDebug() << "BoardScreen: Успешное создание статуса";
 
         QList<StatusWindow*> windows = this->findChildren<StatusWindow*>();
@@ -142,6 +267,10 @@ void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
         for (StatusWindow* window : windows) {
             if (window->getId() == -1) {
                 window->setId(new_id);
+                status_windows_.insert(new_id, window);
+                if (!created_name.isEmpty()) {
+                    status_names_.insert(new_id, created_name);
+                }
                 qDebug() << "BoardScreen: ID статуса обновлен";
                 break;
             }
