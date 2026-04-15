@@ -19,6 +19,7 @@ class StatusRepository {
     std::optional<Status> find_by_board_and_name(int board_id, const std::string& name);
     std::optional<Status> find_by_id(int status_id);
     std::vector<Status> find_by_board_id(int board_id);
+    bool delete_by_id(int status_id);
 
   private:
     ConnectionPool& pool_;
