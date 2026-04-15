@@ -29,6 +29,8 @@ add_executable(ChronosClient
         src/status_window.cpp
         include/task_card.h
         src/task_card.cpp
+        src/profile_edit_screen.cpp
+        include/profile_edit_screen.h
 )
 
 

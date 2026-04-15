@@ -19,13 +19,14 @@ void ProfileScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
-void ProfileScreen::showEvent(QShowEvent* event) {
-    QWidget::showEvent(event);
-
+void ProfileScreen::getUserData() {
     if (network_manager_) {
-        qDebug() << "ProfileScreen: Окно открыто, запрашиваю данные аккаунта...";
         network_manager_->GET(network_manager_->user_info_url_);
     }
+}
+
+void ProfileScreen::onProfileEditRequest() {
+    emit profileEditRequested();
 }
 
 void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
@@ -129,5 +130,6 @@ void ProfileScreen::setupLayout() {
 
     connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::boardRequested);
     connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
+    connect(edit_button_, &QPushButton::clicked, this, &ProfileScreen::profileEditRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
