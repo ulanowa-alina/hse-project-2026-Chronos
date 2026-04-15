@@ -21,7 +21,7 @@ class RegistrationScreen : public QWidget {
 
   signals:
     void loginRequested();
-    void registrationRequested();
+    void registrationRequested(int user_id);
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);

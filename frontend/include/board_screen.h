@@ -20,6 +20,9 @@ class BoardScreen : public QWidget {
     explicit BoardScreen(int board_id, QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setId(int id) {
+        board_id_ = id;
+    }
 
   signals:
     void openProfileScreen();

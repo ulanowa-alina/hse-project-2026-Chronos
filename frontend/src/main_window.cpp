@@ -15,7 +15,7 @@ MainWindow::MainWindow(QWidget* parent)
     profile_screen_ = new ProfileScreen(this);
     profile_edit_screen_ = new ProfileEditScreen(this);
     registration_screen_ = new RegistrationScreen(this);
-    board_screen_ = new BoardScreen(1, this);
+    board_screen_ = new BoardScreen(current_user_id_, this);
 
     login_screen_->setNetworkManager(network_manager_);
     profile_screen_->setNetworkManager(network_manager_);
@@ -31,7 +31,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(login_screen_, &LoginScreen::loginRequested, this, &MainWindow::switchToBoard);
     connect(profile_screen_, &ProfileScreen::logoutRequested, this, &MainWindow::switchToLogin);
-    connect(profile_screen_, &ProfileScreen::boardRequested, this, &MainWindow::switchToBoard);
+    connect(profile_screen_, &ProfileScreen::boardRequested, this,
+            [this]() { this->switchToBoard(this->current_user_id_); });
     connect(registration_screen_, &RegistrationScreen::loginRequested, this,
             &MainWindow::switchToLogin);
     connect(registration_screen_, &RegistrationScreen::registrationRequested, this,
@@ -88,7 +89,13 @@ void MainWindow::switchToRegistration() {
     resize(400, 600);
 }
 
-void MainWindow::switchToBoard() {
+void MainWindow::switchToBoard(int user_id) {
+    if (user_id != -1) {
+        current_user_id_ = user_id;
+    }
+
+    board_screen_->setId(user_id);
+
     profile_screen_->hide();
     stacked_widget_->setCurrentWidget(board_screen_);
     setWindowTitle("Chronos - Доска");

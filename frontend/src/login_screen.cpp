@@ -30,7 +30,8 @@ void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
         network_manager_->setToken(token);
 
         qDebug() << "LoginScreen: успешный вход";
-        emit loginRequested();
+        int id = doc.object()["data"].toObject()["user"].toObject()["id"].toInt();
+        emit loginRequested(id);
     } else {
         qDebug() << "LoginScreen: Ошибка входа:" << code;
     }

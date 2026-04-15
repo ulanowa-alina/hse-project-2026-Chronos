@@ -20,7 +20,7 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
 
 void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
                                            int code) {
-    if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_)
+    if (endpointetwork_manager_->register_url_ && endpoint != network_manager_->login_url_)
         return;
     if (endpoint == network_manager_->register_url_) {
         if (code == 200) {
@@ -42,7 +42,8 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
             network_manager_->setToken(token);
 
             qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен, перехожу на доску";
-            emit registrationRequested();
+            int id = doc.object()["data"].toObject()["user"].toObject()["id"].toInt();
+            emit registrationRequested(id);
         }
     }
 }
