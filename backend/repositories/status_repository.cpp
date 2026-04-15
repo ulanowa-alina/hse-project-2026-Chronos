@@ -106,3 +106,18 @@ std::vector<Status> StatusRepository::find_by_board_id(int board_id) {
         throw std::runtime_error(std::string("Status::find_by_board_id failed: ") + e.what());
     }
 }
+
+bool StatusRepository::delete_by_id(int status_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r =
+            txn.exec_params("DELETE FROM statuses WHERE id = $1 RETURNING id", status_id);
+
+        txn.commit();
+        return !r.empty();
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Status::delete_by_id failed: ") + e.what());
+    }
+}
