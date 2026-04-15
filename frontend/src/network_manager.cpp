@@ -62,7 +62,7 @@ void NetworkManager::sendRequest(const RequestData& req_data) {
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         QByteArray body_data = QJsonDocument(req_data.body_).toJson();
         reply = manager_->sendCustomRequest(request, "DELETE", body_data);
-    }else if(req_data.method_ == "PUT"){
+    } else if (req_data.method_ == "PUT") {
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         QByteArray body_data = QJsonDocument(req_data.body_).toJson();
         reply = manager_->put(request, body_data);
