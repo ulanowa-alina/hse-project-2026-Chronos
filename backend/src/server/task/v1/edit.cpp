@@ -1,15 +1,16 @@
 #include "edit.hpp"
+
 #include "../../../../repositories/board_repository.hpp"
 #include "../../../../repositories/status_repository.hpp"
 #include "../../../../repositories/task_repository.hpp"
 #include "../../utils/response_utils.hpp"
 
-#include <nlohmann/json.hpp>
-#include <string>
-#include <stdexcept>
 #include <array>
 #include <ctime>
+#include <nlohmann/json.hpp>
 #include <optional>
+#include <stdexcept>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -90,35 +91,34 @@ json model_to_json(const Task& task) {
     return data;
 }
 
-
 } // namespace
 
-auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool, int user_id)
-    -> http::response<http::string_body> {
-    
+auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool,
+                int user_id) -> http::response<http::string_body> {
+
     if (req.method() != http::verb::patch) {
-        return server::utils::build_error_response(
-            req, http::status::method_not_allowed, "DUPLICATE_RESOURCE", "Method not allowed");
+        return server::utils::build_error_response(req, http::status::method_not_allowed,
+                                                   "DUPLICATE_RESOURCE", "Method not allowed");
     }
 
     json body;
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
-        return server::utils::build_error_response(
-            req, http::status::bad_request, "INVALID_FORMAT", "Invalid JSON format");
+        return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
+                                                   "Invalid JSON format");
     }
 
     if (!body.is_object()) {
-        return server::utils::build_error_response(
-            req, http::status::bad_request, "INVALID_FORMAT", "Invalid JSON format");
+        return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
+                                                   "Invalid JSON format");
     }
 
     const json missing_fields = collect_missing_fields(body);
     if (!missing_fields.empty()) {
-        return server::utils::build_error_response(
-            req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
-            json{{"missing_fields", missing_fields}});
+        return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
+                                                   "Missing required fields",
+                                                   json{{"missing_fields", missing_fields}});
     }
 
     try {
@@ -149,28 +149,29 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         TaskRepository task_repository(pool);
         const std::optional<Task> existing_task = task_repository.find_by_id(task_id);
         if (!existing_task.has_value()) {
-            return server::utils::build_error_response(
-                req, http::status::not_found, "TASK_NOT_FOUND", "Task not found");
+            return server::utils::build_error_response(req, http::status::not_found,
+                                                       "TASK_NOT_FOUND", "Task not found");
         }
 
         BoardRepository board_repository(pool);
-        const std::optional<Board> task_board = board_repository.find_by_id(existing_task->board_id_);
+        const std::optional<Board> task_board =
+            board_repository.find_by_id(existing_task->board_id_);
         if (!task_board.has_value()) {
-            return server::utils::build_error_response(
-                req, http::status::not_found, "BOARD_NOT_FOUND", "Board not found");
+            return server::utils::build_error_response(req, http::status::not_found,
+                                                       "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (task_board->user_id_ != user_id) {
-            return server::utils::build_error_response(
-                req, http::status::forbidden, "RESOURCE_NOT_OWNED",
-                "Resource belongs to another user");
+            return server::utils::build_error_response(req, http::status::forbidden,
+                                                       "RESOURCE_NOT_OWNED",
+                                                       "Resource belongs to another user");
         }
 
         StatusRepository status_repository(pool);
         const std::optional<Status> new_status = status_repository.find_by_id(status_id);
         if (!new_status.has_value()) {
-            return server::utils::build_error_response(
-                req, http::status::not_found, "STATUS_NOT_FOUND", "Status not found");
+            return server::utils::build_error_response(req, http::status::not_found,
+                                                       "STATUS_NOT_FOUND", "Status not found");
         }
 
         if (new_status->board_id_ != existing_task->board_id_) {
@@ -185,8 +186,8 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
         const Task updated_task = task_repository.save(task_to_save);
 
-        return server::utils::build_json_response(
-            req, http::status::ok, json{{"data", model_to_json(updated_task)}});
+        return server::utils::build_json_response(req, http::status::ok,
+                                                  json{{"data", model_to_json(updated_task)}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
 
@@ -211,17 +212,15 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                 json{{field, "Field must be a positive integer"}});
         }
 
-        return server::utils::build_error_response(
-            req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed");
+        return server::utils::build_error_response(req, http::status::bad_request,
+                                                   "VALIDATION_ERROR", "Validation failed");
     } catch (const std::runtime_error&) {
-        return server::utils::build_error_response(
-            req, http::status::internal_server_error, "DATABASE_ERROR", "Database error");
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "DATABASE_ERROR", "Database error");
     } catch (const std::exception&) {
-        return server::utils::build_error_response(
-            req, http::status::internal_server_error, "INTERNAL_ERROR", "Internal server error");
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "INTERNAL_ERROR", "Internal server error");
     }
-
-
 }
 
 } // namespace task::v1
