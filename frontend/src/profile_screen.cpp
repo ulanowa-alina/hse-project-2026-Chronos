@@ -19,14 +19,13 @@ void ProfileScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
-void ProfileScreen::getUserData() {
+void ProfileScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+
     if (network_manager_) {
+        qDebug() << "ProfileScreen: Окно открыто, запрашиваю данные аккаунта...";
         network_manager_->GET(network_manager_->user_info_url_);
     }
-}
-
-void ProfileScreen::onProfileEditRequest() {
-    emit profileEditRequested();
 }
 
 void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {

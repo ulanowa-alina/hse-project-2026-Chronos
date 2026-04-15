@@ -7,7 +7,6 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QPushButton>
-#include <QShowEvent>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -18,7 +17,6 @@ class ProfileScreen : public QWidget {
     explicit ProfileScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
-    void getUserData();
 
   signals:
     void logoutRequested();
@@ -27,7 +25,7 @@ class ProfileScreen : public QWidget {
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
-    void onProfileEditRequest();
+
   private:
     NetworkManager* network_manager_{nullptr};
 
@@ -41,6 +39,7 @@ class ProfileScreen : public QWidget {
     QLabel* email_label_{nullptr};
 
     void setupLayout();
+    void showEvent(QShowEvent* event) override;
 };
 
 #endif // PROFILE_SCREEN_H

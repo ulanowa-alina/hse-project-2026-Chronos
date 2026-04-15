@@ -15,10 +15,10 @@ class ProfileEditScreen : public QWidget {
     explicit ProfileEditScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
-    void getUserData();
 
   signals:
     void profileRequested();
+
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
@@ -40,6 +40,8 @@ class ProfileEditScreen : public QWidget {
     QLineEdit* password_input_{nullptr};
 
     void setupLayout();
+    void showEvent(QShowEvent* event) override;
+
 };
 
 #endif // PROFILE_EDIT_SCREEN_H

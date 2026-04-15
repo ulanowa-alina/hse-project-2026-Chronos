@@ -19,65 +19,54 @@ void ProfileEditScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
-void ProfileEditScreen::getUserData() {
+void ProfileEditScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
     if (network_manager_) {
-        password_input_->clear();
+        qDebug() << "ProfileEditScreen: Открыто, запрашиваю данные...";
         network_manager_->GET(network_manager_->user_info_url_);
     }
 }
 
 void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (!network_manager_) {
-        return;
-    }
+    if (!network_manager_) return;
 
     if (endpoint == network_manager_->user_info_url_) {
-        if (code != 200) {
-            qDebug() << "ProfileEditScreen: Не удалось загрузить данные профиля. Код ошибки: " << code;
-            return;
+        if (code == 200) {
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject data_obj = doc.object()["data"].toObject();
+
+            name_input_->setText(data_obj["name"].toString());
+            email_input_->setText(data_obj["email"].toString());
+            status_input_->setText(data_obj["status"].toString());
         }
-
-        const QJsonObject data_obj = QJsonDocument::fromJson(data).object()["data"].toObject();
-        name_input_->setText(data_obj["name"].toString());
-        email_input_->setText(data_obj["email"].toString());
-        status_input_->setText(data_obj["status"].toString());
         return;
     }
 
-    if (endpoint != network_manager_->user_edit_info_url_) {
-        return;
-    }
+    if (endpoint == network_manager_->user_edit_info_url_) {
+        if (code == 200) {
+            qDebug() << "ProfileEditScreen: Изменения успешно сохранены";
+            password_input_->clear();
 
-    if (code == 200) {
-        password_input_->clear();
-
-        qDebug() << "ProfileEditScreen: успешное изменение данных";
-        emit profileRequested();
-    } else {
-        qDebug() << "ProfileEditScreen: Ошибка изменения данных:" << code;
+            emit profileRequested();
+        } else {
+            qDebug() << "ProfileEditScreen: Ошибка сохранения! Код:" << code << "Данные:" << data;
+        }
     }
 }
 
 void ProfileEditScreen::onProfileEditRequest() {
-    if (!network_manager_) {
-        return;
-    }
-
-    QString email = email_input_->text().trimmed();
-    QString name = name_input_->text().trimmed();
-    QString status = status_input_->text().trimmed();
-    QString password = password_input_->text();
-
-    if (email.isEmpty() || name.isEmpty() || status.isEmpty() || password.isEmpty()) {
-        qDebug() << "ProfileEditScreen: Поля не могут быть пустыми. Но отправлю запрос";
-    }
+    if (!network_manager_) return;
 
     QJsonObject json;
-    json["name"] = name;
-    json["email"] = email;
-    json["status"] = status;
-    json["password"] = password;
+    json["name"] = name_input_->text();
+    json["email"] = email_input_->text();
+    json["status"] = status_input_->text();
 
+    if (!password_input_->text().isEmpty()) {
+        json["password"] = password_input_->text();
+    }
+
+    qDebug() << "ProfileEditScreen: Отправляю новые данные на сервер...";
     network_manager_->PUT(network_manager_->user_edit_info_url_, json);
 }
 
