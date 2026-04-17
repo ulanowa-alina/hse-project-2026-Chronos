@@ -29,6 +29,7 @@ class TaskCard : public QFrame {
     void setStatusId(int new_status_id) {
         status_id_ = new_status_id;
     }
+    void setData(const QString& title, const QString& description);
     void updateTaskStatus();
 
   private slots:

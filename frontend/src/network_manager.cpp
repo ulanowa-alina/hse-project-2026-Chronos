@@ -72,7 +72,11 @@ void NetworkManager::sendRequest(const RequestData& req_data) {
         request_storage_.insert(reply, req_data);
 
         connect(reply, &QNetworkReply::finished, this, [this, reply]() { onResult(reply); });
-        qDebug() << "NetworkManager: Отправлен" << req_data.method_ << "на" << req_data.endpoint_;
+        const QUrl endpoint_url("http://localhost" + req_data.endpoint_);
+        qDebug() << "NetworkManager: Отправлен" << req_data.method_ << "на" << endpoint_url.path();
+        if (!endpoint_url.query().isEmpty()) {
+            qDebug() << "Query:" << endpoint_url.query();
+        }
     }
 }
 
@@ -105,7 +109,11 @@ void NetworkManager::onResult(QNetworkReply* reply) {
     }
 
     qDebug() << "--- Получен ответ ---";
-    qDebug() << "Endpoint:" << endpoint;
+    const QUrl endpoint_url("http://localhost" + endpoint);
+    qDebug() << "Endpoint:" << endpoint_url.path();
+    if (!endpoint_url.query().isEmpty()) {
+        qDebug() << "Query:" << endpoint_url.query();
+    }
     qDebug() << "Status:" << status_code;
     qDebug() << "Data:" << data;
 

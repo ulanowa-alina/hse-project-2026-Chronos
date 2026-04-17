@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMainWindow>
+#include <QMap>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -20,6 +21,11 @@ class BoardScreen : public QWidget {
     explicit BoardScreen(int board_id, QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void reloadBoardData();
+    void clearBoardData();
+    void setId(int id) {
+        board_id_ = id;
+    }
 
   signals:
     void openProfileScreen();
@@ -42,7 +48,11 @@ class BoardScreen : public QWidget {
 
     QScrollArea* scroll_area_{nullptr};
     QHBoxLayout* board_layout_{nullptr};
+    QMap<int, StatusWindow*> status_windows_;
+    QMap<int, QString> status_names_;
 
+    StatusWindow* ensureStatusWindow(int status_id, const QString& name);
+    void loadTasksFromResponse(const QByteArray& data);
     void setupLayout();
 };
 

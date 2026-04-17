@@ -231,6 +231,10 @@ void StatusWindow::insertTaskCard(TaskCard* card) {
     tasks_layout_->insertWidget(0, card);
 }
 
+void StatusWindow::addTaskCard(TaskCard* card) {
+    insertTaskCard(card);
+}
+
 void StatusWindow::removeTaskCard(TaskCard* card) {
     tasks_layout_->removeWidget(card);
 }

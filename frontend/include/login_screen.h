@@ -20,7 +20,7 @@ class LoginScreen : public QWidget {
     void setNetworkManager(NetworkManager* manager);
 
   signals:
-    void loginRequested();
+    void loginRequested(int board_id);
     void registrationRequested();
 
   private slots:

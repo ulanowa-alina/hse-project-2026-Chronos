@@ -20,7 +20,7 @@ class MainWindow : public QMainWindow {
     void switchToProfile();
     void switchToLogin();
     void switchToRegistration();
-    void switchToBoard();
+    void switchToBoard(int board_id);
     void switchToProfileEdit();
 
   private:
@@ -32,5 +32,7 @@ class MainWindow : public QMainWindow {
     RegistrationScreen* registration_screen_{nullptr};
     BoardScreen* board_screen_{nullptr};
     ProfileEditScreen* profile_edit_screen_{nullptr};
+
+    int current_board_id_ = -1;
 };
 #endif // MAIN_WINDOW_H

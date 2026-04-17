@@ -29,12 +29,16 @@ class NetworkManager : public QObject {
     const QString register_url_ = "/auth/v1/register";
     const QString user_info_url_ = "/personal/v1/info";
     const QString tasks_edit_url_ = "/task/v1/edit";
-    const QString tasks_create_url_ = "/board/v1/tasks/create";
+    const QString tasks_create_url_ = "/task/v1/create";
     const QString statuses_edit_url_ = "/status/v1/edit";
     const QString statuses_create_url_ = "/status/v1/create";
     const QString login_url_ = "/auth/v1/login";
-    const QString tasks_delete_url_ = "/tasks/v1/delete";
+    const QString board_get_url_ = "/board/v1/get";
+    const QString boards_get_all_url_ = "/board/v1/get_all";
+    const QString board_tasks_url_ = "/board/v1/tasks";
+    const QString tasks_delete_url_ = "/task/v1/delete";
     const QString statuses_delete_url_ = "/status/v1/delete";
+    const QString statieses_edit_url_ = "/status/v1/edit";
     const QString user_edit_info_url_ = "/personal/v1/edit";
 
     void GET(const QString& endpoint);

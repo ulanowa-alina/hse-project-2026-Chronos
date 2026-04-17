@@ -32,6 +32,11 @@ void TaskCard::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void TaskCard::setData(const QString& title, const QString& description) {
+    title_->setText(title);
+    description_edit_->setPlainText(description);
+}
+
 void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
     if (endpoint != network_manager_->tasks_edit_url_ &&
         endpoint != network_manager_->tasks_create_url_ &&

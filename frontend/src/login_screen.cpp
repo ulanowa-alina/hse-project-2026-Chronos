@@ -1,6 +1,7 @@
 #include "login_screen.h"
 
 #include <QDebug>
+#include <QJsonArray>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 
@@ -19,20 +20,49 @@ void LoginScreen::setNetworkManager(NetworkManager* manager) {
 }
 
 void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->login_url_)
+    if (!isVisible()) {
+        return;
+    }
+
+    if (endpoint != network_manager_->login_url_ &&
+        endpoint != network_manager_->boards_get_all_url_)
         return;
 
-    if (code == 200) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        QJsonObject data_obj = doc.object()["data"].toObject();
+    if (endpoint == network_manager_->login_url_) {
+        if (code == 200) {
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject data_obj = doc.object()["data"].toObject();
 
-        QString token = data_obj["token"].toString();
-        network_manager_->setToken(token);
+            QString token = data_obj["token"].toString();
+            network_manager_->setToken(token);
 
-        qDebug() << "LoginScreen: успешный вход";
-        emit loginRequested();
-    } else {
-        qDebug() << "LoginScreen: Ошибка входа:" << code;
+            qDebug() << "LoginScreen: успешный вход";
+            network_manager_->GET(network_manager_->boards_get_all_url_);
+        } else {
+            qDebug() << "LoginScreen: Ошибка входа:" << code;
+        }
+        return;
+    }
+
+    if (endpoint == network_manager_->boards_get_all_url_) {
+        if (code == 200) {
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            const QJsonArray boards = doc.object()["data"].toArray();
+            if (boards.isEmpty()) {
+                qDebug() << "LoginScreen: Для пользователя не найдено ни одной доски";
+                return;
+            }
+
+            const int board_id = boards.first().toObject()["id"].toInt(-1);
+            if (board_id <= 0) {
+                qDebug() << "LoginScreen: Некорректный board_id в ответе /board/v1/get_all";
+                return;
+            }
+
+            emit loginRequested(board_id);
+        } else {
+            qDebug() << "LoginScreen: Ошибка получения доски:" << code;
+        }
     }
 }
 /*
