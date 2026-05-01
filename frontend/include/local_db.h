@@ -1,10 +1,24 @@
-//
-// Created by Алина Уланова on 01.05.2026.
-//
+#ifndef LOCAL_DB_H
+#define LOCAL_DB_H
 
-#ifndef CHRONOS_LOCAL_DB_HPP
-#define CHRONOS_LOCAL_DB_HPP
+#include <QObject>
+#include <QString>
+#include <QWidget>
+#include <QtSql/QSqlDatabase>
+class LocalDatabaseManager : public QObject {
+    Q_OBJECT
 
-class local_db {};
+  public:
+    explicit LocalDatabaseManager(QWidget* parent = nullptr);
 
-#endif // CHRONOS_LOCAL_DB_HPP
+    bool open(const QString& db_name);
+    void close();
+    bool isOpen();
+    void createDb(const QString& sql_file_path);
+
+  private:
+    QString connection_name_;
+    QSqlDatabase db_;
+};
+
+#endif // LOCAL_DB_H
