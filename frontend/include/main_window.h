@@ -2,6 +2,7 @@
 #define MAIN_WINDOW_H
 
 #include "board_screen.h"
+#include "local_db.h"
 #include "login_screen.h"
 #include "network_manager.h"
 #include "profile_edit_screen.h"
@@ -10,7 +11,6 @@
 
 #include <QMainWindow>
 #include <QStackedWidget>
-
 class MainWindow : public QMainWindow {
     Q_OBJECT
   public:
@@ -25,6 +25,7 @@ class MainWindow : public QMainWindow {
 
   private:
     NetworkManager* network_manager_;
+    LocalDatabaseManager* local_db_{nullptr};
 
     QStackedWidget* stacked_widget_{nullptr};
     LoginScreen* login_screen_{nullptr};

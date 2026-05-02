@@ -5,6 +5,7 @@
 #include <QString>
 #include <QWidget>
 #include <QtSql/QSqlDatabase>
+
 class LocalDatabaseManager : public QObject {
     Q_OBJECT
 
@@ -13,8 +14,7 @@ class LocalDatabaseManager : public QObject {
 
     bool open(const QString& db_name);
     void close();
-    bool isOpen();
-    void createDb(const QString& sql_file_path);
+    bool createDb(const QString& sql_file_path);
 
   private:
     QString connection_name_;

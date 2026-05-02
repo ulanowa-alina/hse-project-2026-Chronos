@@ -7,6 +7,9 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
     network_manager_ = new NetworkManager(this);
+    local_db_ = new LocalDatabaseManager(this);
+    local_db_->open("chronos_local.db");
+    local_db_->createDb("../sql/local_init.sql");
 
     stacked_widget_ = new QStackedWidget(this);
     setCentralWidget(stacked_widget_);
