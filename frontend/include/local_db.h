@@ -15,7 +15,9 @@ class LocalDatabaseManager : public QObject {
     bool open(const QString& db_name);
     void close();
     bool createDb(const QString& sql_file_path);
-
+    QSqlDatabase getDatabase() const{
+         return db_;
+    }
   private:
     QString connection_name_;
     QSqlDatabase db_;

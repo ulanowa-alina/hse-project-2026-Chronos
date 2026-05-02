@@ -9,6 +9,9 @@
 #include "profile_screen.h"
 #include "registration_screen.h"
 
+#include "../local_repositories/local_task_repository.hpp"
+
+
 #include <QMainWindow>
 #include <QStackedWidget>
 class MainWindow : public QMainWindow {
