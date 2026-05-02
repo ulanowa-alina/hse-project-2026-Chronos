@@ -1,6 +1,7 @@
 #include "local_db.h"
 
 #include <QDebug>
+#include <QFile>
 #include <QUuid>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlQuery>
@@ -37,6 +38,10 @@ bool LocalDatabaseManager::createDb(const QString& sql_file_path) {
     }
 
     QFile file(sql_file_path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "Local DB: Cannot open SQL file" << sql_file_path;
+        return false;
+    }
 
     QString sql_script = file.readAll();
     file.close();
