@@ -1,0 +1,8 @@
+//
+// Created by Алина Уланова on 02.05.2026.
+//
+
+#ifndef CHRONOSCLIENT_LOCAL_STATUS_HPP
+#define CHRONOSCLIENT_LOCAL_STATUS_HPP
+
+#endif //CHRONOSCLIENT_LOCAL_STATUS_HPP

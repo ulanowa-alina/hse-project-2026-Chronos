@@ -33,6 +33,15 @@ add_executable(ChronosClient
         include/profile_edit_screen.h
         src/local_db.cpp
         include/local_db.h
+        local_repositories/local_board_repository.cpp
+        local_repositories/local_board_repository.hpp
+        local_repositories/local_status_repository.cpp
+        local_repositories/local_status_repository.hpp
+        local_repositories/local_task_repository.cpp
+        local_repositories/local_task_repository.hpp
+        local_models/local_task.hpp
+        local_models/local_board.hpp
+        local_models/local_status.hpp
 )
 
 

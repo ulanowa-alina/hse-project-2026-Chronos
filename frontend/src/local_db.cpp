@@ -21,7 +21,7 @@ bool LocalDatabaseManager::open(const QString& db_name) {
         return false;
     }
 
-    qDebug() << "Local DB:" << db_name;
+    qDebug() << "Local DB: database created succesfully: " << db_name;
     return true;
 }
 
