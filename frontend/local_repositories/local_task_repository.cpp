@@ -140,6 +140,27 @@ std::vector<LocalTask> LocalTaskRepository::findByBoardId(int board_id) {
     return tasks;
 }
 
+std::vector<LocalTask> LocalTaskRepository::findByStatusId(int status_id) {
+    QSqlQuery query(db_);
+    query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
+                  "created_at, updated_at, is_sync, is_deleted "
+                  "FROM tasks "
+                  "WHERE status_id = :status_id AND is_deleted = 0 ");
+    query.bindValue(":status_id", status_id);
+
+    if (!query.exec()) {
+        throw std::runtime_error(
+            ("LocalTaskRepository: Error find by board_id: " + query.lastError().text())
+                .toStdString());
+    }
+
+    std::vector<LocalTask> tasks;
+    while (query.next()) {
+        tasks.push_back(createTask(query));
+    }
+    return tasks;
+}
+
 void LocalTaskRepository::deleteById(int task_id) {
     QSqlQuery query(db_);
 
