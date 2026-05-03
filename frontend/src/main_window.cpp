@@ -1,8 +1,7 @@
 #include "main_window.h"
 
-#include <QStackedWidget>
-
 #include <QSqlQuery>
+#include <QStackedWidget>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
@@ -17,27 +16,19 @@ MainWindow::MainWindow(QWidget* parent)
     LocalTaskRepository task_repo(db);
 
     // DEBUG: TODO: удалю потом
-    LocalTask test_task(
-            1,
-            1,
-            "Test task",
-            "Local sqlite task",
-            1,
-            "gray",
-            "",
-            QDateTime::currentDateTime().toString(Qt::ISODate),
-            QDateTime::currentDateTime().toString(Qt::ISODate),
-            0,
-            0
-    );
+    LocalTask test_task(1, 1, "Test task", "Local sqlite task", 1, "gray", "",
+                        QDateTime::currentDateTime().toString(Qt::ISODate),
+                        QDateTime::currentDateTime().toString(Qt::ISODate), 0, 0);
 
     try {
         QSqlQuery query(db);
-        query.exec("INSERT OR IGNORE INTO boards (id, title, description, is_private, created_at, updated_at, is_sync, is_deleted) "
+        query.exec("INSERT OR IGNORE INTO boards (id, title, description, is_private, created_at, "
+                   "updated_at, is_sync, is_deleted) "
                    "VALUES (1, 'Test board', '', 0, datetime('now'), datetime('now'), 1, 0)");
 
-        query.exec("INSERT OR IGNORE INTO statuses (id, board_id, name, position, is_sync, is_deleted) "
-                   "VALUES (1, 1, 'todo', 0, 1, 0)");
+        query.exec(
+            "INSERT OR IGNORE INTO statuses (id, board_id, name, position, is_sync, is_deleted) "
+            "VALUES (1, 1, 'todo', 0, 1, 0)");
 
         task_repo.save(test_task);
 
@@ -45,17 +36,13 @@ MainWindow::MainWindow(QWidget* parent)
         qDebug() << "Tasks in board 1:" << tasks.size();
 
         for (const auto& task : tasks) {
-            qDebug() << "Task:"
-                     << task.id_
-                     << task.title_
-                     << task.description_
-                     << task.is_sync_;
+            qDebug() << "Task:" << task.id_ << task.title_ << task.description_ << task.is_sync_;
         }
     } catch (const std::exception& e) {
         qDebug() << "LocalTaskRepository error:" << e.what();
     }
 
-    //DEBUG закончился
+    // DEBUG закончился
 
     stacked_widget_ = new QStackedWidget(this);
     setCentralWidget(stacked_widget_);

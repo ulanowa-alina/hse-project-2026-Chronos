@@ -2,10 +2,13 @@
 #define LOCAL_TASK_REPOSITORY_HPP
 
 #include "../local_models/local_task.hpp"
+
 #include <QSqlDatabase>
+#include <optional>
+#include <vector>
 
 class LocalTaskRepository {
-public:
+  public:
     explicit LocalTaskRepository(QSqlDatabase& db);
 
     LocalTask save(const LocalTask& task);
@@ -15,12 +18,11 @@ public:
     void deleteById(int task_id);
     void markSynced(int task_id);
 
-private:
+  private:
     QSqlDatabase& db_;
 
     LocalTask insert(const LocalTask& task);
     LocalTask update(const LocalTask& task);
 };
 
-
-#endif //LOCAL_TASK_REPOSITORY_HPP
+#endif // LOCAL_TASK_REPOSITORY_HPP

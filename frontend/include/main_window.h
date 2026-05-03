@@ -1,6 +1,7 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
+#include "../local_repositories/local_task_repository.hpp"
 #include "board_screen.h"
 #include "local_db.h"
 #include "login_screen.h"
@@ -8,9 +9,6 @@
 #include "profile_edit_screen.h"
 #include "profile_screen.h"
 #include "registration_screen.h"
-
-#include "../local_repositories/local_task_repository.hpp"
-
 
 #include <QMainWindow>
 #include <QStackedWidget>
