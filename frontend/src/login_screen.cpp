@@ -19,6 +19,10 @@ void LoginScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void LoginScreen::setSyncManager(SyncManager* manager) {
+    sync_manager_ = manager;
+}
+
 void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
     if (!isVisible()) {
         return;
@@ -37,7 +41,7 @@ void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
             network_manager_->setToken(token);
 
             qDebug() << "LoginScreen: успешный вход";
-            network_manager_->GET(network_manager_->boards_get_all_url_);
+            sync_manager_->loadBoards(); // TODO: когда все laod сделаю: заменить на loadALL
         } else {
             qDebug() << "LoginScreen: Ошибка входа:" << code;
         }
@@ -48,6 +52,9 @@ void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
         if (code == 200) {
             QJsonDocument doc = QJsonDocument::fromJson(data);
             const QJsonArray boards = doc.object()["data"].toArray();
+
+            sync_manager_->parsingBoards(boards);
+
             if (boards.isEmpty()) {
                 qDebug() << "LoginScreen: Для пользователя не найдено ни одной доски";
                 return;

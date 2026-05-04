@@ -2,6 +2,7 @@
 #define LOGIN_SCREEN_H
 
 #include "network_manager.h"
+#include "sync_manager.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -18,6 +19,7 @@ class LoginScreen : public QWidget {
     explicit LoginScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncManager(SyncManager* manager);
 
   signals:
     void loginRequested(int board_id);
@@ -29,6 +31,7 @@ class LoginScreen : public QWidget {
 
   private:
     NetworkManager* network_manager_{nullptr};
+    SyncManager* sync_manager_{nullptr};
 
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};
