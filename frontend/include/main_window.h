@@ -12,6 +12,8 @@
 
 #include <QMainWindow>
 #include <QStackedWidget>
+#include "sync_manager.h"
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
   public:
@@ -26,6 +28,7 @@ class MainWindow : public QMainWindow {
 
   private:
     NetworkManager* network_manager_;
+    SyncManager* sync_manager_;
     LocalDatabaseManager* local_db_{nullptr};
 
     QStackedWidget* stacked_widget_{nullptr};

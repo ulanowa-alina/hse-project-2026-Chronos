@@ -7,7 +7,8 @@
 LocalStatus createStatus(QSqlQuery& query) {
     return LocalStatus(query.value("id").toInt(), query.value("board_id").toInt(),
                        query.value("name").toString(), query.value("position").toInt(),
-                       query.value("is_sync").toInt(), query.value("is_deleted").toInt());
+                       query.value("is_sync").toInt(), query.value("is_deleted").toInt(),
+                       query.value("is_new").toInt());
 }
 
 LocalSatusRepository::LocalSatusRepository(QSqlDatabase& db)
@@ -16,14 +17,15 @@ LocalSatusRepository::LocalSatusRepository(QSqlDatabase& db)
 
 LocalStatus LocalSatusRepository::insert(const LocalStatus& status) {
     QSqlQuery query(db_);
-    query.prepare("INSERT INTO statuses (id, board_id, name, position, is_sync, is_deleted)"
-                  "VALUES(:id, :board_id, :name, :position, :is_sync, :is_deleted)");
+    query.prepare("INSERT INTO statuses (id, board_id, name, position, is_sync, is_deleted, is_new)"
+                  "VALUES(:id, :board_id, :name, :position, :is_sync, :is_deleted, :is_new)");
     query.bindValue(":id", status.id_);
     query.bindValue(":board_id", status.board_id_);
     query.bindValue(":name", status.name_);
     query.bindValue(":position", status.position_);
     query.bindValue(":is_sync", status.is_sync_);
     query.bindValue(":is_deleted", status.is_deleted_);
+    query.bindValue(":is_new", status.is_new_);
 
     if (!query.exec()) {
         qDebug() << "LocalStatusRepository: insert error:" << query.lastError().text();
@@ -36,8 +38,13 @@ LocalStatus LocalSatusRepository::insert(const LocalStatus& status) {
 
 LocalStatus LocalSatusRepository::update(const LocalStatus& status) {
     QSqlQuery query(db_);
-    query.prepare("UPDATE statuses SET (id, board_id, name, position, is_sync, is_deleted)"
-                  "VALUES(:id, :board_id, :name, :position, :is_sync, :is_deleted)"
+    query.prepare("UPDATE statuses SET "
+                  "board_id = :board_id, "
+                  "name = :name, "
+                  "position = :position, "
+                  "is_sync = :is_sync, "
+                  "is_deleted = :is_deleted, "
+                  "is_new = :is_new "
                   "WHERE id = :id");
     query.bindValue(":id", status.id_);
     query.bindValue(":board_id", status.board_id_);
@@ -45,6 +52,7 @@ LocalStatus LocalSatusRepository::update(const LocalStatus& status) {
     query.bindValue(":position", status.position_);
     query.bindValue(":is_sync", status.is_sync_);
     query.bindValue(":is_deleted", status.is_deleted_);
+    query.bindValue(":is_new", status.is_new_);
 
     if (!query.exec()) {
         qDebug() << "LocalStatusRepository: update error:" << query.lastError().text();
@@ -57,7 +65,7 @@ LocalStatus LocalSatusRepository::update(const LocalStatus& status) {
 
 LocalStatus LocalSatusRepository::save(const LocalStatus& status) {
     try {
-        if (status.id_ == 0) {
+        if (!findByid(status.id_)) {
             return insert(status);
         } else {
             return update(status);
@@ -71,7 +79,7 @@ std::optional<LocalStatus> LocalSatusRepository::findByid(int status_id) {
     QSqlQuery query(db_);
 
     query.prepare(
-        "SELECT id, board_id, name, position, is_sync, is_deleted FROM statuses WHERE id = :id");
+        "SELECT id, board_id, name, position, is_sync, is_deleted, is_new FROM statuses WHERE id = :id");
 
     query.bindValue(":id", status_id);
 
@@ -91,8 +99,8 @@ std::vector<LocalStatus> LocalSatusRepository::findByBoardId(int board_id) {
 
     QSqlQuery query(db_);
 
-    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted FROM statuses WHERE id "
-                  "= :id AND is_deleted = 0 ");
+    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted, is_new FROM statuses WHERE board_id "
+                  "= :board_id AND is_deleted = 0 ");
 
     query.bindValue(":board_id", board_id);
 
@@ -112,7 +120,7 @@ std::vector<LocalStatus> LocalSatusRepository::findByBoardId(int board_id) {
 void LocalSatusRepository::deleteById(int status_id) {
     QSqlQuery query(db_);
 
-    query.prepare("UPDATE tasks SET is_deleted = 1, is_sync = 0 WHERE id = :id");
+    query.prepare("UPDATE statuses SET is_deleted = 1, is_sync = 0 WHERE id = :id");
 
     query.bindValue(":id", status_id);
 
@@ -125,7 +133,7 @@ void LocalSatusRepository::deleteById(int status_id) {
 
 void LocalSatusRepository::markSynced(int status_id) {
     QSqlQuery query(db_);
-    query.prepare("UPDATE tasks SET is_sync = 1 WHERE id = :id");
+    query.prepare("UPDATE statuses SET is_sync = 1 WHERE id = :id");
     query.bindValue(":id", status_id);
 
     if (!query.exec()) {
@@ -137,7 +145,7 @@ void LocalSatusRepository::markSynced(int status_id) {
 std::vector<LocalStatus> LocalSatusRepository::findUnsynced() {
     QSqlQuery query(db_);
 
-    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted "
+    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted, is_new "
                   "FROM statuses WHERE is_sync = 0 ");
 
     if (!query.exec()) {

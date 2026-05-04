@@ -6,6 +6,7 @@ Table users {
   created_at text [not null, default: `now()`]
   is_sync integer [not null, default: 1]
   is_deleted integer [not null, default: 0]
+  is_new integer [not null, default: 1]
 }
 
 Table boards {
@@ -17,6 +18,7 @@ Table boards {
   updated_at text [not null, default: `now()`]
   is_sync integer [not null, default: 1]
   is_deleted integer [not null, default: 0]
+  is_new integer [not null, default: 1]
 }
 
 Table statuses {
@@ -26,6 +28,7 @@ Table statuses {
   position integer [not null, default: 0]
   is_sync integer [not null, default: 1]
   is_deleted integer [not null, default: 0]
+  is_new integer [not null, default: 1]
 
   indexes {
     (board_id, name) [unique]
@@ -44,6 +47,7 @@ Table tasks {
   updated_at text [not null, default: `now()`]
   is_sync integer [not null, default: 1]
   is_deleted integer [not null, default: 0]
+  is_new integer [not null, default: 1]
 }
 
 Ref: statuses.board_id > boards.id [delete: cascade]

@@ -7,7 +7,8 @@ CREATE TABLE users(
     status TEXT NOT NULL CHECK (length(status) BETWEEN 1 AND 255),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     is_sync INTEGER NOT NULL DEFAULT 1,
-    is_deleted INTEGER NOT NULL DEFAULT 0
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    is_new INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE boards (
@@ -18,7 +19,8 @@ CREATE TABLE boards (
                         created_at TEXT NOT NULL DEFAULT (datetime('now')),
                         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                         is_sync INTEGER NOT NULL DEFAULT 1,
-                        is_deleted INTEGER NOT NULL DEFAULT 0
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        is_new INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE statuses (
@@ -28,6 +30,7 @@ CREATE TABLE statuses (
                           position INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
                           is_sync INTEGER NOT NULL DEFAULT 1,
                           is_deleted INTEGER NOT NULL DEFAULT 0,
+                          is_new INTEGER NOT NULL DEFAULT 1,
                           UNIQUE (board_id, name)
 );
 
@@ -43,6 +46,7 @@ CREATE TABLE tasks (
                        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                        is_sync INTEGER NOT NULL DEFAULT 1,
                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                       is_new INTEGER NOT NULL DEFAULT 1,
                        CONSTRAINT fk_board FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
                        CONSTRAINT fk_status FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE
 );

@@ -13,7 +13,7 @@ class LocalBoardRepository {
 
     LocalBoard save(const LocalBoard& board);
     std::optional<LocalBoard> findById(int board_id);
-    std::vector<LocalBoard> findAll(int user_id);
+    std::vector<LocalBoard> findAll();
     std::vector<LocalBoard> findUnsynced();
     void deleteById(int board_id);
     void markSynced(int board_id);

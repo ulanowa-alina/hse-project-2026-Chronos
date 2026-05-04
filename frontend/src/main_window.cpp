@@ -8,41 +8,14 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
     network_manager_ = new NetworkManager(this);
+
     local_db_ = new LocalDatabaseManager(this);
     local_db_->open("chronos_local.db");
     local_db_->createDb("../sql/local_init.sql");
 
+
     QSqlDatabase db = local_db_->getDatabase();
-    LocalTaskRepository task_repo(db);
-
-    // DEBUG: TODO: удалю потом
-    LocalTask test_task(1, 1, "Test task", "Local sqlite task", 1, "gray", "",
-                        QDateTime::currentDateTime().toString(Qt::ISODate),
-                        QDateTime::currentDateTime().toString(Qt::ISODate), 0, 0);
-
-    try {
-        QSqlQuery query(db);
-        query.exec("INSERT OR IGNORE INTO boards (id, title, description, is_private, created_at, "
-                   "updated_at, is_sync, is_deleted) "
-                   "VALUES (1, 'Test board', '', 0, datetime('now'), datetime('now'), 1, 0)");
-
-        query.exec(
-            "INSERT OR IGNORE INTO statuses (id, board_id, name, position, is_sync, is_deleted) "
-            "VALUES (1, 1, 'todo', 0, 1, 0)");
-
-        task_repo.save(test_task);
-
-        std::vector<LocalTask> tasks = task_repo.findByBoardId(1);
-        qDebug() << "Tasks in board 1:" << tasks.size();
-
-        for (const auto& task : tasks) {
-            qDebug() << "Task:" << task.id_ << task.title_ << task.description_ << task.is_sync_;
-        }
-    } catch (const std::exception& e) {
-        qDebug() << "LocalTaskRepository error:" << e.what();
-    }
-
-    // DEBUG закончился
+    sync_manager_ = new SyncManager(db, network_manager_);
 
     stacked_widget_ = new QStackedWidget(this);
     setCentralWidget(stacked_widget_);
@@ -58,6 +31,8 @@ MainWindow::MainWindow(QWidget* parent)
     profile_edit_screen_->setNetworkManager(network_manager_);
     registration_screen_->setNetworkManager(network_manager_);
     board_screen_->setNetworkManager(network_manager_);
+
+    login_screen_->setSyncManager(sync_manager_);
 
     stacked_widget_->addWidget(login_screen_);
     stacked_widget_->addWidget(registration_screen_);

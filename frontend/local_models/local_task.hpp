@@ -15,12 +15,13 @@ struct LocalTask {
     QString updated_at_;
     int is_sync_;
     int is_deleted_;
+    int is_new_;
 
     LocalTask() = default;
 
     LocalTask(int id, int board_id, const QString& title, const QString& description, int status_id,
               const QString& priority_color, const QString& deadline, const QString& created_at,
-              const QString& updated_at, int is_sync, int is_deleted)
+              const QString& updated_at, int is_sync, int is_deleted, int is_new)
         : id_(id)
         , board_id_(board_id)
         , title_(title)
@@ -31,7 +32,8 @@ struct LocalTask {
         , created_at_(created_at)
         , updated_at_(updated_at)
         , is_sync_(is_sync)
-        , is_deleted_(is_deleted) {
+        , is_deleted_(is_deleted)
+        , is_new_(is_new) {
     }
 };
 
