@@ -43,11 +43,9 @@ class NetworkManager : public QObject {
     const QString board_get_url_ = "/board/v1/get";
     const QString boards_get_all_url_ = "/board/v1/get_all";
     const QString board_tasks_url_ = "/board/v1/tasks";
-    const QString boards_delete_url_ = "/board/v1/delete"; //Заглушка, ручки нет
-    const QString boards_create_url_ = "/board/v1/create"; //Заглушка, ручки нет
-    const QString boards_edit_url_ = "/board/v1/edit"; //Заглушка, ручки нет
-
-
+    const QString boards_delete_url_ = "/board/v1/delete"; // Заглушка, ручки нет
+    const QString boards_create_url_ = "/board/v1/create"; // Заглушка, ручки нет
+    const QString boards_edit_url_ = "/board/v1/edit";     // Заглушка, ручки нет
 
     void GET(const QString& endpoint);
     void POST(const QString& endpoint, const QJsonObject& data);

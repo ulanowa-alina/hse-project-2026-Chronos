@@ -13,7 +13,6 @@ MainWindow::MainWindow(QWidget* parent)
     local_db_->open("chronos_local.db");
     local_db_->createDb("../sql/local_init.sql");
 
-
     QSqlDatabase db = local_db_->getDatabase();
     sync_manager_ = new SyncManager(db, network_manager_);
 
