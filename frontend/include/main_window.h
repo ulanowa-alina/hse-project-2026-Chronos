@@ -9,10 +9,10 @@
 #include "profile_edit_screen.h"
 #include "profile_screen.h"
 #include "registration_screen.h"
+#include "sync_manager.h"
 
 #include <QMainWindow>
 #include <QStackedWidget>
-#include "sync_manager.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT

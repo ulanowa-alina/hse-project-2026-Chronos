@@ -2,6 +2,7 @@
 #define LOGIN_SCREEN_H
 
 #include "network_manager.h"
+#include "sync_manager.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -10,7 +11,6 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QWidget>
-#include "sync_manager.h"
 
 class LoginScreen : public QWidget {
     Q_OBJECT
@@ -32,7 +32,6 @@ class LoginScreen : public QWidget {
   private:
     NetworkManager* network_manager_{nullptr};
     SyncManager* sync_manager_{nullptr};
-
 
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};

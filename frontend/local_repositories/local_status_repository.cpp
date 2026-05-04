@@ -78,8 +78,8 @@ LocalStatus LocalSatusRepository::save(const LocalStatus& status) {
 std::optional<LocalStatus> LocalSatusRepository::findByid(int status_id) {
     QSqlQuery query(db_);
 
-    query.prepare(
-        "SELECT id, board_id, name, position, is_sync, is_deleted, is_new FROM statuses WHERE id = :id");
+    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted, is_new FROM statuses "
+                  "WHERE id = :id");
 
     query.bindValue(":id", status_id);
 
@@ -99,7 +99,8 @@ std::vector<LocalStatus> LocalSatusRepository::findByBoardId(int board_id) {
 
     QSqlQuery query(db_);
 
-    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted, is_new FROM statuses WHERE board_id "
+    query.prepare("SELECT id, board_id, name, position, is_sync, is_deleted, is_new FROM statuses "
+                  "WHERE board_id "
                   "= :board_id AND is_deleted = 0 ");
 
     query.bindValue(":board_id", board_id);
