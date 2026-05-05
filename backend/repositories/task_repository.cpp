@@ -140,6 +140,82 @@ std::vector<Task> TaskRepository::find_by_board_id(int board_id) {
     }
 }
 
+std::vector<Task> TaskRepository::find_by_user_id(int user_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r = txn.exec_params("SELECT t.id, t.board_id, t.title, t.description, "
+                                         "EXTRACT(EPOCH FROM t.deadline)::bigint AS deadline_sec, "
+                                         "t.status_id, t.priority_color, "
+                                         "EXTRACT(EPOCH FROM t.created_at)::bigint AS created_sec, "
+                                         "EXTRACT(EPOCH FROM t.updated_at)::bigint AS updated_sec "
+                                         "FROM tasks t "
+                                         "JOIN boards b ON b.id = t.board_id "
+                                         "WHERE b.user_id = $1 "
+                                         "ORDER BY t.created_at ASC, t.id ASC",
+                                         user_id);
+
+        std::vector<Task> tasks;
+        tasks.reserve(r.size());
+
+        for (const auto& row : r) {
+            tasks.emplace_back(
+                row["id"].as<int>(), row["board_id"].as<int>(), row["title"].as<std::string>(),
+                row["description"].is_null() ? "" : row["description"].as<std::string>(),
+                row["deadline_sec"].is_null() ? std::optional<std::time_t>{}
+                                              : std::optional<std::time_t>{static_cast<std::time_t>(
+                                                    row["deadline_sec"].as<long>())},
+                row["status_id"].as<int>(), row["priority_color"].as<std::string>(),
+                static_cast<std::time_t>(row["created_sec"].as<long>()),
+                static_cast<std::time_t>(row["updated_sec"].as<long>()));
+        }
+
+        txn.commit();
+        return tasks;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to find Tasks by user id: ") + e.what());
+    }
+}
+
+std::vector<Task> TaskRepository::find_by_board_and_status_id(int board_id, int status_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r = txn.exec_params("SELECT id, board_id, title, description, "
+                                         "EXTRACT(EPOCH FROM deadline)::bigint AS deadline_sec, "
+                                         "status_id, priority_color, "
+                                         "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+                                         "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
+                                         "FROM tasks "
+                                         "WHERE board_id = $1 AND status_id = $2 "
+                                         "ORDER BY created_at ASC, id ASC",
+                                         board_id, status_id);
+
+        std::vector<Task> tasks;
+        tasks.reserve(r.size());
+
+        for (const auto& row : r) {
+            tasks.emplace_back(
+                row["id"].as<int>(), row["board_id"].as<int>(), row["title"].as<std::string>(),
+                row["description"].is_null() ? "" : row["description"].as<std::string>(),
+                row["deadline_sec"].is_null() ? std::optional<std::time_t>{}
+                                              : std::optional<std::time_t>{static_cast<std::time_t>(
+                                                    row["deadline_sec"].as<long>())},
+                row["status_id"].as<int>(), row["priority_color"].as<std::string>(),
+                static_cast<std::time_t>(row["created_sec"].as<long>()),
+                static_cast<std::time_t>(row["updated_sec"].as<long>()));
+        }
+
+        txn.commit();
+        return tasks;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to find Tasks by board id and status id: ") +
+                                 e.what());
+    }
+}
+
 bool TaskRepository::delete_by_id(int task_id) {
     try {
         auto handle = pool_.acquire();
