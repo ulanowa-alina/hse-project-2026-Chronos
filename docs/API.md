@@ -1,4 +1,4 @@
-**Актуальная версия: 1.4**
+**Актуальная версия: 1.5**
 ### Содержание:
 1. [[#История изменений]]
 2. [[#Входные параметры]]<br>
@@ -17,36 +17,40 @@
 **Дата** - дата в формате ДД.ММ.ГГГГ
 **Описание изменений** - текстовое описание изменений документа
 
-| Версия | Дата       | Описание                                                                                                                                                                                                                |
-| ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0    | 07.02.2026 | Создана первая версия документа                                                                                                                                                                                         |
-| 1.1    | 15.02.2026 | Обновлены Endpoints(обновлены примеры запросов и ответов).                                                                                                                                                              |
-| 1.2    | 28.02.2026 | Добавлены ручки:<br>1. Регистрация пользователя <br>2. Получение информации о пользователе<br>3. Обновление информации о пользователе<br><br>Обновление информации о ручках (уточнение):<br>1. Авторизация пользователя |
-| 1.3    | 07.04.2026 | Документ приведён к единому стилю:<br>1. Названия полей переведены в `snake_case`<br>2. Форматы успешных ответов унифицированы через `data`<br>3. Примеры запросов и ответов синхронизированы с текущими endpoint'ами `.../v1/...`<br>4. Удалены упоминания `Tag/tags` |
-| 1.4    | 10.04.2026 | Обновлены endpoint'ы board/task и personal API: унифицированы пути для досок, добавлены `/board/v1/edit` и task endpoint'ы `/task/v1/create`, `/task/v1/edit`, `/task/v1/delete`; обновлены примеры запросов и таблица успешных ответов. |
+| Версия | Дата       | Описание                                                                                                                                                                                                                                                              |
+| ------ | ---------- |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1.0    | 07.02.2026 | Создана первая версия документа                                                                                                                                                                                                                                       |
+| 1.1    | 15.02.2026 | Обновлены Endpoints(обновлены примеры запросов и ответов).                                                                                                                                                                                                            |
+| 1.2    | 28.02.2026 | Добавлены ручки:<br>1. Регистрация пользователя <br>2. Получение информации о пользователе<br>3. Обновление информации о пользователе<br><br>Обновление информации о ручках (уточнение):<br>1. Авторизация пользователя                                               |
+| 1.3    | 07.04.2026 | Документ приведён к единому стилю:<br>1. Названия полей переведены в `snake_case`<br>2. Форматы успешных ответов унифицированы через `data`<br>3. Примеры запросов и ответов синхронизированы с текущими endpoint'ами `.../v1/...`<br>4. Удалены упоминания `Tag/tags`|
+| 1.4    | 10.04.2026 | Обновлены endpoint'ы board/task и personal API: унифицированы пути для досок, добавлены `/board/v1/edit` и task endpoint'ы `/task/v1/create`, `/task/v1/edit`, `/task/v1/delete`; обновлены примеры запросов и таблица успешных ответов.                              |
+| 1.5    | 05.05.2026 | Добавлен endpoint `/task/v1/get_all` для получения задач пользователя с фильтрацией по `board_id` и `status_id`; добавлены описание параметров и пример запроса/ответа; еnpoint для получения всех статусов с фильтрацией по доске `board_id`                         |
 
 
 ### Входные параметры
 ##### Endpoints
 
-| Метод  | Endpoint          | Описание                           | Request body / params                                                                                                     | Response            |
-| ------ | ----------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| POST   | /auth/v1/login    | Авторизация пользователя           | {"email": "...",<br>"password": "..."}                                                                                   | `data.token + user` |
-| POST   | /auth/v1/register | Регистрация пользователя           | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                                            | `data: User`        |
-| PUT    | /personal/v1/edit | Обновление данных пользователя     | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                                            | `data: User`        |
-| GET    | /personal/v1/info | Получить информацию о пользователе | —                                                                                                                         | `data: User`        |
-| GET    | /board/v1/get_all | Получить список досок пользователя | —                                                                                                                         | `data: Board[]`     |
-| POST   | /board/v1/create  | Создать новую доску                | {"title": "...",<br>"description": "...",<br>"is_private": false}                                                       | `data: Board`       |
-| PATCH  | /board/v1/edit    | Обновить доску                     | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"is_private": false}                                 | `data: Board`       |
-| GET    | /board/v1/get     | Получить доску по id               | `query: board_id=<id>`                                                                                                    | `data: Board`       |
-| DELETE | /board/v1/delete  | Удалить доску                      | {"board_id": "id"}                                                                                                       | 204 No Content      |
-| GET    | /board/v1/tasks   | Получить задачи доски              | `query: board_id=<id>`                                                                                                    | `data: Task[]`      |
-| POST   | /task/v1/create   | Создать задачу в доске             | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."}      | `data: Task`        |
-| PATCH  | /task/v1/edit     | Обновить задачу                    | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."}       | `data: Task`        |
-| DELETE | /task/v1/delete   | Удалить задачу                     | {"task_id": "id"}                                                                                                        | 204 No Content      |
-| POST   | /status/v1/create | Создать статус доски               | {"board_id": "id",<br>"name": "...",<br>"position": 0}                                                                   | `data: Status`      |
-| PATCH  | /status/v1/edit   | Обновить статус доски              | {"status_id": "id",<br>"name": "...",<br>"position": 0}                                                                  | `data: Status`      |
-| DELETE | /status/v1/delete | Удалить статус доски               | {"status_id": "id"}                                                                                                      | 204 No Content      |
+| Метод  | Endpoint          | Описание                            | Request body / params                                                                                            | Response            |
+| ------ | ----------------- |-------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------|
+| POST   | /auth/v1/login    | Авторизация пользователя            | {"email": "...",<br>"password": "..."}                                                                           | `data.token + user` |
+| POST   | /auth/v1/register | Регистрация пользователя            | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                                     | `data: User`        |
+| PUT    | /personal/v1/edit | Обновление данных пользователя      | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                                     | `data: User`        |
+| GET    | /personal/v1/info | Получить информацию о пользователе  | —                                                                                                                | `data: User`        |
+| GET    | /board/v1/get_all | Получить список досок пользователя  | —                                                                                                                | `data: Board[]`     |
+| POST   | /board/v1/create  | Создать новую доску                 | {"title": "...",<br>"description": "...",<br>"is_private": false}                                                | `data: Board`       |
+| PATCH  | /board/v1/edit    | Обновить доску                      | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"is_private": false}                           | `data: Board`       |
+| GET    | /board/v1/get     | Получить доску по id                | `query: board_id=<id>`                                                                                           | `data: Board`       |
+| DELETE | /board/v1/delete  | Удалить доску                       | {"board_id": "id"}                                                                                               | 204 No Content      |
+| GET    | /board/v1/tasks   | Получить задачи доски               | `query: board_id=<id>`                                                                                           | `data: Task[]`      |
+| GET    | /task/v1/get_all  | Получить задачи пользователя        | `query: board_id=<id> (optional), status_id=<id> (optional)`                                                     | `data: Task[]`      |
+| POST   | /task/v1/create   | Создать задачу в доске              | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."} | `data: Task`        |
+| PATCH  | /task/v1/edit     | Обновить задачу                     | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."}  | `data: Task`        |
+| DELETE | /task/v1/delete   | Удалить задачу                      | {"task_id": "id"}                                                                                                | 204 No Content      |
+| POST   | /status/v1/create | Создать статус доски                | {"board_id": "id",<br>"name": "...",<br>"position": 0}                                                           | `data: Status`      |
+| PATCH  | /status/v1/edit   | Обновить статус доски               | {"status_id": "id",<br>"name": "...",<br>"position": 0}                                                          | `data: Status`      |
+| DELETE | /status/v1/delete | Удалить статус доски                | {"status_id": "id"}                                                                                              | 204 No Content      |
+| GET    | /status/v1/get_all| Получить статусы пользователя       | `query: board_id=<id> (optional)`                                                                                |  `data: Status[]`   |
+
 
 ##### Модели
 1. User (Пользователь)
@@ -222,9 +226,10 @@ HTTP 204 No Content
 Связь с входными параметрами:
 
 | Endpoint                 | Тип успешного ответа     |
-| ------------------------ | ------------------------ |
+|--------------------------|--------------------------|
 | POST /auth/v1/login      | `data.token + data.user` |
 | POST /auth/v1/register   | `data: User`             |
+| GET /task/v1/get_all     | `data: Task[]`           |
 | PUT /personal/v1/edit    | `data: User`             |
 | GET /personal/v1/info    | `data: User`             |
 | GET /board/v1/get_all    | `data: Board[]`          |
@@ -239,6 +244,8 @@ HTTP 204 No Content
 | POST /status/v1/create   | `data: Status`           |
 | PATCH /status/v1/edit    | `data: Status`           |
 | DELETE /status/v1/delete | `204 No Content`         |
+| GET /status/v1/get_all   | `data: Status[]`         |
+
 
 ##### Ответ с ошибками
 
@@ -466,4 +473,102 @@ Content-Type: application/json
     }
   }
 }
+```
+
+6. Получение задач пользователя с фильтрацией по доске и статусу
+
+Запрос:
+```bash
+GET /task/v1/get_all?board_id=10&status_id=2
+Authorization: Bearer <JWT>
+```
+
+Ответ:
+```json
+{
+  "data": [
+      {
+         "id": 101,
+         "board_id": 10,
+         "title": "Оформить README",
+         "description": "Финальная версия",
+         "status_id": 2,
+         "priority_color": "red",
+         "deadline": "2026-05-20T18:00:00Z",
+         "created_at": "2026-02-07T10:30:00Z",
+         "updated_at": "2026-02-08T12:10:00Z"
+      }
+   ]
+}
+```
+
+7. Получение всех статусов пользователя
+
+Запрос:
+```bash
+GET /status/v1/get_all
+Authorization: Bearer <JWT>
+```
+
+Ответ:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "board_id": 10,
+      "name": "todo",
+      "position": 0
+    },
+    {
+      "id": 2,
+      "board_id": 10,
+      "name": "in_progress",
+      "position": 1
+    },
+    {
+      "id": 3,
+      "board_id": 10,
+      "name": "done",
+      "position": 2
+    }
+  ]
+}
+```
+
+8. Получение всех статусов одной доски
+ 
+Запрос:
+```bash
+GET /status/v1/get_all?board_id=10
+Authorization: Bearer <JWT>
+```
+ 
+Ответ:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "board_id": 10,
+      "name": "todo",
+      "position": 0
+    },
+    {
+      "id": 2,
+      "board_id": 10,
+      "name": "in_progress",
+      "position": 1
+    },
+    {
+      "id": 3,
+      "board_id": 10,
+      "name": "done",
+      "position": 2
+    }
+  ]
+}
+
 ```
