@@ -7,56 +7,86 @@
 #include <utility>
 
 ConnectionPool::ConnectionPool(std::string connection_info, std::size_t pool_size)
-    : connection_info_(std::move(connection_info)) {
-    if (pool_size == 0) {
+    : connection_info_(std::move(connection_info))
+    , max_size_(pool_size) {
+    if (max_size_ == 0) {
         throw std::invalid_argument("pool_size must be > 0");
     }
 
-    for (std::size_t i = 0; i < pool_size; ++i) {
-        std::unique_ptr<pqxx::connection> c;
+    auto c = create_connection();
+    free_.push(std::move(c));
+    total_created_ = 1;
+}
 
-        const int max_attempts = 30;
-        std::string last_error;
-        for (int attempt = 1; attempt <= max_attempts; ++attempt) {
-            try {
-                c = std::make_unique<pqxx::connection>(connection_info_);
-                if (c->is_open())
-                    break;
-            } catch (const pqxx::broken_connection& e) {
-                last_error = e.what();
+std::unique_ptr<pqxx::connection> ConnectionPool::create_connection() {
+    std::unique_ptr<pqxx::connection> c;
+
+    const int max_attempts = 30;
+    std::string last_error;
+
+    for (int attempt = 1; attempt <= max_attempts; ++attempt) {
+        try {
+            c = std::make_unique<pqxx::connection>(connection_info_);
+            if (c->is_open()) {
+                return c;
             }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        } catch (const pqxx::broken_connection& e) {
+            last_error = e.what();
+        } catch (const std::exception& e) {
+            last_error = e.what();
         }
 
-        if (!c || !c->is_open()) {
-            std::string msg = "failed to connect to postgres after retries";
-            if (!last_error.empty()) {
-                msg += ": ";
-                msg += last_error;
-            }
-            throw std::runtime_error(msg);
-        }
-
-        free_.push(std::move(c));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
+
+    std::string msg = "failed to connect to postgres after retries";
+    if (!last_error.empty()) {
+        msg += ": ";
+        msg += last_error;
+    }
+    throw std::runtime_error(msg);
 }
 
 ConnectionPool::Handle ConnectionPool::acquire() {
     std::unique_lock<std::mutex> lock(m_);
-    cv_.wait(lock, [&] { return !free_.empty(); });
 
-    auto c = std::move(free_.front());
-    free_.pop();
+    while (true) {
+        if (!free_.empty()) {
+            auto c = std::move(free_.front());
+            free_.pop();
+            return Handle(this, std::move(c));
+        }
 
-    return Handle(this, std::move(c));
+        if (total_created_ < max_size_) {
+            ++total_created_;
+            lock.unlock();
+
+            try {
+                auto c = create_connection();
+                return Handle(this, std::move(c));
+            } catch (...) {
+                lock.lock();
+                --total_created_;
+                cv_.notify_one();
+                throw;
+            }
+        }
+
+        cv_.wait(lock);
+    }
 }
 
 void ConnectionPool::release(std::unique_ptr<pqxx::connection> c) {
     {
         std::lock_guard<std::mutex> lock(m_);
-        free_.push(std::move(c));
+
+        if (c && c->is_open()) {
+            free_.push(std::move(c));
+        } else if (total_created_ > 0) {
+            --total_created_;
+        }
     }
+
     cv_.notify_one();
 }
 
