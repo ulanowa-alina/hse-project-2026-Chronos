@@ -37,9 +37,13 @@ class ConnectionPool {
     Handle acquire();
 
   private:
+    std::unique_ptr<pqxx::connection> create_connection();
     void release(std::unique_ptr<pqxx::connection> c);
 
     std::string connection_info_;
+    std::size_t max_size_ = 0;
+    std::size_t total_created_ = 0;
+
     std::mutex m_;
     std::condition_variable cv_;
     std::queue<std::unique_ptr<pqxx::connection>> free_;
