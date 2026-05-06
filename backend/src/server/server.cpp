@@ -3,6 +3,7 @@
 #include "auth/v1/login.hpp"
 #include "auth/v1/register.hpp"
 #include "auth/with_auth.hpp"
+#include "board/v1/delete.hpp"
 #include "board/v1/get.hpp"
 #include "board/v1/get_all.hpp"
 #include "board/v1/tasks.hpp"
@@ -132,6 +133,22 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
             if (req.method() == http::verb::get) {
                 return board::v1::handleGet(req, pool_, user_id);
+            }
+
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
+
+    router_["/board/v1/delete"] =
+        auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
+            if (req.method() == http::verb::delete_) {
+                return board::v1::handleDelete(req, pool_, user_id);
             }
 
             http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
