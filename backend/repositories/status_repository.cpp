@@ -6,24 +6,54 @@ StatusRepository::StatusRepository(ConnectionPool& pool)
     : pool_(pool) {
 }
 
-Status StatusRepository::create(int board_id, const std::string& name, int position) {
+Status StatusRepository::insert(const Status& status) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
     pqxx::result r =
         txn.exec_params("INSERT INTO statuses (board_id, name, position) VALUES ($1, $2, $3) "
                         "RETURNING id, board_id, name, position",
-                        board_id, name, position);
+                        status.board_id_, status.name_, status.position_);
 
     txn.commit();
 
     if (r.empty()) {
-        throw std::runtime_error("Failed to create status");
+        throw std::runtime_error("Failed to insert status");
     }
 
     const auto& row = r[0];
     return Status(row["id"].as<int>(), row["board_id"].as<int>(), row["name"].as<std::string>(),
                   row["position"].as<int>());
+}
+
+Status StatusRepository::update(const Status& status) {
+    auto handle = pool_.acquire();
+    pqxx::work txn(handle.conn());
+
+    pqxx::result r = txn.exec_params("UPDATE statuses SET name = $1, position = $2 WHERE id = $3 "
+                                     "RETURNING id, board_id, name, position",
+                                     status.name_, status.position_, status.id_);
+
+    txn.commit();
+
+    if (r.empty()) {
+        throw std::runtime_error("Failed to update status");
+    }
+
+    const auto& row = r[0];
+    return Status(row["id"].as<int>(), row["board_id"].as<int>(), row["name"].as<std::string>(),
+                  row["position"].as<int>());
+}
+
+Status StatusRepository::save(const Status& status) {
+    try {
+        if (status.id_ == 0) {
+            return insert(status);
+        }
+        return update(status);
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Failed to save Status: ") + e.what());
+    }
 }
 
 void StatusRepository::create_defaults_for_board(int board_id) {
@@ -104,6 +134,32 @@ std::vector<Status> StatusRepository::find_by_board_id(int board_id) {
         return statuses;
     } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Status::find_by_board_id failed: ") + e.what());
+    }
+}
+
+std::vector<Status> StatusRepository::find_by_user_id(int user_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r = txn.exec_params("SELECT s.id, s.board_id, s.name, s.position "
+                                         "FROM statuses s "
+                                         "JOIN boards b ON b.id = s.board_id "
+                                         "WHERE b.user_id = $1 "
+                                         "ORDER BY s.board_id ASC, s.position ASC, s.id ASC",
+                                         user_id);
+
+        std::vector<Status> statuses;
+        statuses.reserve(r.size());
+        for (const auto& row : r) {
+            statuses.emplace_back(row["id"].as<int>(), row["board_id"].as<int>(),
+                                  row["name"].as<std::string>(), row["position"].as<int>());
+        }
+
+        txn.commit();
+        return statuses;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Status::find_by_user_id failed: ") + e.what());
     }
 }
 
