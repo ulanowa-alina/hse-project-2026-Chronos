@@ -12,7 +12,7 @@ class StatusRepository {
   public:
     explicit StatusRepository(ConnectionPool& pool);
 
-    Status create(int board_id, const std::string& name, int position);
+    Status save(const Status& status);
 
     void create_defaults_for_board(int board_id);
 
@@ -23,6 +23,9 @@ class StatusRepository {
 
   private:
     ConnectionPool& pool_;
+
+    Status insert(const Status& status);
+    Status update(const Status& status);
 };
 
 #endif // STATUS_REPOSITORY_HPP
