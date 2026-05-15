@@ -12,11 +12,10 @@
 using json = nlohmann::json;
 
 namespace status::v1 {
-#include "create.hpp"
-
 #include "../../../../repositories/board_repository.hpp"
 #include "../../../../repositories/status_repository.hpp"
 #include "../../utils/response_utils.hpp"
+#include "create.hpp"
 
 #include <nlohmann/json.hpp>
 #include <optional>
