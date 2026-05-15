@@ -10,6 +10,7 @@ find_package(Boost 1.74 REQUIRED COMPONENTS json url)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(spdlog REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
 
@@ -49,5 +50,6 @@ target_link_libraries(chronos_backend PRIVATE
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
         OpenSSL::Crypto
+        spdlog::spdlog
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
