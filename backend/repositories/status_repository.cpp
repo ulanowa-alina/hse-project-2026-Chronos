@@ -137,6 +137,32 @@ std::vector<Status> StatusRepository::find_by_board_id(int board_id) {
     }
 }
 
+std::vector<Status> StatusRepository::find_by_user_id(int user_id) {
+    try {
+        auto handle = pool_.acquire();
+        pqxx::work txn(handle.conn());
+
+        pqxx::result r = txn.exec_params("SELECT s.id, s.board_id, s.name, s.position "
+                                         "FROM statuses s "
+                                         "JOIN boards b ON b.id = s.board_id "
+                                         "WHERE b.user_id = $1 "
+                                         "ORDER BY s.board_id ASC, s.position ASC, s.id ASC",
+                                         user_id);
+
+        std::vector<Status> statuses;
+        statuses.reserve(r.size());
+        for (const auto& row : r) {
+            statuses.emplace_back(row["id"].as<int>(), row["board_id"].as<int>(),
+                                  row["name"].as<std::string>(), row["position"].as<int>());
+        }
+
+        txn.commit();
+        return statuses;
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("Status::find_by_user_id failed: ") + e.what());
+    }
+}
+
 bool StatusRepository::delete_by_id(int status_id) {
     try {
         auto handle = pool_.acquire();
