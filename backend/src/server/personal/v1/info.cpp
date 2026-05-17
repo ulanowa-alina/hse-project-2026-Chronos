@@ -1,5 +1,5 @@
 #include "info.hpp"
-
+#include "utils/response_utils.hpp"
 #include "repositories/user_repository.hpp"
 
 #include <boost/beast/http.hpp>
@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
+#include <spdlog/spdlog.h>
 
 namespace http = boost::beast::http;
 
@@ -62,6 +63,13 @@ auto build_not_found_response(const http::request<http::string_body>& req)
 
 auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& pool,
                 int user_id) -> http::response<http::string_body> {
+    spdlog::info("User get request received");
+    if (req.method() != http::verb::get) {
+        spdlog::warn("Board get rejected: method not allowed");
+        return server::utils::build_error_response(req, http::status::method_not_allowed,
+                                                   "DUPLICATE_RESOURCE", "Method not allowed");
+    }
+
     try {
         UserRepository repo(pool);
         const auto user = repo.find_by_id(user_id);
@@ -70,9 +78,16 @@ auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& poo
             return build_not_found_response(req);
         }
 
+        spdlog::info("Successfully get user info for user_id={}", user_id);
         return build_ok_response(req, *user);
+    }catch (const std::runtime_error& e) {
+        spdlog::error("User get failed with database error: {}", e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "DATABASE_ERROR", "Database error");
     } catch (const std::exception& e) {
-        return build_error_response(req, e);
+        spdlog::error("User get failed with unexpected error: {}", e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "INTERNAL_ERROR", "Internal server error");
     }
 }
 

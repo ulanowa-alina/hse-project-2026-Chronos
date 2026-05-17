@@ -9,6 +9,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <spdlog/spdlog.h>
 
 using json = nlohmann::json;
 
@@ -91,7 +92,9 @@ json model_to_json(const Board& board) {
 
 auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool,
                 int user_id) -> http::response<http::string_body> {
+    spdlog::info("Board edit request received");
     if (req.method() != http::verb::patch) {
+        spdlog::warn("Board edit rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -100,17 +103,20 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
+        spdlog::warn("Board edit rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     if (!body.is_object()) {
+        spdlog::warn("Board edit rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     const json missing_fields = collect_missing_fields(body);
     if (!missing_fields.empty()) {
+        spdlog::warn("Board edit rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
                                                    "Missing required fields",
                                                    json{{"missing_fields", missing_fields}});
@@ -123,12 +129,14 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         const bool is_private = require_bool_field(body, "is_private");
 
         if (title.empty() || title.size() > 100) {
+            spdlog::warn("Board edit rejected: invalid title length");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"title", "Title must be between 1 and 100 characters"}});
         }
 
         if (description.size() > 1000) {
+            spdlog::warn("Board edit rejected: description is too long");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"description", "Description cannot exceed 1000 characters"}});
@@ -137,11 +145,13 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         BoardRepository board_repository(pool);
         const std::optional<Board> existing_board = board_repository.find_by_id(board_id);
         if (!existing_board.has_value()) {
+            spdlog::warn("Board edit rejected: board with id={} not found", board_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (existing_board->user_id_ != user_id) {
+            spdlog::warn("Board edit rejected: board with id={} belongs to another user", board_id);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
@@ -152,12 +162,15 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                   existing_board->updated_at_);
         const Board updated_board = board_repository.save(board_to_save);
 
+        spdlog::info("Board with id={} successfully edited", board_id);
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(updated_board)}});
     } catch (const std::invalid_argument& e) {
+
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
+            spdlog::warn("Board edit rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
@@ -165,6 +178,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         }
 
         if (message.rfind("type:", 0) == 0) {
+            spdlog::warn("Board edit rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
@@ -172,6 +186,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         }
 
         if (message.rfind("value:", 0) == 0) {
+            spdlog::warn("Board edit rejected: invalid filed value");
             const std::string field = message.substr(6);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
@@ -180,10 +195,12 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", "Validation failed");
-    } catch (const std::runtime_error&) {
+    } catch (const std::runtime_error& e) {
+        spdlog::error("Board edit failed with database error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", "Database error");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::error("Board delete failed with unexpected error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "INTERNAL_ERROR", "Internal server error");
     }
