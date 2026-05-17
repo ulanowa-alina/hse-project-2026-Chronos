@@ -1,35 +1,41 @@
 #include "edit.hpp"
 
 #include "../../../../repositories/board_repository.hpp"
-#include "../../../../repositories/status_repository.hpp"
 #include "../../utils/response_utils.hpp"
 
+#include <array>
+#include <ctime>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <stdexcept>
 #include <string>
 
 using json = nlohmann::json;
 
-namespace status::v1 {
+namespace board::v1 {
+
 namespace {
 
-json missing_fields(const json& body) {
+json collect_missing_fields(const json& body) {
     json missing = json::array();
 
-    if (!body.contains("status_id")) {
-        missing.push_back("status_id");
+    if (!body.contains("board_id")) {
+        missing.push_back("board_id");
     }
-    if (!body.contains("name")) {
-        missing.push_back("name");
+    if (!body.contains("title")) {
+        missing.push_back("title");
     }
-    if (!body.contains("position")) {
-        missing.push_back("position");
+    if (!body.contains("description")) {
+        missing.push_back("description");
+    }
+    if (!body.contains("is_private")) {
+        missing.push_back("is_private");
     }
 
     return missing;
 }
 
-int positive_field(const json& body, const std::string& key) {
+int require_positive_int_field(const json& body, const std::string& key) {
     try {
         const int value = body.at(key).get<int>();
         if (value <= 0) {
@@ -43,21 +49,7 @@ int positive_field(const json& body, const std::string& key) {
     }
 }
 
-int negative_field(const json& body, const std::string& key) {
-    try {
-        const int value = body.at(key).get<int>();
-        if (value < 0) {
-            throw std::invalid_argument("value:" + key);
-        }
-        return value;
-    } catch (const json::out_of_range&) {
-        throw std::invalid_argument("missing:" + key);
-    } catch (const json::type_error&) {
-        throw std::invalid_argument("type:" + key);
-    }
-}
-
-std::string string_field(const json& body, const std::string& key) {
+std::string require_string_field(const json& body, const std::string& key) {
     try {
         return body.at(key).get<std::string>();
     } catch (const json::out_of_range&) {
@@ -67,12 +59,34 @@ std::string string_field(const json& body, const std::string& key) {
     }
 }
 
-json model_to_json(const Status& status) {
-    return json{{"id", status.id_},
-                {"board_id", status.board_id_},
-                {"name", status.name_},
-                {"position", status.position_}};
+bool require_bool_field(const json& body, const std::string& key) {
+    try {
+        return body.at(key).get<bool>();
+    } catch (const json::out_of_range&) {
+        throw std::invalid_argument("missing:" + key);
+    } catch (const json::type_error&) {
+        throw std::invalid_argument("type:" + key);
+    }
 }
+
+std::string time_to_string_iso8601(std::time_t t) {
+    std::array<char, 25> buffer{};
+    if (std::strftime(buffer.data(), buffer.size(), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&t))) {
+        return {buffer.data()};
+    }
+    throw std::runtime_error("Failed to format timestamp");
+}
+
+json model_to_json(const Board& board) {
+    return json{{"id", board.id_},
+                {"user_id", board.user_id_},
+                {"title", board.title_},
+                {"description", board.description_},
+                {"is_private", board.is_private_},
+                {"created_at", time_to_string_iso8601(board.created_at_)},
+                {"updated_at", time_to_string_iso8601(board.updated_at_)}};
+}
+
 } // namespace
 
 auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool,
@@ -95,58 +109,51 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                    "Invalid JSON format");
     }
 
-    const json missing = missing_fields(body);
-    if (!missing.empty()) {
+    const json missing_fields = collect_missing_fields(body);
+    if (!missing_fields.empty()) {
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
                                                    "Missing required fields",
-                                                   json{{"missing_fields", missing}});
+                                                   json{{"missing_fields", missing_fields}});
     }
 
     try {
-        const int status_id = positive_field(body, "status_id");
-        const std::string name = string_field(body, "name");
-        const int position = negative_field(body, "position");
+        const int board_id = require_positive_int_field(body, "board_id");
+        const std::string title = require_string_field(body, "title");
+        const std::string description = require_string_field(body, "description");
+        const bool is_private = require_bool_field(body, "is_private");
 
-        if (name.empty() || name.size() > 50) {
+        if (title.empty() || title.size() > 100) {
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"name", "Name length must be between 1 and 50 symbols"}});
+                json{{"title", "Title must be between 1 and 100 characters"}});
         }
 
-        StatusRepository status_repository(pool);
-        const std::optional<Status> old_status = status_repository.find_by_id(status_id);
-        if (!old_status.has_value()) {
-            return server::utils::build_error_response(req, http::status::not_found,
-                                                       "STATUS_NOT_FOUND", "Status not found");
+        if (description.size() > 1000) {
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                json{{"description", "Description cannot exceed 1000 characters"}});
         }
 
         BoardRepository board_repository(pool);
-        const std::optional<Board> board = board_repository.find_by_id(old_status->board_id_);
-        if (!board.has_value()) {
+        const std::optional<Board> existing_board = board_repository.find_by_id(board_id);
+        if (!existing_board.has_value()) {
             return server::utils::build_error_response(req, http::status::not_found,
-                                                       "STATUS_NOT_FOUND", "Status not found");
+                                                       "BOARD_NOT_FOUND", "Board not found");
         }
 
-        if (board->user_id_ != user_id) {
+        if (existing_board->user_id_ != user_id) {
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
         }
 
-        const std::optional<Status> existing_status =
-            status_repository.find_by_board_and_name(old_status->board_id_, name);
-
-        if (existing_status.has_value() && existing_status->id_ != status_id) {
-            return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
-                "Status with this name already exists", json{{"name", "already exists"}});
-        }
-
-        const Status status_to_save(status_id, old_status->board_id_, name, position);
-        const Status updated_status = status_repository.save(status_to_save);
+        const Board board_to_save(existing_board->id_, existing_board->user_id_, title, description,
+                                  is_private, existing_board->created_at_,
+                                  existing_board->updated_at_);
+        const Board updated_board = board_repository.save(board_to_save);
 
         return server::utils::build_json_response(req, http::status::ok,
-                                                  json{{"data", model_to_json(updated_status)}});
+                                                  json{{"data", model_to_json(updated_board)}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
 
@@ -166,31 +173,20 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
         if (message.rfind("value:", 0) == 0) {
             const std::string field = message.substr(6);
-            const std::string detail = field == "position"
-                                           ? "Position must be greater than or equal to 0"
-                                           : "Status id must be positive";
-            return server::utils::build_error_response(req, http::status::bad_request,
-                                                       "VALIDATION_ERROR", "Validation failed",
-                                                       json{{field, detail}});
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                json{{field, "Field must be a positive integer"}});
         }
 
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", "Validation failed");
-    } catch (const pqxx::sql_error& e) {
-        const std::string msg = e.what();
-        if (msg.find("statuses_board_id_name_key") != std::string::npos ||
-            msg.find("duplicate key") != std::string::npos) {
-            return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
-                "Status with this name already exists", json{{"name", "already exists"}});
-        }
-
+    } catch (const std::runtime_error&) {
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", "Database error");
     } catch (const std::exception&) {
         return server::utils::build_error_response(req, http::status::internal_server_error,
-                                                   "DATABASE_ERROR", "Database error");
+                                                   "INTERNAL_ERROR", "Internal server error");
     }
 }
 
-} // namespace status::v1
+} // namespace board::v1
