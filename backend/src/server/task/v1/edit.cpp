@@ -9,6 +9,7 @@
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
 
@@ -95,8 +96,10 @@ json model_to_json(const Task& task) {
 
 auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool,
                 int user_id) -> http::response<http::string_body> {
+    spdlog::info("Task edit request received");
 
     if (req.method() != http::verb::patch) {
+        spdlog::warn("Task edit rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -105,17 +108,20 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
+        spdlog::warn("Task edit rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     if (!body.is_object()) {
+        spdlog::warn("Task edit rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     const json missing_fields = collect_missing_fields(body);
     if (!missing_fields.empty()) {
+        spdlog::warn("Task edit rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
                                                    "Missing required fields",
                                                    json{{"missing_fields", missing_fields}});
@@ -129,18 +135,21 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         const std::string priority_color = require_string_field(body, "priority_color");
 
         if (title.empty() || title.size() > 100) {
+            spdlog::warn("Task edit rejected: invalid title length");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"title", "Title must be between 1 and 100 characters"}});
         }
 
         if (description.size() > 1000) {
+            spdlog::warn("Task edit rejected: description is too long");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"description", "Description cannot exceed 1000 characters"}});
         }
 
         if (priority_color.empty() || priority_color.size() > 50) {
+            spdlog::warn("Task edit rejected: invalid priority color format");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"priority_color", "Priority color must be between 1 and 50 characters"}});
@@ -149,6 +158,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         TaskRepository task_repository(pool);
         const std::optional<Task> existing_task = task_repository.find_by_id(task_id);
         if (!existing_task.has_value()) {
+            spdlog::warn("Task edit rejected: task with id={} not found", task_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "TASK_NOT_FOUND", "Task not found");
         }
@@ -157,11 +167,15 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         const std::optional<Board> task_board =
             board_repository.find_by_id(existing_task->board_id_);
         if (!task_board.has_value()) {
+            spdlog::warn("Task edit rejected: board with id={} not found",
+                         existing_task->board_id_);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (task_board->user_id_ != user_id) {
+            spdlog::warn("Task edit rejected: board with id={} belongs to another user",
+                         existing_task->board_id_);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
@@ -170,11 +184,13 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         StatusRepository status_repository(pool);
         const std::optional<Status> new_status = status_repository.find_by_id(status_id);
         if (!new_status.has_value()) {
+            spdlog::warn("Task edit rejected: status with id={} not found", status_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "STATUS_NOT_FOUND", "Status not found");
         }
 
         if (new_status->board_id_ != existing_task->board_id_) {
+            spdlog::warn("Task edit rejected: invalid status_id");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"status_id", "status_id must reference a status from this board"}});
@@ -186,12 +202,14 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
         const Task updated_task = task_repository.save(task_to_save);
 
+        spdlog::info("Task with id={} successfully edited", task_id);
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(updated_task)}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
+            spdlog::warn("Task edit rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
@@ -199,6 +217,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         }
 
         if (message.rfind("type:", 0) == 0) {
+            spdlog::warn("Task edit rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
@@ -206,6 +225,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         }
 
         if (message.rfind("value:", 0) == 0) {
+            spdlog::warn("Task edit rejected: invalid field value");
             const std::string field = message.substr(6);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
@@ -214,10 +234,12 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", "Validation failed");
-    } catch (const std::runtime_error&) {
+    } catch (const std::runtime_error& e) {
+        spdlog::error("Task edit failed with database error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", "Database error");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::error("Task edit failed with unexpected error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "INTERNAL_ERROR", "Internal server error");
     }
