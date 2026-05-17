@@ -13,7 +13,29 @@ find_package(OpenSSL REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
 
+include(FetchContent)
 
+FetchContent_Declare(
+        prometheus-cpp-lite
+        GIT_REPOSITORY https://github.com/biaks/prometheus-cpp-lite.git
+        GIT_TAG v2.0
+)
+FetchContent_MakeAvailable(prometheus-cpp-lite)
+
+if(APPLE)
+    target_include_directories(prometheus-cpp-lite INTERFACE
+            "${CMAKE_CURRENT_SOURCE_DIR}/compat"
+    )
+    target_include_directories(prometheus-cpp-lite-full PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/compat"
+    )
+    target_compile_options(prometheus-cpp-lite INTERFACE
+            $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
+    )
+    target_compile_options(prometheus-cpp-lite-full PRIVATE
+            $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
+    )
+endif()
 
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
@@ -38,7 +60,7 @@ target_include_directories(chronos_backend PRIVATE
 )
 
 target_compile_definitions(chronos_backend PRIVATE
-    BOOST_ERROR_CODE_HEADER_ONLY
+        BOOST_ERROR_CODE_HEADER_ONLY
 )
 
 target_link_libraries(chronos_backend PRIVATE
@@ -49,5 +71,6 @@ target_link_libraries(chronos_backend PRIVATE
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
         OpenSSL::Crypto
+        prometheus-cpp-lite-full
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
