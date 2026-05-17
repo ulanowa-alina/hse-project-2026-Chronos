@@ -1,9 +1,32 @@
 #include "session.hpp"
 
+#include "metrics.hpp"
 #include "personal/v1/info.hpp"
 
 #include <boost/url.hpp>
 #include <iostream>
+
+namespace {
+
+bool is_error_response(const Response& response) {
+    return response.result_int() >= 400;
+}
+
+bool is_database_error_response(const Response& response) {
+    return is_error_response(response) &&
+           response.body().find("DATABASE_ERROR") != std::string::npos;
+}
+
+void record_response_metrics(const Response& response) {
+    if (is_error_response(response)) {
+        server::metrics::record_http_error();
+    }
+    if (is_database_error_response(response)) {
+        server::metrics::record_db_error();
+    }
+}
+
+} // namespace
 
 Session::Session(tcp::socket socket, Router router)
     : socket_(std::move(socket))
@@ -29,19 +52,24 @@ void Session::doRead() {
 }
 
 void Session::handleRequest() {
+    server::metrics::record_http_request();
+
     const auto url_view_result = boost::urls::parse_origin_form(req_.target());
     const std::string route =
         url_view_result ? std::string(url_view_result->encoded_path()) : std::string(req_.target());
 
     auto it = router_.find(route);
     if (it != router_.end()) {
-        sendResponse(it->second(req_));
+        Response response = it->second(req_);
+        record_response_metrics(response);
+        sendResponse(std::move(response));
     } else {
         http::response<http::string_body> res{http::status::not_found, req_.version()};
         res.set(http::field::content_type, "application/json");
         res.keep_alive(req_.keep_alive());
         res.body() = R"({"error":{"code":"BOARD_NOT_FOUND","message":"Resource not found"}})";
         res.prepare_payload();
+        record_response_metrics(res);
         sendResponse(std::move(res));
     }
 }

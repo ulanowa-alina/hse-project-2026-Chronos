@@ -1,9 +1,11 @@
 #include "db/connection_pool.hpp"
 #include "db/db_config.hpp"
+#include "server/metrics.hpp"
 #include "server/server.hpp"
 
 #include <boost/asio.hpp>
 #include <iostream>
+#include <prometheus/prometheus.h>
 #include <string>
 #include <thread>
 #include <vector>
@@ -22,6 +24,9 @@ int main(int argc, char* argv[]) {
         const std::string host = argv[1];
         const auto port = static_cast<unsigned short>(std::stoi(argv[2]));
         const int threadCount = static_cast<int>(std::thread::hardware_concurrency());
+
+        server::metrics::initialize();
+        prometheus::http_server.start("0.0.0.0:9100");
 
         asio::io_context ioc{threadCount};
         Server server(ioc, host, port, pool);
