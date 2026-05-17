@@ -3,8 +3,8 @@
 #include "auth/v1/login.hpp"
 #include "auth/v1/register.hpp"
 #include "auth/with_auth.hpp"
-#include "board/v1/delete.hpp"
 #include "board/v1/create.hpp"
+#include "board/v1/delete.hpp"
 #include "board/v1/edit.hpp"
 #include "board/v1/get.hpp"
 #include "board/v1/get_all.hpp"
@@ -164,7 +164,7 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
             res.prepare_payload();
             return res;
         });
-      
+
     router_["/board/v1/delete"] =
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
             if (req.method() == http::verb::delete_) {
@@ -180,7 +180,7 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
             res.prepare_payload();
             return res;
         });
-      
+
     router_["/board/v1/edit"] =
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
             if (req.method() == http::verb::patch) {
