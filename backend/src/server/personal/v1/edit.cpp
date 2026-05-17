@@ -8,9 +8,9 @@
 #include <iomanip>
 #include <nlohmann/json.hpp>
 #include <pqxx/pqxx>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
-#include <spdlog/spdlog.h>
 
 namespace http = boost::beast::http;
 
@@ -94,8 +94,8 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     json body;
     if (req.method() != http::verb::put) {
         spdlog::warn("User edit rejected: method not allowed");
-        return build_api_error(req, http::status::method_not_allowed,
-                                                   "DUPLICATE_RESOURCE", "Method not allowed");
+        return build_api_error(req, http::status::method_not_allowed, "DUPLICATE_RESOURCE",
+                               "Method not allowed");
     }
     try {
         body = json::parse(req.body());

@@ -3,9 +3,9 @@
 #include "server/auth/jwt.hpp"
 
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <string>
 #include <utility>
-#include <spdlog/spdlog.h>
 
 namespace auth {
 
@@ -30,7 +30,8 @@ RequestHandler with_auth(AuthorizedHandler handler) {
 
         const auto auth_header = req[http::field::authorization];
         if (auth_header.empty()) {
-            spdlog::warn("Authorization rejected: missing authorization header (user is not authorized)");
+            spdlog::warn(
+                "Authorization rejected: missing authorization header (user is not authorized)");
             return build_auth_error(req, http::status::unauthorized, "UNAUTHORIZED",
                                     "User is not authorized");
         }
@@ -56,7 +57,7 @@ RequestHandler with_auth(AuthorizedHandler handler) {
                                     "Invalid token");
         }
 
-        spdlog::info("Authorization succeeded for user_id={}");
+        spdlog::info("Authorization succeeded for user_id={}", payload.user_id);
         return handler(req, payload.user_id);
     };
 }

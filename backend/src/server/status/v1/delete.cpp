@@ -5,8 +5,8 @@
 #include "../../utils/response_utils.hpp"
 
 #include <nlohmann/json.hpp>
-#include <string>
 #include <spdlog/spdlog.h>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -68,20 +68,24 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
         BoardRepository board_repository(pool);
         const std::optional<Board> board = board_repository.find_by_id(status->board_id_);
         if (!board.has_value()) {
-            spdlog::warn("Status delete rejected: board with board_id={} not found", status->board_id_);
+            spdlog::warn("Status delete rejected: board with board_id={} not found",
+                         status->board_id_);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "STATUS_NOT_FOUND", "Status not found");
         }
 
         if (board->user_id_ != user_id) {
-            spdlog::warn("Status delete rejected: board with board_id={} belongs to another user",status->board_id_);
+            spdlog::warn("Status delete rejected: board with board_id={} belongs to another user",
+                         status->board_id_);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
         }
 
         if (!status_repository.delete_by_id(status_id)) {
-            spdlog::warn("Status delete rejected: status with id={} not belongs to board with id={}", status_id, status->board_id_);
+            spdlog::warn(
+                "Status delete rejected: status with id={} not belongs to board with id={}",
+                status_id, status->board_id_);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "STATUS_NOT_FOUND", "Status not found");
         }
@@ -119,14 +123,14 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", e.what());
     } catch (const std::runtime_error& e) {
-    spdlog::error("Status delete failed with database error: {}", e.what());
-    return server::utils::build_error_response(req, http::status::internal_server_error,
-                                               "DATABASE_ERROR", e.what());
+        spdlog::error("Status delete failed with database error: {}", e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "DATABASE_ERROR", e.what());
     } catch (const std::exception& e) {
-    spdlog::error("Status delete failed with unexpected error: {}", e.what());
-    return server::utils::build_error_response(req, http::status::internal_server_error,
-                                               "INTERNAL_ERROR", "Internal server error");
-}
+        spdlog::error("Status delete failed with unexpected error: {}", e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "INTERNAL_ERROR", "Internal server error");
+    }
 }
 
 } // namespace status::v1

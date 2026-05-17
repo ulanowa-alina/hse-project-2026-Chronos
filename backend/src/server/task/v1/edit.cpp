@@ -167,7 +167,8 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         const std::optional<Board> task_board =
             board_repository.find_by_id(existing_task->board_id_);
         if (!task_board.has_value()) {
-            spdlog::warn("Task edit rejected: board with id={} not found", existing_task->board_id_);
+            spdlog::warn("Task edit rejected: board with id={} not found",
+                         existing_task->board_id_);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }

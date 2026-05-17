@@ -6,8 +6,8 @@
 
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <string>
 #include <spdlog/spdlog.h>
+#include <string>
 
 using json = nlohmann::json;
 

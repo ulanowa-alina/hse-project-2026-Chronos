@@ -1,14 +1,15 @@
 #include "info.hpp"
-#include "utils/response_utils.hpp"
+
 #include "repositories/user_repository.hpp"
+#include "utils/response_utils.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
-#include <spdlog/spdlog.h>
 
 namespace http = boost::beast::http;
 
@@ -80,7 +81,7 @@ auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& poo
 
         spdlog::info("Successfully get user info for user_id={}", user_id);
         return build_ok_response(req, *user);
-    }catch (const std::runtime_error& e) {
+    } catch (const std::runtime_error& e) {
         spdlog::error("User get failed with database error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", "Database error");

@@ -5,8 +5,8 @@
 
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <string>
 #include <spdlog/spdlog.h>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -66,7 +66,8 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
         }
 
         if (board->user_id_ != user_id) {
-            spdlog::warn("Board delete rejected: board with id = {} belongs to another user", board_id);
+            spdlog::warn("Board delete rejected: board with id = {} belongs to another user",
+                         board_id);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");

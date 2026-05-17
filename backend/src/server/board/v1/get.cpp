@@ -9,9 +9,9 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
-#include <spdlog/spdlog.h>
 
 using json = nlohmann::json;
 
@@ -88,18 +88,19 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
                                          : board_repository.find_by_user_id(user_id);
 
         if (!board.has_value()) {
-            spdlog::warn("Board get rejected: board with id={} not found", requested_board_id.value());
+            spdlog::warn("Board get rejected: board with id={} not found",
+                         requested_board_id.value());
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (board->user_id_ != user_id) {
-            spdlog::warn("Board get rejected: board with id={} belongs to another user", board->id_);
+            spdlog::warn("Board get rejected: board with id={} belongs to another user",
+                         board->id_);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
         }
-
 
         spdlog::info("Successfully get board with id={}", board->id_);
         return server::utils::build_json_response(req, http::status::ok,

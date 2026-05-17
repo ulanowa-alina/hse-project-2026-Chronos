@@ -6,8 +6,8 @@
 #include <array>
 #include <ctime>
 #include <nlohmann/json.hpp>
-#include <string>
 #include <spdlog/spdlog.h>
+#include <string>
 
 using json = nlohmann::json;
 

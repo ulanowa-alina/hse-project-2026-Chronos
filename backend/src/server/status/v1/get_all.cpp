@@ -8,8 +8,8 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <string>
 #include <spdlog/spdlog.h>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -93,13 +93,15 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
             BoardRepository board_repository(pool);
             const std::optional<Board> board = board_repository.find_by_id(*board_id);
             if (!board.has_value()) {
-                spdlog::warn("Status get all rejected: board with id={} not found", board_id.value());
+                spdlog::warn("Status get all rejected: board with id={} not found",
+                             board_id.value());
                 return server::utils::build_error_response(req, http::status::not_found,
                                                            "BOARD_NOT_FOUND", "Board not found");
             }
 
             if (board->user_id_ != user_id) {
-                spdlog::warn("Status get all rejected: board with id={} belongs to another user", board->id_);
+                spdlog::warn("Status get all rejected: board with id={} belongs to another user",
+                             board->id_);
                 return server::utils::build_error_response(req, http::status::forbidden,
                                                            "RESOURCE_NOT_OWNED",
                                                            "Resource belongs to another user");
@@ -115,7 +117,7 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
         for (const auto& status : statuses) {
             data.push_back(model_to_json(status));
         }
-        spdlog::info("Status get all succeeded with status_count={}",statuses.size());
+        spdlog::info("Status get all succeeded with status_count={}", statuses.size());
         return server::utils::build_json_response(req, http::status::ok, json{{"data", data}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();

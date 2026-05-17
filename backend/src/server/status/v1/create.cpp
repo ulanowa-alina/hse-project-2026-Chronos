@@ -7,8 +7,8 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <pqxx/pqxx>
-#include <string>
 #include <spdlog/spdlog.h>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -130,13 +130,14 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::optional<Board> board = board_repository.find_by_id(board_id);
 
         if (!board.has_value()) {
-            spdlog::warn("Status create rejected: board with id={} not found",board_id);
+            spdlog::warn("Status create rejected: board with id={} not found", board_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (board->user_id_ != user_id) {
-            spdlog::warn("Status create rejected: board with id={} belongs to another user", board_id);
+            spdlog::warn("Status create rejected: board with id={} belongs to another user",
+                         board_id);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
@@ -156,7 +157,8 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const Status new_status(0, board_id, name, position);
         const Status created_status = status_repository.save(new_status);
 
-        spdlog::info("Status with id={} successfully created for board_id={}",created_status.id_,  board_id);
+        spdlog::info("Status with id={} successfully created for board_id={}", created_status.id_,
+                     board_id);
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(created_status)}});
 
