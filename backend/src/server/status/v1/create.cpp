@@ -143,7 +143,8 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
 
-        const Status created_status = status_repository.create(board_id, name, position);
+        const Status new_status(0, board_id, name, position);
+        const Status created_status = status_repository.save(new_status);
 
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(created_status)}});
