@@ -30,6 +30,21 @@ def board_get_all_url(base_url):
 
 
 @pytest.fixture
+def board_create_url(base_url):
+    return f"{base_url}/board/v1/create"
+
+
+@pytest.fixture
+def board_edit_url(base_url):
+    return f"{base_url}/board/v1/edit"
+
+
+@pytest.fixture
+def board_delete_url(base_url):
+    return f"{base_url}/board/v1/delete"
+
+
+@pytest.fixture
 def status_edit_url(base_url):
     return f"{base_url}/status/v1/edit"
 
