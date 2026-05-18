@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network Sql)
 
 add_executable(ChronosClient
         src/main.cpp
@@ -31,6 +31,19 @@ add_executable(ChronosClient
         src/task_card.cpp
         src/profile_edit_screen.cpp
         include/profile_edit_screen.h
+        src/local_db.cpp
+        include/local_db.h
+        local_repositories/local_board_repository.cpp
+        local_repositories/local_board_repository.hpp
+        local_repositories/local_status_repository.cpp
+        local_repositories/local_status_repository.hpp
+        local_repositories/local_task_repository.cpp
+        local_repositories/local_task_repository.hpp
+        local_models/local_task.hpp
+        local_models/local_board.hpp
+        local_models/local_status.hpp
+        include/sync_manager.h
+        src/sync_manager.cpp
 )
 
 
@@ -39,6 +52,7 @@ target_include_directories(ChronosClient PRIVATE include)
 target_link_libraries(ChronosClient PRIVATE
         Qt6::Widgets
         Qt6::Network
+        Qt6::Sql
 )
 
 

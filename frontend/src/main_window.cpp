@@ -1,5 +1,6 @@
 #include "main_window.h"
 
+#include <QSqlQuery>
 #include <QStackedWidget>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
@@ -7,6 +8,13 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
     network_manager_ = new NetworkManager(this);
+
+    local_db_ = new LocalDatabaseManager(this);
+    local_db_->open("chronos_local.db");
+    local_db_->createDb("../sql/local_init.sql");
+
+    QSqlDatabase db = local_db_->getDatabase();
+    sync_manager_ = new SyncManager(db, network_manager_);
 
     stacked_widget_ = new QStackedWidget(this);
     setCentralWidget(stacked_widget_);
@@ -22,6 +30,8 @@ MainWindow::MainWindow(QWidget* parent)
     profile_edit_screen_->setNetworkManager(network_manager_);
     registration_screen_->setNetworkManager(network_manager_);
     board_screen_->setNetworkManager(network_manager_);
+
+    login_screen_->setSyncManager(sync_manager_);
 
     stacked_widget_->addWidget(login_screen_);
     stacked_widget_->addWidget(registration_screen_);
