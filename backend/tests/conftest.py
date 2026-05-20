@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from tests.status_test_helpers import create_user, get_first_board_id, get_statuses
+from status_test_helpers import create_user, get_first_board_id, get_statuses
 
 
 @pytest.fixture
