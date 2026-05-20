@@ -16,6 +16,65 @@ namespace {
 
 using nlohmann::json;
 
+auto is_valid_email(const std::string& email) -> bool {
+    if (email.empty()) {
+        return false;
+    }
+
+    if (email.size() > 254) {
+        return false;
+    }
+
+    if (email.find(' ') != std::string::npos) {
+        return false;
+    }
+
+    const auto at_pos = email.find('@');
+    if (at_pos == std::string::npos) {
+        return false;
+    }
+
+    if (at_pos == 0 || at_pos != email.rfind('@')) {
+        return false;
+    }
+
+    const std::string local = email.substr(0, at_pos);
+    const std::string domain = email.substr(at_pos + 1);
+
+    if (local.empty() || domain.empty()) {
+        return false;
+    }
+
+    if (local.front() == '.' || local.back() == '.') {
+        return false;
+    }
+
+    if (domain.front() == '.' || domain.back() == '.') {
+        return false;
+    }
+
+    if (email.find("..") != std::string::npos) {
+        return false;
+    }
+
+    if (domain.find('.') == std::string::npos) {
+        return false;
+    }
+
+    for (char ch : email) {
+        const bool is_ascii_letter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+        const bool is_digit = ch >= '0' && ch <= '9';
+        const bool is_allowed_symbol =
+            ch == '@' || ch == '.' || ch == '_' || ch == '-' || ch == '+';
+
+        if (!is_ascii_letter && !is_digit && !is_allowed_symbol) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
                          const json& body) -> http::response<http::string_body> {
     http::response<http::string_body> res{status, req.version()};
@@ -50,6 +109,12 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     try {
         body = json::parse(req.body());
     } catch (...) {
+        error_response = build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                         "Invalid JSON format");
+        return false;
+    }
+
+    if (!body.is_object()) {
         error_response = build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                          "Invalid JSON format");
         return false;
@@ -90,14 +155,10 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     out.email = body["email"].get<std::string>();
     out.password = body["password"].get<std::string>();
 
-    const bool valid_email = !out.email.empty() && out.email.find(' ') == std::string::npos &&
-                             out.email.find('@') != std::string::npos &&
-                             out.email.find('.', out.email.find('@') + 1) != std::string::npos;
-
-    if (!valid_email) {
+    if (!is_valid_email(out.email)) {
         error_response =
-            build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
-                            "Invalid email format", json{{"email", "Invalid email format"}});
+            build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                            json{{"email", "Invalid email format"}});
         return false;
     }
 
@@ -105,6 +166,13 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
         error_response =
             build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                             json{{"password", "Password cannot be empty"}});
+        return false;
+    }
+
+    if (out.password.size() < 8) {
+        error_response =
+            build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                            json{{"password", "Password length cannot be less than 8 symbols"}});
         return false;
     }
 
