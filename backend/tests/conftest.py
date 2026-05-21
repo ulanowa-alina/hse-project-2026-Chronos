@@ -1,5 +1,6 @@
 import pytest
 import requests
+import time
 
 from status_test_helpers import create_user, get_first_board_id, get_statuses
 
@@ -72,3 +73,15 @@ def board_id(session, board_get_all_url, auth_user):
 @pytest.fixture
 def board_statuses(session, status_get_all_url, auth_user, board_id):
     return get_statuses(session, status_get_all_url, auth_user["headers"], board_id)
+
+
+@pytest.fixture
+def reg_user_data():
+    code = time.time_ns()
+
+    return {
+        "name": f"user_{code}",
+        "email": f"user_{code}@example.com",
+        "status": "student",
+        "password": f"password_{code}"
+    }

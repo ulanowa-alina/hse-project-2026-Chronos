@@ -1,11 +1,7 @@
-from http.client import responses
-
 import pytest
 import requests
 
-#TODO:Занести user-а в базу:
-# "email": "user@example.com",
-# "password": "12345678"
+
 def test_login_success(login_url, session):
     response = session.post(
         login_url,

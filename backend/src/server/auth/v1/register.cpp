@@ -16,6 +16,64 @@ namespace auth::v1 {
 namespace {
 
 using nlohmann::json;
+auto is_valid_email(const std::string& email) -> bool {
+    if (email.empty()) {
+        return false;
+    }
+
+    if (email.size() > 254) {
+        return false;
+    }
+
+    if (email.find(' ') != std::string::npos) {
+        return false;
+    }
+
+    const auto at_pos = email.find('@');
+    if (at_pos == std::string::npos) {
+        return false;
+    }
+
+    if (at_pos == 0 || at_pos != email.rfind('@')) {
+        return false;
+    }
+
+    const std::string local = email.substr(0, at_pos);
+    const std::string domain = email.substr(at_pos + 1);
+
+    if (local.empty() || domain.empty()) {
+        return false;
+    }
+
+    if (local.front() == '.' || local.back() == '.') {
+        return false;
+    }
+
+    if (domain.front() == '.' || domain.back() == '.') {
+        return false;
+    }
+
+    if (email.find("..") != std::string::npos) {
+        return false;
+    }
+
+    if (domain.find('.') == std::string::npos) {
+        return false;
+    }
+
+    for (char ch : email) {
+        const bool is_ascii_letter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+        const bool is_digit = ch >= '0' && ch <= '9';
+        const bool is_allowed_symbol =
+            ch == '@' || ch == '.' || ch == '_' || ch == '-' || ch == '+';
+
+        if (!is_ascii_letter && !is_digit && !is_allowed_symbol) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
                          const json& body) -> http::response<http::string_body> {
@@ -81,17 +139,45 @@ auto collect_missing_fields(const json& body) -> json {
     return missing;
 }
 
+std::string require_string_field(const json& body, const std::string& key) {
+    if (!body.contains(key)) {
+        throw std::invalid_argument("missing:" + key);
+    }
+
+    if (!body.at(key).is_string()) {
+        throw std::invalid_argument("type:" + key);
+    }
+
+    return body.at(key).get<std::string>();
+}
+
 User parse_new_user(const json& body) {
-    const std::string email = body.at("email").get<std::string>();
-    const std::string name = body.at("name").get<std::string>();
-    const std::string status = body.at("status").get<std::string>();
-    const std::string password = body.at("password").get<std::string>();
+    const std::string email = require_string_field(body, "email");
+    const std::string name = require_string_field(body, "name");
+    const std::string status = require_string_field(body, "status");
+    const std::string password = require_string_field(body, "password");
+
+    if (!is_valid_email(email)) {
+        throw std::invalid_argument("invalid_email");
+    }
+
+    if (name.empty() || name.size() > 50) {
+        throw std::invalid_argument("invalid_name");
+    }
+
+    if (status.empty() || status.size() > 50) {
+        throw std::invalid_argument("invalid_status");
+    }
+
+    if (password.empty()) {
+        throw std::invalid_argument("empty_password");
+    }
 
     if (password.size() < 8) {
         throw std::length_error("password_too_short");
     }
 
-    const std::string password_hash = "hash:" + password; // временно, до реального хеша
+    const std::string password_hash = "hash:" + password;
     return User(0, email, name, status, password_hash, std::time(nullptr));
 }
 
@@ -106,13 +192,16 @@ void create_board(ConnectionPool& pool, int user_id) {
     const Board b(0, user_id, "My board", "", false, now, now);
     (void) repo.save(b);
 }
-
 } // namespace
 
 auto handleRegister(const http::request<http::string_body>& req,
                     ConnectionPool& pool) -> http::response<http::string_body> {
     try {
         const json body = parse_body(req);
+        if (!body.is_object()) {
+            return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                   "Invalid JSON format");
+        }
         const json missing_fields = collect_missing_fields(body);
         if (!missing_fields.empty()) {
             return build_api_error(req, http::status::bad_request, "MISSING_FIELD",
@@ -129,18 +218,57 @@ auto handleRegister(const http::request<http::string_body>& req,
     } catch (const std::invalid_argument& e) {
         const std::string reason = e.what();
 
-        if (reason == "Invalid email format") {
+        if (reason == "type:email") {
             return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                    "Invalid email format", json{{"email", "Invalid email format"}});
         }
 
-        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
-                               "Validation failed", json{{"name_or_status", reason}});
+        if (reason == "type:name") {
+            return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                   "Invalid name format", json{{"name", "Invalid name format"}});
+        }
 
+        if (reason == "type:status") {
+            return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                   "Invalid status format",
+                                   json{{"status", "Invalid status format"}});
+        }
+
+        if (reason == "type:password") {
+            return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                                   "Invalid password format",
+                                   json{{"password", "Invalid password format"}});
+        }
+
+        if (reason == "invalid_email") {
+            return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                                   "Validation failed", json{{"email", "Invalid email format"}});
+        }
+
+        if (reason == "invalid_name") {
+            return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                                   "Validation failed",
+                                   json{{"name", "Name length must be between 1 and 50 symbols"}});
+        }
+
+        if (reason == "invalid_status") {
+            return build_api_error(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                json{{"status", "Status length must be between 1 and 50 symbols"}});
+        }
+
+        if (reason == "empty_password") {
+            return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                                   "Validation failed",
+                                   json{{"password", "Password cannot be empty"}});
+        }
+
+        return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
+                               "Validation failed");
     } catch (const std::length_error&) {
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed",
-                               json{{"password", "Minimum length is 8 symbols"}});
+                               json{{"password", "Password length cannot be less than 8 symbols"}});
     } catch (const pqxx::sql_error& e) {
         const std::string msg = e.what();
         if (msg.find("users_email_key") != std::string::npos ||
