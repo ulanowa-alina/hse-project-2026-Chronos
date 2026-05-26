@@ -4,7 +4,7 @@ import re
 
 ISO_8601_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
-def test_register_success(register_url, session, reg_user_data):
+def test_register_success(register_url, session, reg_user_data, login_url):
     response = session.post(
         register_url,
         json=reg_user_data
@@ -34,6 +34,16 @@ def test_register_success(register_url, session, reg_user_data):
 
     assert "password" not in body["data"]
 
+    response_login = session.post(
+        login_url,
+        json={
+            "email": reg_user_data["email"],
+            "password": reg_user_data["password"]
+        }
+    )
+
+    assert response_login.status_code == 200
+
 
 
 
@@ -41,7 +51,7 @@ def test_register_success(register_url, session, reg_user_data):
     "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm",
     ""
 ])
-def test_register_invalid_name(name, register_url, session, reg_user_data):
+def test_register_invalid_name(name, register_url, session, reg_user_data, login_url):
     response = session.post(
         register_url,
         json={
@@ -62,6 +72,16 @@ def test_register_invalid_name(name, register_url, session, reg_user_data):
 
     assert "details" in body["error"]
     assert "name" in body["error"]["details"]
+
+    response_login = session.post(
+        login_url,
+        json={
+            "email": reg_user_data["email"],
+            "password": reg_user_data["password"]
+        }
+    )
+
+    assert response_login.status_code == 401
 
 
 
@@ -84,7 +104,7 @@ def test_register_invalid_name(name, register_url, session, reg_user_data):
     " ",
     "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqaewsredtzsexdrcftvgbhnjkmlmkjnhbgvfcdxszxdcfvgbhnjkmcfyvgubhdcfvgbhnjmjnhbgvcxddcfvgbhnjmkjnhbgvfcdinjmkjhgfdxcfgvhqwertyuioasdfghjkzxcvbnmqwertyuioasdfghjkzxcvbnbjnkmjhgfdtcfvghbjknrstuqwertyuiopasdfghjklzxcvbnmvwxyzabcdefghxml@example.com"
 ])
-def test_register_invalid_email(email, register_url, session, reg_user_data):
+def test_register_invalid_email(email, register_url, session, reg_user_data, login_url):
     response = session.post(
         register_url,
         json={
@@ -105,9 +125,19 @@ def test_register_invalid_email(email, register_url, session, reg_user_data):
     assert "details" in body["error"]
     assert "email" in body["error"]["details"]
 
+    response_login = session.post(
+        login_url,
+        json={
+            "email": email,
+            "password": reg_user_data["password"]
+        }
+    )
+
+    assert response_login.status_code != 200
+
 
 @pytest.mark.parametrize("password", ["1234567"[:i] for i in range(1, 8)])
-def test_register_invalid_password(password, register_url, session, reg_user_data):
+def test_register_invalid_password(password, register_url, session, reg_user_data, login_url):
     response = session.post(
         register_url,
         json={
@@ -130,8 +160,18 @@ def test_register_invalid_password(password, register_url, session, reg_user_dat
     assert "password" in body["error"]["details"]
     assert body["error"]["details"]["password"] == "Password length cannot be less than 8 symbols"
 
+    response_login = session.post(
+        login_url,
+        json={
+            "email": reg_user_data["email"],
+            "password": password
+        }
+    )
 
-def test_register_empty_password(register_url, session, reg_user_data):
+    assert response_login.status_code != 200
+
+
+def test_register_empty_password(register_url, session, reg_user_data, login_url):
     response = session.post(
         register_url,
         json = {
@@ -153,6 +193,7 @@ def test_register_empty_password(register_url, session, reg_user_data):
     assert "details" in body["error"]
     assert  'password' in body["error"]["details"]
     assert  body["error"]["details"]["password"] == "Password cannot be empty"
+
 
 
 @pytest.mark.parametrize("status", [
