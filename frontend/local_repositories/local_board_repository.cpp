@@ -8,8 +8,8 @@ LocalBoard createBoard(const QSqlQuery& query) {
     return LocalBoard(query.value("id").toInt(), query.value("title").toString(),
                       query.value("description").toString(), query.value("is_private").toInt(),
                       query.value("created_at").toString(), query.value("updated_at").toString(),
-                      query.value("is_sync").toInt(), query.value("is_deleted").toInt(),
-                      query.value("is_new").toInt());
+                      query.value("deleted_at").toString(), stringToSyncStatus(query.value("sync_status").toString()),
+                        query.value("server_version").toInt());
 }
 
 LocalBoardRepository::LocalBoardRepository(QSqlDatabase& db)
@@ -21,10 +21,10 @@ LocalBoard LocalBoardRepository::insert(const LocalBoard& board) {
 
     query.prepare("INSERT INTO boards ("
                   "id, title, description, is_private, "
-                  "created_at, updated_at, is_sync, is_deleted, is_new"
+                  "created_at, updated_at, deleted_at, sync_status, server_version"
                   ") VALUES ("
                   ":id, :title, :description, :is_private, "
-                  ":created_at, :updated_at, :is_sync, :is_deleted, :is_new"
+                  ":created_at, :updated_at, :deleted_at, :sync_status, :server_version"
                   ")");
 
     query.bindValue(":id", board.id_);
@@ -33,9 +33,10 @@ LocalBoard LocalBoardRepository::insert(const LocalBoard& board) {
     query.bindValue(":is_private", board.is_private_);
     query.bindValue(":created_at", board.created_at_);
     query.bindValue(":updated_at", board.updated_at_);
-    query.bindValue(":is_sync", board.is_sync_);
-    query.bindValue(":is_deleted", board.is_deleted_);
-    query.bindValue(":is_new", board.is_new_);
+    query.bindValue(":deleted_at", board.deleted_at_.isEmpty() ? QVariant(QVariant::String)
+                                                               : board.deleted_at_);
+    query.bindValue(":sync_status", syncStatusToString(board.sync_status_));
+    query.bindValue(":server_version", board.server_version_);
 
     if (!query.exec()) {
         qDebug() << "LocalBoardRepository: insert error:" << query.lastError().text();
@@ -55,9 +56,9 @@ LocalBoard LocalBoardRepository::update(const LocalBoard& board) {
                   "is_private = :is_private, "
                   "created_at = :created_at, "
                   "updated_at = :updated_at, "
-                  "is_sync = :is_sync, "
-                  "is_deleted = :is_deleted, "
-                  "is_new = :is_new "
+                  "deleted_at = :deleted_at, "
+                  "sync_status = :sync_status, "
+                  "server_version = :server_version "
                   "WHERE id = :id");
 
     query.bindValue(":id", board.id_);
@@ -66,9 +67,10 @@ LocalBoard LocalBoardRepository::update(const LocalBoard& board) {
     query.bindValue(":is_private", board.is_private_);
     query.bindValue(":created_at", board.created_at_);
     query.bindValue(":updated_at", board.updated_at_);
-    query.bindValue(":is_sync", board.is_sync_);
-    query.bindValue(":is_deleted", board.is_deleted_);
-    query.bindValue(":is_new", board.is_new_);
+    query.bindValue(":deleted_at", board.deleted_at_.isEmpty() ? QVariant(QVariant::String)
+                                                               : board.deleted_at_);
+    query.bindValue(":sync_status", syncStatusToString(board.sync_status_));
+    query.bindValue(":server_version", board.server_version_);
 
     if (!query.exec()) {
         qDebug() << "LocalTaskRepository: insert error:" << query.lastError().text();
@@ -94,7 +96,7 @@ LocalBoard LocalBoardRepository::save(const LocalBoard& board) {
 std::optional<LocalBoard> LocalBoardRepository::findById(int board_id) {
     QSqlQuery query(db_);
     query.prepare("SELECT id, title, description, is_private, "
-                  "created_at, updated_at, is_sync, is_deleted, is_new "
+                  "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM boards WHERE id = :id");
     query.bindValue(":id", board_id);
 
@@ -114,7 +116,7 @@ std::vector<LocalBoard> LocalBoardRepository::findAll() {
     QSqlQuery query(db_);
 
     query.prepare("SELECT id, title, description, is_private,"
-                  "created_at, updated_at, is_sync, is_deleted, is_new "
+                  "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM boards");
 
     if (!query.exec()) {
@@ -133,7 +135,9 @@ std::vector<LocalBoard> LocalBoardRepository::findAll() {
 void LocalBoardRepository::deleteById(int board_id) {
     QSqlQuery query(db_);
 
-    query.prepare("UPDATE boards SET is_deleted = 1, is_sync = 0 WHERE id = :id");
+    query.prepare("UPDATE boards "
+                  "SET deleted_at = CURRENT_TIMESTAMP, sync_status = 'pending' "
+                  "WHERE id = :id");
     query.bindValue(":id", board_id);
 
     if (!query.exec()) {
@@ -147,8 +151,8 @@ std::vector<LocalBoard> LocalBoardRepository::findUnsynced() {
     QSqlQuery query(db_);
 
     query.prepare("SELECT id, title, description, is_private,"
-                  "created_at, updated_at, is_sync, is_deleted, is_new "
-                  "FROM boards WHERE is_sync = 0");
+                  "created_at, updated_at, deleted_at, sync_status, server_version "
+                  "FROM boards WHERE sync_status = 'pending'");
 
     if (!query.exec()) {
         throw std::runtime_error(
@@ -168,7 +172,7 @@ std::vector<LocalBoard> LocalBoardRepository::findUnsynced() {
 void LocalBoardRepository::markSynced(int board_id) {
     QSqlQuery query(db_);
 
-    query.prepare("UPDATE boards SET is_sync = 1 WHERE id = :id");
+    query.prepare("UPDATE boards SET sync_status = 'synced' WHERE id = :id");
     query.bindValue(":id", board_id);
 
     if (!query.exec()) {

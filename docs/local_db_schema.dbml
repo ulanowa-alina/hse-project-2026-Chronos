@@ -4,9 +4,10 @@ Table users {
   name text [not null]
   status text [not null]
   created_at text [not null, default: `now()`]
-  is_sync integer [not null, default: 1]
-  is_deleted integer [not null, default: 0]
-  is_new integer [not null, default: 1]
+  updated_at text [not null, default: `now()`]
+  deleted_at text
+  sync_status text [not null, default: 'pending']
+  server_version integer [not null, default: 0]
 }
 
 Table boards {
@@ -16,9 +17,9 @@ Table boards {
   is_private integer [not null, default: 0]
   created_at text [not null, default: `now()`]
   updated_at text [not null, default: `now()`]
-  is_sync integer [not null, default: 1]
-  is_deleted integer [not null, default: 0]
-  is_new integer [not null, default: 1]
+  deleted_at text
+  sync_status text [not null, default: 'pending']
+  server_version integer [not null, default: 0]
 }
 
 Table statuses {
@@ -26,9 +27,11 @@ Table statuses {
   board_id integer [not null]
   name text(50) [not null]
   position integer [not null, default: 0]
-  is_sync integer [not null, default: 1]
-  is_deleted integer [not null, default: 0]
-  is_new integer [not null, default: 1]
+  created_at text [not null, default: `now()`]
+  updated_at text [not null, default: `now()`]
+  deleted_at text
+  sync_status text [not null, default: 'pending']
+  server_version integer [not null, default: 0]
 
   indexes {
     (board_id, name) [unique]
@@ -45,9 +48,9 @@ Table tasks {
   deadline text
   created_at text [not null, default: `now()`]
   updated_at text [not null, default: `now()`]
-  is_sync integer [not null, default: 1]
-  is_deleted integer [not null, default: 0]
-  is_new integer [not null, default: 1]
+  deleted_at text
+  sync_status text [not null, default: 'pending']
+  server_version integer [not null, default: 0]
 }
 
 Ref: statuses.board_id > boards.id [delete: cascade]

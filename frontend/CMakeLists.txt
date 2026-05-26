@@ -44,6 +44,10 @@ add_executable(ChronosClient
         local_models/local_status.hpp
         include/sync_manager.h
         src/sync_manager.cpp
+        local_models/local_user.hpp
+        local_repositories/local_user_repository.cpp
+        local_repositories/local_user_repository.hpp
+        local_models/sync_status.hpp
 )
 
 

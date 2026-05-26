@@ -17,7 +17,7 @@ void SyncManager::syncBoards() {
     std::vector<LocalBoard> should_synced = repo.findUnsynced();
 
     for (auto& board : should_synced) {
-        if (board.is_deleted_ == 1) {
+        if (!board.deleted_at_.isEmpty()) {
             QJsonObject json;
             json["board_id"] = board.id_;
 
@@ -25,13 +25,12 @@ void SyncManager::syncBoards() {
             continue;
         }
 
-        if (board.is_new_) {
+        if (board.server_version_ == 0) {
             QJsonObject json;
             json["title"] = board.title_;
             json["description"] = board.description_;
             json["is_private"] = board.is_private_;
             network_manager_->POST(network_manager_->boards_create_url_, json);
-            board.is_new_ = 0;
         } else {
             QJsonObject json;
             json["board_id"] = board.id_;
@@ -50,7 +49,7 @@ void SyncManager::syncStatuses() {
     std::vector<LocalStatus> should_synced = repo.findUnsynced();
 
     for (auto& status : should_synced) {
-        if (status.is_deleted_ == 1) {
+        if (!status.deleted_at_.isEmpty()) {
             QJsonObject json;
             json["status_id"] = status.id_;
 
@@ -58,13 +57,12 @@ void SyncManager::syncStatuses() {
             continue;
         }
 
-        if (status.is_new_) {
+        if (status.server_version_ == 0) {
             QJsonObject json;
             json["board_id"] = status.board_id_;
             json["name"] = status.name_;
             json["position"] = status.position_;
             network_manager_->POST(network_manager_->statuses_create_url_, json);
-            status.is_new_ = 0;
         } else {
             QJsonObject json;
             json["status_id"] = status.id_;
@@ -82,7 +80,7 @@ void SyncManager::syncTasks() {
     std::vector<LocalTask> should_synced = repo.findUnsynced();
 
     for (auto& task : should_synced) {
-        if (task.is_deleted_ == 1) {
+        if (!task.deleted_at_.isEmpty()) {
             QJsonObject json;
             json["task_id"] = task.id_;
 
@@ -90,7 +88,7 @@ void SyncManager::syncTasks() {
             continue;
         }
 
-        if (task.is_new_) {
+        if (task.server_version_ == 0) {
             QJsonObject json;
             json["board_id"] = task.board_id_;
             json["title"] = task.title_;
@@ -98,7 +96,6 @@ void SyncManager::syncTasks() {
             json["status_id"] = task.status_id_;
             json["priority_color"] = task.priority_color_;
             network_manager_->POST(network_manager_->tasks_create_url_, json);
-            task.is_new_ = 0;
         } else {
             QJsonObject json;
             json["task_id"] = task.id_;
@@ -133,8 +130,8 @@ void SyncManager::parsingBoards(const QJsonArray& boards) {
         QJsonObject board_obj = json.toObject();
         LocalBoard board(board_obj["id"].toInt(), board_obj["title"].toString(),
                          board_obj["description"].toString(), board_obj["is_private"].toInt(),
-                         board_obj["created_at"].toString(), board_obj["updated_at"].toString(), 1,
-                         0, 0);
+                         board_obj["created_at"].toString(), board_obj["updated_at"].toString(),
+                         QString(), SyncStatus::SYNCED, 1);
 
         repo.save(board);
     }
