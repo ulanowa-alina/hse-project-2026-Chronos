@@ -1,233 +1,79 @@
-from uuid import uuid4
-
 import pytest
 
 
-def unique_email():
-    return f"board-delete-{uuid4().hex}@example.com"
-
-
-def register_user(session, register_url):
-    password = "12345678"
-    email = unique_email()
-
-    response = session.post(
-        register_url,
-        json={
-            "name": "Board Tester",
-            "email": email,
-            "status": "student",
-            "password": password,
-        },
-    )
-
-    assert response.status_code == 200
-    user = response.json()["data"]
-
-    return {
-        "id": user["id"],
-        "email": email,
-        "password": password,
-    }
-
-
-def login_user(session, login_url, user):
-    response = session.post(
-        login_url,
-        json={
-            "email": user["email"],
-            "password": user["password"],
-        },
-    )
-
-    assert response.status_code == 200
-    return response.json()["data"]["token"]
-
-
-def auth_headers(token):
-    return {"Authorization": f"Bearer {token}"}
-
-
-def create_authenticated_user(session, register_url, login_url):
-    user = register_user(session, register_url)
-    token = login_user(session, login_url, user)
-    return user, token
-
-
-def create_board(session, board_create_url, token):
-    response = session.post(
-        board_create_url,
-        headers=auth_headers(token),
-        json={
-            "title": "Study board",
-            "description": "Spring semester",
-            "is_private": False,
-        },
-    )
-
-    assert response.status_code == 200
-    return response.json()["data"]
-
-
-def assert_error(response, status_code, code):
-    assert response.status_code == status_code
-
-    body = response.json()
+def assert_error_response(body, code):
     assert "error" in body
     assert body["error"]["code"] == code
+    assert "message" in body["error"]
 
 
-def delete_payload(board_id):
-    return {"board_id": board_id}
+def test_board_delete_success_returns_no_content(board_delete):
+    body = board_delete()
+
+    assert body is None
 
 
-def test_board_delete_success_returns_no_content(
-    session,
-    register_url,
-    login_url,
-    board_create_url,
-    board_delete_url,
-    board_get_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
-    board = create_board(session, board_create_url, token)
+def test_board_delete_removes_existing_board(board_delete):
+    board_delete()
 
-    response = session.delete(
-        board_delete_url,
-        headers=auth_headers(token),
-        json=delete_payload(board["id"]),
+    body = board_delete(status_code=404)
+
+    assert_error_response(body, "BOARD_NOT_FOUND")
+
+
+def test_board_delete_requires_authorization(board_delete):
+    body = board_delete(status_code=401, headers={})
+
+    assert_error_response(body, "UNAUTHORIZED")
+
+
+def test_board_delete_rejects_invalid_token(board_delete):
+    body = board_delete(
+        status_code=401,
+        headers={"Authorization": "Bearer invalid-token"},
     )
 
-    assert response.status_code == 204
-    assert response.text == ""
-
-    get_response = session.get(
-        board_get_url,
-        headers=auth_headers(token),
-        params={"board_id": board["id"]},
-    )
-    assert_error(get_response, 404, "BOARD_NOT_FOUND")
+    assert_error_response(body, "INVALID_TOKEN")
 
 
-def test_board_delete_requires_auth(
-    session,
-    register_url,
-    login_url,
-    board_create_url,
-    board_delete_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
-    board = create_board(session, board_create_url, token)
+def test_board_delete_requires_board_id(board_delete):
+    body = board_delete(status_code=400, omit_fields=("board_id",))
 
-    response = session.delete(
-        board_delete_url,
-        json=delete_payload(board["id"]),
-    )
-
-    assert_error(response, 401, "UNAUTHORIZED")
-
-
-def test_board_delete_requires_board_id(
-    session,
-    register_url,
-    login_url,
-    board_delete_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
-
-    response = session.delete(
-        board_delete_url,
-        headers=auth_headers(token),
-        json={},
-    )
-
-    assert_error(response, 400, "MISSING_FIELD")
-    assert (
-        response.json()["error"]["details"]["board_id"]
-        == "Field board_id is required"
-    )
+    assert_error_response(body, "MISSING_FIELD")
+    assert body["error"]["details"]["board_id"] == "Field board_id is required"
 
 
 @pytest.mark.parametrize(
-    "payload",
+    "kwargs",
     [
         {"board_id": "1"},
         {"board_id": {"id": 1}},
         {"board_id": [1]},
     ],
 )
-def test_board_delete_invalid_board_id_type(
-    payload,
-    session,
-    register_url,
-    login_url,
-    board_delete_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
+def test_board_delete_validates_board_id_type(board_delete, kwargs):
+    body = board_delete(status_code=400, **kwargs)
 
-    response = session.delete(
-        board_delete_url,
-        headers=auth_headers(token),
-        json=payload,
-    )
-
-    assert_error(response, 400, "INVALID_FORMAT")
+    assert_error_response(body, "INVALID_FORMAT")
 
 
 @pytest.mark.parametrize("board_id", [0, -1])
-def test_board_delete_invalid_board_id_value(
-    board_id,
-    session,
-    register_url,
-    login_url,
-    board_delete_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
+def test_board_delete_validates_board_id_value(board_delete, board_id):
+    body = board_delete(status_code=400, board_id=board_id)
 
-    response = session.delete(
-        board_delete_url,
-        headers=auth_headers(token),
-        json=delete_payload(board_id),
-    )
-
-    assert_error(response, 400, "VALIDATION_ERROR")
+    assert_error_response(body, "VALIDATION_ERROR")
 
 
-def test_board_delete_returns_not_found_for_unknown_board(
-    session,
-    register_url,
-    login_url,
-    board_delete_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
+def test_board_delete_returns_not_found_for_unknown_board(board_delete):
+    body = board_delete(status_code=404, board_id=999999999)
 
-    response = session.delete(
-        board_delete_url,
-        headers=auth_headers(token),
-        json=delete_payload(999999999),
-    )
-
-    assert_error(response, 404, "BOARD_NOT_FOUND")
+    assert_error_response(body, "BOARD_NOT_FOUND")
 
 
-def test_board_delete_forbidden_for_other_user(
-    session,
-    register_url,
-    login_url,
-    board_create_url,
-    board_delete_url,
-):
-    _, owner_token = create_authenticated_user(session, register_url, login_url)
-    _, other_token = create_authenticated_user(session, register_url, login_url)
-    board = create_board(session, board_create_url, owner_token)
+def test_board_delete_forbids_other_user(board_delete, other_auth_user):
+    body = board_delete(status_code=403, headers=other_auth_user["headers"])
 
-    response = session.delete(
-        board_delete_url,
-        headers=auth_headers(other_token),
-        json=delete_payload(board["id"]),
-    )
-
-    assert_error(response, 403, "RESOURCE_NOT_OWNED")
+    assert_error_response(body, "RESOURCE_NOT_OWNED")
 
 
 @pytest.mark.parametrize(
@@ -239,22 +85,7 @@ def test_board_delete_forbidden_for_other_user(
         '"just a string"',
     ],
 )
-def test_board_delete_invalid_json(
-    raw_body,
-    session,
-    register_url,
-    login_url,
-    board_delete_url,
-):
-    _, token = create_authenticated_user(session, register_url, login_url)
+def test_board_delete_rejects_invalid_json(board_delete, raw_body):
+    body = board_delete(status_code=400, raw_body=raw_body)
 
-    response = session.delete(
-        board_delete_url,
-        headers={
-            **auth_headers(token),
-            "Content-Type": "application/json",
-        },
-        data=raw_body,
-    )
-
-    assert_error(response, 400, "INVALID_FORMAT")
+    assert_error_response(body, "INVALID_FORMAT")
