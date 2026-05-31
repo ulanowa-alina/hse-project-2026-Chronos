@@ -40,11 +40,12 @@ void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray&
         QString name = data_obj["name"].toString();
         QString email = data_obj["email"].toString();
         QString status = data_obj["status"].toString();
+        QString avatar_s3_key = data_obj["avatar_s3_key"].toString();
 
         name_label_->setText(name);
         email_label_->setText(email);
         status_label_->setText(status);
-
+        qDebug() << "ProfileScreen avatar_s3_key:" << avatar_s3_key;
         qDebug() << "ProfileScreen: Данные получены";
     } else {
         qDebug() << "Ошибка сервера, код:" << code;

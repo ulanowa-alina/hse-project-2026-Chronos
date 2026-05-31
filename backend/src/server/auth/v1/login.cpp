@@ -131,6 +131,7 @@ auto build_login_success_response(const http::request<http::string_body>& req, c
                    {"email", user.email_},
                    {"name", user.name_},
                    {"status", user.status_},
+                   {"avatar_s3_key", user.avatar_s3_key_},
                    {"created_at", to_iso8601(user.created_at_)}};
 
     json out{{"token", token}, {"user", user_json}};

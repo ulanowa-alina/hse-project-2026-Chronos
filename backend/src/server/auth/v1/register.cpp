@@ -53,6 +53,7 @@ auto build_create_response(const http::request<http::string_body>& req,
     out["email"] = created.email_;
     out["name"] = created.name_;
     out["status"] = created.status_;
+    out["avatar_s3_key"] = created.avatar_s3_key_;
     out["created_at"] = to_iso8601(created.created_at_);
 
     return build_json_response(req, http::status::ok, json{{"data", out}});
@@ -92,7 +93,7 @@ User parse_new_user(const json& body) {
     }
 
     const std::string password_hash = "hash:" + password; // временно, до реального хеша
-    return User(0, email, name, status, password_hash, std::time(nullptr));
+    return User(0, email, name, status, password_hash, "", std::time(nullptr));
 }
 
 User createUser(ConnectionPool& pool, const User& user) {

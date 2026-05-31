@@ -11,22 +11,24 @@ User UserRepository::insert(const User& user) {
     pqxx::work txn(handle.conn());
 
     pqxx::result r = txn.exec_params(
-        "INSERT INTO users (email, name, status, password_hash) VALUES ($1, $2, $3, $4) "
+        "INSERT INTO users (email, name, status, password_hash, avatar_s3_key) VALUES ($1, $2, $3, "
+        "$4, $5) "
         "RETURNING id, EXTRACT(EPOCH FROM created_at)::bigint AS created_sec",
-        user.email_, user.name_, user.status_, user.password_hash_);
+        user.email_, user.name_, user.status_, user.password_hash_, user.avatar_s3_key_);
 
     txn.commit();
     return User(r[0][0].as<int>(), user.email_, user.name_, user.status_, user.password_hash_,
-                static_cast<std::time_t>(r[0]["created_sec"].as<long>()));
+                user.avatar_s3_key_, static_cast<std::time_t>(r[0]["created_sec"].as<long>()));
 }
 
 void UserRepository::update(const User& user) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
-    txn.exec_params("UPDATE users SET email = $1, name = $2, status = $3, password_hash = $4 "
-                    "WHERE id = $5",
-                    user.email_, user.name_, user.status_, user.password_hash_, user.id_);
+    txn.exec_params("UPDATE users SET email = $1, name = $2, status = $3, password_hash = $4, "
+                    "avatar_s3_key = $5 WHERE id = $6",
+                    user.email_, user.name_, user.status_, user.password_hash_, user.avatar_s3_key_,
+                    user.id_);
     txn.commit();
 }
 
@@ -42,10 +44,11 @@ std::optional<User> UserRepository::find_by_id(int user_id) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
-    pqxx::result r = txn.exec_params("SELECT id, email, name, status, password_hash, "
-                                     "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
-                                     "FROM users WHERE id = $1",
-                                     user_id);
+    pqxx::result r =
+        txn.exec_params("SELECT id, email, name, status, password_hash, avatar_s3_key, "
+                        "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
+                        "FROM users WHERE id = $1",
+                        user_id);
 
     if (r.empty()) {
         return std::nullopt;
@@ -55,6 +58,7 @@ std::optional<User> UserRepository::find_by_id(int user_id) {
     const auto& row = r[0];
     return User(row["id"].as<int>(), row["email"].as<std::string>(), row["name"].as<std::string>(),
                 row["status"].as<std::string>(), row["password_hash"].as<std::string>(),
+                row["avatar_s3_key"].is_null() ? "" : row["avatar_s3_key"].as<std::string>(),
                 row["created_sec"].as<long>());
 }
 
@@ -62,10 +66,11 @@ std::optional<User> UserRepository::find_by_email(const std::string& email) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
-    pqxx::result r = txn.exec_params("SELECT id, email, name, status, password_hash, "
-                                     "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
-                                     "FROM users WHERE email = $1",
-                                     email);
+    pqxx::result r =
+        txn.exec_params("SELECT id, email, name, status, password_hash, avatar_s3_key, "
+                        "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec "
+                        "FROM users WHERE email = $1",
+                        email);
 
     if (r.empty()) {
         return std::nullopt;
@@ -75,5 +80,6 @@ std::optional<User> UserRepository::find_by_email(const std::string& email) {
     const auto& row = r[0];
     return User(row["id"].as<int>(), row["email"].as<std::string>(), row["name"].as<std::string>(),
                 row["status"].as<std::string>(), row["password_hash"].as<std::string>(),
+                row["avatar_s3_key"].is_null() ? "" : row["avatar_s3_key"].as<std::string>(),
                 row["created_sec"].as<long>());
 }

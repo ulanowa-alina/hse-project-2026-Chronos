@@ -37,6 +37,7 @@ auto build_ok_response(const http::request<http::string_body>& req,
                        {"email", user.email_},
                        {"name", user.name_},
                        {"status", user.status_},
+                       {"avatar_s3_key", user.avatar_s3_key_},
                        {"created_at", to_iso8601(user.created_at_)}};
 
     http::response<http::string_body> res{http::status::ok, req.version()};

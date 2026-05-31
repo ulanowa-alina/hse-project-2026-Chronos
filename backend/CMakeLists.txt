@@ -10,6 +10,8 @@ find_package(Boost 1.74 REQUIRED COMPONENTS json url)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
 
@@ -49,5 +51,7 @@ target_link_libraries(chronos_backend PRIVATE
         PkgConfig::PQXX
         ${PostgreSQL_LIBRARIES}
         OpenSSL::Crypto
+        CURL::libcurl
+        nlohmann_json::nlohmann_json
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
