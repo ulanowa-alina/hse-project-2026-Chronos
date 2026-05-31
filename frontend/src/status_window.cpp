@@ -1,60 +1,46 @@
 #include "status_window.h"
 
+#include "../local_repositories/local_status_repository.hpp"
+#include "../local_repositories/local_task_repository.hpp"
+
 #include <QDataStream>
 #include <QDebug>
 #include <QEvent>
 #include <QMenu>
 #include <QMimeData>
 
-StatusWindow::StatusWindow(int status_id, int board_id, const QString& name, QWidget* parent)
+StatusWindow::StatusWindow(int status_id, int board_id, const QString& name, QSqlDatabase db,
+                           QWidget* parent)
     : QFrame(parent)
     , status_id_(status_id)
-    , board_id_(board_id) {
+    , board_id_(board_id)
+    , db_(db) {
     setupLayout(name);
     setAcceptDrops(true);
 }
 
-void StatusWindow::setNetworkManager(NetworkManager* manager) {
-    network_manager_ = manager;
-
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &StatusWindow::onNetworkResponse);
-    }
-}
-
-void StatusWindow::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->statuses_edit_url_ &&
-        endpoint != network_manager_->statuses_delete_url_)
-        return;
-
-    if (endpoint == network_manager_->statuses_delete_url_) {
-        if (should_be_delete_ && code == 204) {
-            qDebug() << "StatusWindow: Статус успешно удален";
-            deleteLater();
-        } else if (should_be_delete_) {
-            qDebug() << "StatusWindow: Ошибка удаления. Ответ сервера:" << code;
-            should_be_delete_ = false;
-        }
-        return;
-    }
-
-    if (code == 200) {
-        qDebug() << "StatusWindow: Успешное обновление статуса";
-    } else {
-        qDebug() << "StatusWindow: Ошибка обновления. Ответ сервера: " << code;
-    }
+void StatusWindow::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
 }
 
 void StatusWindow::onCreateTaskRequest() {
-    if (!network_manager_)
+    if (!sync_coordinator_) {
         return;
+    }
 
-    auto* card = new TaskCard(-1, board_id_, status_id_, this);
-    card->setNetworkManager(network_manager_);
+    LocalTaskRepository repo(db_);
+    const int temp_id = repo.createLocalId();
+    LocalTask task(temp_id, board_id_, QString(), status_id_, "gray");
+    task.sync_status_ = SyncStatus::PENDING;
+    task.server_version_ = 0;
+    repo.save(task);
 
+    auto* card = new TaskCard(temp_id, board_id_, status_id_, db_, this);
+    card->setSyncCoordinator(sync_coordinator_);
     tasks_layout_->insertWidget(0, card);
     updateGeometry();
+
+    sync_coordinator_->syncTasks();
 }
 
 void StatusWindow::onOpenSettings() {
@@ -88,17 +74,41 @@ void StatusWindow::onStatusEditRequest() {
     status_name_->selectAll();
 }
 
+void StatusWindow::onStatusNameSaved() {
+    if (!sync_coordinator_) {
+        return;
+    }
+
+    LocalStatusRepository repo(db_);
+    const auto existing = repo.findById(status_id_);
+    if (!existing) {
+        return;
+    }
+
+    LocalStatus status = *existing;
+    status.name_ = status_name_->text().trimmed();
+    status.sync_status_ = SyncStatus::PENDING;
+    repo.save(status);
+
+    status_name_->setReadOnly(true);
+    status_name_->setStyleSheet("QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "
+                                "border: none; background: transparent; }");
+
+    if (sync_coordinator_) {
+        sync_coordinator_->syncStatuses();
+    }
+}
+
 void StatusWindow::onStatusDeleteRequest() {
-    if (status_id_ == -1 || !network_manager_) {
+    if (!sync_coordinator_) {
         deleteLater();
         return;
     }
 
-    should_be_delete_ = true;
-
-    QJsonObject json;
-    json["status_id"] = status_id_;
-    network_manager_->DELETE(network_manager_->statuses_delete_url_, json);
+    LocalStatusRepository repo(db_);
+    repo.markDeletedById(status_id_);
+    sync_coordinator_->syncStatuses();
+    deleteLater();
 }
 
 void StatusWindow::dragEnterEvent(QDragEnterEvent* event) {
@@ -317,7 +327,7 @@ void StatusWindow::setupLayout(const QString& name) {
     tasks_scroll_area_->setWidget(tasks_container_);
     main_layout->addWidget(tasks_scroll_area_, 1);
 
-    connect(status_name_, &QLineEdit::editingFinished, this, [this]() {});
+    connect(status_name_, &QLineEdit::editingFinished, this, &StatusWindow::onStatusNameSaved);
     connect(create_task_button_, &QPushButton::clicked, this, &StatusWindow::onCreateTaskRequest);
     connect(settings_button_, &QPushButton::clicked, this, &StatusWindow::onOpenSettings);
 }

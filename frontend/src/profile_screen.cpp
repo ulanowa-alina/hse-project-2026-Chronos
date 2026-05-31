@@ -1,54 +1,40 @@
 #include "profile_screen.h"
 
-#include <QDebug>
-#include <QShowEvent>
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+#include "../local_repositories/local_user_repository.hpp"
 
 ProfileScreen::ProfileScreen(QWidget* parent)
     : QWidget(parent) {
     setupLayout();
 }
 
-void ProfileScreen::setNetworkManager(NetworkManager* manager) {
-    network_manager_ = manager;
-
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &ProfileScreen::onNetworkResponse);
-    }
+void ProfileScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
 }
 
-void ProfileScreen::showEvent(QShowEvent* event) {
-    QWidget::showEvent(event);
-
-    if (network_manager_) {
-        qDebug() << "ProfileScreen: Окно открыто, запрашиваю данные аккаунта...";
-        network_manager_->GET(network_manager_->user_info_url_);
-    }
+void ProfileScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
 }
 
-void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->user_info_url_)
+void ProfileScreen::reloadFromLocal() {
+    if (!db_.isOpen()) {
         return;
+    }
 
-    if (code == 200) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        QJsonObject root = doc.object();
-        QJsonObject data_obj = root["data"].toObject();
+    LocalUserRepository repo(db_);
+    const auto user = repo.getCurrentUser();
+    if (!user) {
+        name_label_->setText("Нет данных");
+        email_label_->setText("");
+        status_label_->setText("");
+        return;
+    }
 
-        QString name = data_obj["name"].toString();
-        QString email = data_obj["email"].toString();
-        QString status = data_obj["status"].toString();
+    name_label_->setText(user->name_);
+    email_label_->setText(user->email_);
+    status_label_->setText(user->status_);
 
-        name_label_->setText(name);
-        email_label_->setText(email);
-        status_label_->setText(status);
-
-        qDebug() << "ProfileScreen: Данные получены";
-    } else {
-        qDebug() << "Ошибка сервера, код:" << code;
-        name_label_->setText("Ошибка загрузки");
+    if (sync_coordinator_) {
+        sync_coordinator_->loadAll();
     }
 }
 
@@ -131,4 +117,3 @@ void ProfileScreen::setupLayout() {
     connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
     connect(edit_button_, &QPushButton::clicked, this, &ProfileScreen::profileEditRequested);
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

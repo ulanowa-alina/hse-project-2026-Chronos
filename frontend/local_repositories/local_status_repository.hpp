@@ -7,15 +7,19 @@
 #include <optional>
 #include <vector>
 
-class LocalSatusRepository {
+class LocalStatusRepository {
   public:
-    explicit LocalSatusRepository(QSqlDatabase& db);
+    explicit LocalStatusRepository(QSqlDatabase& db);
 
     LocalStatus save(const LocalStatus& status);
-    std::optional<LocalStatus> findByid(int status_id);
+    std::optional<LocalStatus> findById(int status_id);
+    std::vector<LocalStatus> findAll();
     std::vector<LocalStatus> findByBoardId(int board_id);
     std::vector<LocalStatus> findUnsynced();
+    int createLocalId();
+    void replaceId(int old_id, int new_id);
     void deleteById(int status_id);
+    void markDeletedById(int status_id);
     void markSynced(int status_id);
 
   private:

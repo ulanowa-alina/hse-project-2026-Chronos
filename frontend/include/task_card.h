@@ -1,7 +1,7 @@
 #ifndef TASK_WINDOW_H
 #define TASK_WINDOW_H
 
-#include "network_manager.h"
+#include "../sync/sync_coordinator.hpp"
 
 #include <QFrame>
 #include <QLabel>
@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QStackedWidget>
 #include <QTextEdit>
 #include <QWidget>
@@ -17,9 +18,10 @@ class TaskCard : public QFrame {
     Q_OBJECT
 
   public:
-    explicit TaskCard(int task_id, int board_id, int status_id, QWidget* parent = nullptr);
+    explicit TaskCard(int task_id, int board_id, int status_id, QSqlDatabase db,
+                      QWidget* parent = nullptr);
 
-    void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
     int getId() const {
         return task_id_;
     }
@@ -33,7 +35,6 @@ class TaskCard : public QFrame {
     void updateTaskStatus();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onTaskSaveRequest();
     void onOpenSettings();
     void onTitleEditRequest();
@@ -48,10 +49,10 @@ class TaskCard : public QFrame {
     int task_id_;
     int board_id_;
     int status_id_;
+    QSqlDatabase db_;
     QPoint drag_start_position_;
-    bool should_be_delete_{false};
 
-    NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
 
     QLineEdit* title_{nullptr};
     QTextEdit* description_edit_{nullptr};

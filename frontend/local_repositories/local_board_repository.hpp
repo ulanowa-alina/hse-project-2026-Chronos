@@ -15,7 +15,11 @@ class LocalBoardRepository {
     std::optional<LocalBoard> findById(int board_id);
     std::vector<LocalBoard> findAll();
     std::vector<LocalBoard> findUnsynced();
+    std::optional<int> findFirstBoard();
+    int createLocalId();
+    void replaceId(int old_id, int new_id);
     void deleteById(int board_id);
+    void markDeletedById(int board_id);
     void markSynced(int board_id);
 
   private:

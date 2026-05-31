@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="16a24a5c-86f5-46dc-b565-f5a266bdf32a" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/../include/board_screen.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../include/status_window.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../include/task_card.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/board_screen.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/status_window.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/task_card.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/../CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../include/login_screen.h" beforeDir="false" afterPath="$PROJECT_DIR$/../include/login_screen.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../include/main_window.h" beforeDir="false" afterPath="$PROJECT_DIR$/../include/main_window.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../include/network_manager.h" beforeDir="false" afterPath="$PROJECT_DIR$/../include/network_manager.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../include/profile_screen.h" beforeDir="false" afterPath="$PROJECT_DIR$/../include/profile_screen.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../include/registration_screen.h" beforeDir="false" afterPath="$PROJECT_DIR$/../include/registration_screen.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/login_screen.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/login_screen.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main_window.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main_window.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/network_manager.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/network_manager.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/profile_screen.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/profile_screen.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/registration_screen.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/registration_screen.cpp" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="ProjectApplicationVersion">
+    <option name="ide" value="CLion" />
+    <option name="majorVersion" value="2025" />
+    <option name="minorVersion" value="2.2" />
+    <option name="productBranch" value="Classic" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 7
+}]]></component>
+  <component name="ProjectId" id="3CDjzpwbg9htIMfBsZsYjMytlOT" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="16a24a5c-86f5-46dc-b565-f5a266bdf32a" name="Changes" comment="" />
+      <created>1775927299910</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1775927299910</updated>
+      <workItem from="1775927300958" duration="4000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
