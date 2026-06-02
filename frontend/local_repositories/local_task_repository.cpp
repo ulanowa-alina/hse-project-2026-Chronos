@@ -1,5 +1,7 @@
 #include "local_task_repository.hpp"
 
+#include "repository_utils.hpp"
+
 #include <QSqlError>
 #include <QSqlQuery>
 #include <stdexcept>
@@ -20,6 +22,14 @@ LocalTaskRepository::LocalTaskRepository(QSqlDatabase& db)
 }
 
 LocalTask LocalTaskRepository::insert(const LocalTask& task) {
+    if (task.title_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalTaskRepository: title must not be empty");
+    }
+
+    const QString created_at = processingTimestamp(task.created_at_);
+    const QString updated_at =
+        processingTimestamp(task.updated_at_.isEmpty() ? created_at : task.updated_at_);
+
     QSqlQuery query(db_);
 
     query.prepare("INSERT INTO tasks ("
@@ -32,13 +42,13 @@ LocalTask LocalTaskRepository::insert(const LocalTask& task) {
 
     query.bindValue(":id", task.id_);
     query.bindValue(":board_id", task.board_id_);
-    query.bindValue(":title", task.title_);
+    query.bindValue(":title", task.title_.trimmed());
     query.bindValue(":description", task.description_);
     query.bindValue(":status_id", task.status_id_);
     query.bindValue(":priority_color", task.priority_color_);
     query.bindValue(":deadline", task.deadline_);
-    query.bindValue(":created_at", task.created_at_);
-    query.bindValue(":updated_at", task.updated_at_);
+    query.bindValue(":created_at", created_at);
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", task.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : task.deleted_at_);
@@ -51,10 +61,20 @@ LocalTask LocalTaskRepository::insert(const LocalTask& task) {
             ("LocalTaskRepository: insert error: " + query.lastError().text()).toStdString());
     }
 
-    return task;
+    LocalTask saved = task;
+    saved.title_ = task.title_.trimmed();
+    saved.created_at_ = created_at;
+    saved.updated_at_ = updated_at;
+    return saved;
 }
 
 LocalTask LocalTaskRepository::update(const LocalTask& task) {
+    if (task.title_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalTaskRepository: title must not be empty");
+    }
+
+    const QString updated_at = processingTimestamp(task.updated_at_);
+
     QSqlQuery query(db_);
 
     query.prepare("UPDATE tasks SET "
@@ -73,13 +93,13 @@ LocalTask LocalTaskRepository::update(const LocalTask& task) {
 
     query.bindValue(":id", task.id_);
     query.bindValue(":board_id", task.board_id_);
-    query.bindValue(":title", task.title_);
+    query.bindValue(":title", task.title_.trimmed());
     query.bindValue(":description", task.description_);
     query.bindValue(":status_id", task.status_id_);
     query.bindValue(":priority_color", task.priority_color_);
     query.bindValue(":deadline", task.deadline_);
-    query.bindValue(":created_at", task.created_at_);
-    query.bindValue(":updated_at", task.updated_at_);
+    query.bindValue(":created_at", processingTimestamp(task.created_at_));
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", task.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : task.deleted_at_);
@@ -125,25 +145,6 @@ std::optional<LocalTask> LocalTaskRepository::findById(int task_id) {
     return createTask(query);
 }
 
-std::vector<LocalTask> LocalTaskRepository::findAll() {
-    QSqlQuery query(db_);
-
-    query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
-                  "created_at, updated_at, deleted_at, sync_status, server_version "
-                  "FROM tasks WHERE deleted_at IS NULL");
-
-    if (!query.exec()) {
-        throw std::runtime_error(
-            ("LocalTaskRepository: Error find all: " + query.lastError().text()).toStdString());
-    }
-
-    std::vector<LocalTask> tasks;
-    while (query.next()) {
-        tasks.push_back(createTask(query));
-    }
-    return tasks;
-}
-
 std::vector<LocalTask> LocalTaskRepository::findByBoardId(int board_id) {
 
     QSqlQuery query(db_);
@@ -158,27 +159,6 @@ std::vector<LocalTask> LocalTaskRepository::findByBoardId(int board_id) {
     if (!query.exec()) {
         throw std::runtime_error(
             ("LocalTaskRepository: Error find by board_id: " + query.lastError().text())
-                .toStdString());
-    }
-
-    std::vector<LocalTask> tasks;
-    while (query.next()) {
-        tasks.push_back(createTask(query));
-    }
-    return tasks;
-}
-
-std::vector<LocalTask> LocalTaskRepository::findByStatusId(int status_id) {
-    QSqlQuery query(db_);
-    query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
-                  "created_at, updated_at, deleted_at, sync_status, server_version "
-                  "FROM tasks "
-                  "WHERE status_id = :status_id AND deleted_at IS NULL ");
-    query.bindValue(":status_id", status_id);
-
-    if (!query.exec()) {
-        throw std::runtime_error(
-            ("LocalTaskRepository: Error find by status_id: " + query.lastError().text())
                 .toStdString());
     }
 

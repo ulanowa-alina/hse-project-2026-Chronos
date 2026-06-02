@@ -55,7 +55,7 @@ class BoardScreen : public QWidget {
     QMap<int, StatusWindow*> status_windows_;
     QMap<int, QString> status_names_;
 
-    StatusWindow* ensureStatusWindow(int status_id, const QString& name);
+    StatusWindow* showStatusWindow(int status_id, const QString& name);
     void loadFromLocalDatabase();
     void setupLayout();
 };

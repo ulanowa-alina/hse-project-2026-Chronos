@@ -1,10 +1,13 @@
 #include "sync_coordinator.hpp"
 
 #include "../local_repositories/local_board_repository.hpp"
+#include "../local_repositories/local_user_repository.hpp"
 
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSqlQuery>
+
 bool codeIsError(int code) {
     return code < 200 || code >= 300;
 }
@@ -24,16 +27,53 @@ SyncCoordinator::SyncCoordinator(QSqlDatabase& db, NetworkManager* network_manag
     connect(periodic_timer_, &QTimer::timeout, this, &SyncCoordinator::onPeriodicSync);
 }
 
-void SyncCoordinator::saveUserFromLogin(const QJsonObject& user_obj) {
+void SyncCoordinator::clearLocalData() {
+    QSqlQuery query(db_);
+    query.exec("DELETE FROM tasks");
+    query.exec("DELETE FROM statuses");
+    query.exec("DELETE FROM boards");
+    query.exec("DELETE FROM users");
+    current_user_id_ = -1;
+}
+
+void SyncCoordinator::beginUserSession(const QJsonObject& user_obj) {
+    clearLocalData();
+    current_user_id_ = user_obj["id"].toInt();
     user_manager_->saveFromLogin(user_obj);
+    loadAll();
+}
+
+void SyncCoordinator::loadCurrentUser() {
+    LocalUserRepository repo(db_);
+    const auto user = repo.getCurrentUser();
+    if (user) {
+        current_user_id_ = user->id_;
+    }
 }
 
 void SyncCoordinator::loadAll() {
+    if (remote_loading_) {
+        return;
+    }
+
+    remote_loading_ = true;
     waiting_initial_boards_ = true;
+    waiting_initial_children_ = false;
     user_manager_->load();
     board_manager_->load();
+}
+
+void SyncCoordinator::loadChildrenAfterBoards() {
+    waiting_initial_children_ = true;
     status_manager_->load();
     task_manager_->load();
+}
+
+void SyncCoordinator::finishInitialLoadCycle() {
+    waiting_initial_boards_ = false;
+    waiting_initial_children_ = false;
+    remote_loading_ = false;
+    emitInitialData();
 }
 
 void SyncCoordinator::syncAll() {
@@ -63,6 +103,10 @@ void SyncCoordinator::setPassword(const QString& password) {
     user_manager_->setPassword(password);
 }
 
+int SyncCoordinator::currentUserId() const {
+    return current_user_id_;
+}
+
 SyncManager* SyncCoordinator::managerByModel(const QString& entity) const {
     for (SyncManager* manager : managers_) {
         if (manager->modelName() == entity) {
@@ -73,16 +117,23 @@ SyncManager* SyncCoordinator::managerByModel(const QString& entity) const {
 }
 
 void SyncCoordinator::handleResponse(const QString& endpoint, const QByteArray& data, int code) {
+    const bool is_boards = endpoint == network_manager_->boards_get_all_url_;
+    const bool is_statuses = endpoint.startsWith(network_manager_->statuses_get_all_url_);
+
     if (codeIsError(code)) {
-        if (waiting_initial_boards_ && endpoint == network_manager_->boards_get_all_url_) {
-            waiting_initial_boards_ = false;
-            emit initialDataReady(defaultBoardId());
+        if (waiting_initial_boards_ && is_boards) {
+            finishInitialLoadCycle();
+        } else if (waiting_initial_children_ && is_statuses) {
+            finishInitialLoadCycle();
         }
         return;
     }
 
     const QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isObject()) {
+        if (waiting_initial_boards_ && is_boards) {
+            finishInitialLoadCycle();
+        }
         return;
     }
 
@@ -102,12 +153,16 @@ void SyncCoordinator::handleResponse(const QString& endpoint, const QByteArray& 
         break;
     }
 
-    if (waiting_initial_boards_ && endpoint == network_manager_->boards_get_all_url_) {
+    if (waiting_initial_boards_ && is_boards) {
         waiting_initial_boards_ = false;
-        emitInitialData();
+        loadChildrenAfterBoards();
+    } else if (waiting_initial_children_ && is_statuses) {
+        finishInitialLoadCycle();
     }
 
-    emit dataChanged();
+    if (!remote_loading_) {
+        emit dataChanged();
+    }
 }
 
 void SyncCoordinator::handleSyncResponse(const QString& endpoint, const QByteArray& data, int code,
@@ -143,6 +198,9 @@ void SyncCoordinator::emitInitialData() {
 }
 
 void SyncCoordinator::startPeriodicSync(int interval_ms) {
+    if (periodic_timer_->isActive()) {
+        periodic_timer_->stop();
+    }
     periodic_timer_->start(interval_ms);
 }
 
@@ -151,7 +209,7 @@ void SyncCoordinator::stopPeriodicSync() {
 }
 
 void SyncCoordinator::onPeriodicSync() {
-    if (!network_manager_->hasToken()) {
+    if (!network_manager_->hasToken() || remote_loading_) {
         return;
     }
     syncAll();

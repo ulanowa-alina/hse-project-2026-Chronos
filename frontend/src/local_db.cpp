@@ -1,6 +1,7 @@
 #include "local_db.h"
 
 #include <QDebug>
+#include <QDir>
 #include <QFile>
 #include <QUuid>
 #include <QtSql/QSqlError>
@@ -68,7 +69,8 @@ bool LocalDatabaseManager::open(const QString& db_name) {
         return false;
     }
 
-    qDebug() << "Local DB: database created succesfully: " << db_name;
+    qDebug() << "Local DB: database created succesfully:"
+             << QDir::current().absoluteFilePath(db_name);
     return true;
 }
 

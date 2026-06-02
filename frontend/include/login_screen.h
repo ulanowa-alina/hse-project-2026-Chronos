@@ -22,7 +22,6 @@ class LoginScreen : public QWidget {
     void setSyncCoordinator(SyncCoordinator* coordinator);
 
   signals:
-    void loginRequested(int board_id);
     void registrationRequested();
     void authenticated(const QString& token);
 

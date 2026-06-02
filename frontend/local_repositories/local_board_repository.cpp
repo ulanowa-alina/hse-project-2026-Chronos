@@ -1,5 +1,7 @@
 #include "local_board_repository.hpp"
 
+#include "repository_utils.hpp"
+
 #include <QSqlError>
 #include <QSqlQuery>
 #include <stdexcept>
@@ -18,6 +20,14 @@ LocalBoardRepository::LocalBoardRepository(QSqlDatabase& db)
 }
 
 LocalBoard LocalBoardRepository::insert(const LocalBoard& board) {
+    if (board.title_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalBoardRepository: title must not be empty");
+    }
+
+    const QString created_at = processingTimestamp(board.created_at_);
+    const QString updated_at =
+        processingTimestamp(board.updated_at_.isEmpty() ? created_at : board.updated_at_);
+
     QSqlQuery query(db_);
 
     query.prepare("INSERT INTO boards ("
@@ -29,11 +39,11 @@ LocalBoard LocalBoardRepository::insert(const LocalBoard& board) {
                   ")");
 
     query.bindValue(":id", board.id_);
-    query.bindValue(":title", board.title_);
+    query.bindValue(":title", board.title_.trimmed());
     query.bindValue(":description", board.description_);
     query.bindValue(":is_private", board.is_private_);
-    query.bindValue(":created_at", board.created_at_);
-    query.bindValue(":updated_at", board.updated_at_);
+    query.bindValue(":created_at", created_at);
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", board.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : board.deleted_at_);
@@ -46,10 +56,20 @@ LocalBoard LocalBoardRepository::insert(const LocalBoard& board) {
             ("LocalBoardRepository: insert error: " + query.lastError().text()).toStdString());
     }
 
-    return board;
+    LocalBoard saved = board;
+    saved.title_ = board.title_.trimmed();
+    saved.created_at_ = created_at;
+    saved.updated_at_ = updated_at;
+    return saved;
 }
 
 LocalBoard LocalBoardRepository::update(const LocalBoard& board) {
+    if (board.title_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalBoardRepository: title must not be empty");
+    }
+
+    const QString updated_at = processingTimestamp(board.updated_at_);
+
     QSqlQuery query(db_);
 
     query.prepare("UPDATE boards SET "
@@ -64,11 +84,11 @@ LocalBoard LocalBoardRepository::update(const LocalBoard& board) {
                   "WHERE id = :id");
 
     query.bindValue(":id", board.id_);
-    query.bindValue(":title", board.title_);
+    query.bindValue(":title", board.title_.trimmed());
     query.bindValue(":description", board.description_);
     query.bindValue(":is_private", board.is_private_);
-    query.bindValue(":created_at", board.created_at_);
-    query.bindValue(":updated_at", board.updated_at_);
+    query.bindValue(":created_at", processingTimestamp(board.created_at_));
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", board.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : board.deleted_at_);
@@ -112,26 +132,6 @@ std::optional<LocalBoard> LocalBoardRepository::findById(int board_id) {
     }
 
     return createBoard(query);
-}
-
-std::vector<LocalBoard> LocalBoardRepository::findAll() {
-    QSqlQuery query(db_);
-
-    query.prepare("SELECT id, title, description, is_private,"
-                  "created_at, updated_at, deleted_at, sync_status, server_version "
-                  "FROM boards WHERE deleted_at IS NULL");
-
-    if (!query.exec()) {
-        throw std::runtime_error(
-            ("LocalBoardRepository: Error find all: " + query.lastError().text()).toStdString());
-    }
-
-    std::vector<LocalBoard> boards;
-    while (query.next()) {
-        boards.push_back(createBoard(query));
-    }
-
-    return boards;
 }
 
 std::optional<int> LocalBoardRepository::findFirstBoard() {

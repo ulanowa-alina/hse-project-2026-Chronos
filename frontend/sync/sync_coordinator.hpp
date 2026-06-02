@@ -21,7 +21,9 @@ class SyncCoordinator : public QObject {
   public:
     SyncCoordinator(QSqlDatabase& db, NetworkManager* network_manager, QObject* parent = nullptr);
 
-    void saveUserFromLogin(const QJsonObject& user_obj);
+    void beginUserSession(const QJsonObject& user_obj);
+    void loadCurrentUser();
+    void clearLocalData();
     void loadAll();
     void syncAll();
     void syncBoards();
@@ -32,6 +34,7 @@ class SyncCoordinator : public QObject {
     void handleResponse(const QString& endpoint, const QByteArray& data, int code);
     void handleSyncResponse(const QString& endpoint, const QByteArray& data, int code,
                             const QString& entity, int local_id, const QString& operation);
+    int currentUserId() const;
     int defaultBoardId() const;
     bool hasLocalData() const;
     void startPeriodicSync(int interval_ms = INTERVAL);
@@ -54,11 +57,16 @@ class SyncCoordinator : public QObject {
     std::vector<SyncManager*> managers_;
     QTimer* periodic_timer_{nullptr};
     bool waiting_initial_boards_{false};
+    bool waiting_initial_children_{false};
+    bool remote_loading_{false};
+    int current_user_id_{-1};
 
     static const int INTERVAL = 30'000;
 
     SyncManager* managerByModel(const QString& entity) const;
     void emitInitialData();
+    void finishInitialLoadCycle();
+    void loadChildrenAfterBoards();
 };
 
 #endif // SYNC_COORDINATOR_HPP

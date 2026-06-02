@@ -23,7 +23,12 @@ void ProfileEditScreen::reloadFromLocal() {
     }
 
     LocalUserRepository repo(db_);
-    const auto user = repo.getCurrentUser();
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
     if (!user) {
         return;
     }
@@ -39,17 +44,27 @@ void ProfileEditScreen::onProfileEditRequest() {
     }
 
     LocalUserRepository repo(db_);
-    const auto user = repo.getCurrentUser();
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
     if (!user) {
         return;
     }
 
     LocalUser updated = *user;
-    updated.name_ = name_input_->text();
-    updated.email_ = email_input_->text();
-    updated.status_ = status_input_->text();
+    updated.name_ = name_input_->text().trimmed();
+    updated.email_ = email_input_->text().trimmed();
+    updated.status_ = status_input_->text().trimmed();
     updated.sync_status_ = SyncStatus::PENDING;
-    repo.save(updated);
+    try {
+        repo.save(updated);
+    } catch (const std::exception& e) {
+        qDebug() << "ProfileEditScreen: failed to save user:" << e.what();
+        return;
+    }
 
     pending_password_ = password_input_->text();
     password_input_->clear();

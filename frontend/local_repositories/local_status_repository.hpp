@@ -13,7 +13,6 @@ class LocalStatusRepository {
 
     LocalStatus save(const LocalStatus& status);
     std::optional<LocalStatus> findById(int status_id);
-    std::vector<LocalStatus> findAll();
     std::vector<LocalStatus> findByBoardId(int board_id);
     std::vector<LocalStatus> findUnsynced();
     int createLocalId();

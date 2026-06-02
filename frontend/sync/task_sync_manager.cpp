@@ -2,6 +2,7 @@
 
 #include "../local_repositories/local_board_repository.hpp"
 #include "../local_repositories/local_status_repository.hpp"
+#include "sync_json_helpers.hpp"
 
 #include <QDebug>
 #include <QJsonDocument>
@@ -30,10 +31,15 @@ bool TaskSyncManager::isParentBoardSynced(int board_id) const {
 }
 
 LocalTask TaskSyncManager::taskFromJson(const QJsonObject& obj) const {
+    const QString created_at = jsonTimestamp(obj, "created_at");
+    const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
+    QString priority_color = obj["priority_color"].toString();
+    if (priority_color.isEmpty()) {
+        priority_color = QStringLiteral("gray");
+    }
     return LocalTask(obj["id"].toInt(), obj["board_id"].toInt(), obj["title"].toString(),
-                     obj["status_id"].toInt(), obj["priority_color"].toString(),
-                     obj["description"].toString(), obj["deadline"].toString(),
-                     obj["created_at"].toString(), obj["updated_at"].toString(), QString(),
+                     obj["status_id"].toInt(), priority_color, obj["description"].toString(),
+                     obj.value("deadline").toString(), created_at, updated_at, QString(),
                      SyncStatus::SYNCED, 1);
 }
 
@@ -84,6 +90,10 @@ void TaskSyncManager::sync() {
 
     for (const auto& task : pending) {
         if (task.board_id_ < 0 || !isParentBoardSynced(task.board_id_)) {
+            continue;
+        }
+
+        if (task.title_.trimmed().isEmpty() && task.deleted_at_.isEmpty()) {
             continue;
         }
 

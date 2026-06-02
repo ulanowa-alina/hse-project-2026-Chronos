@@ -36,12 +36,12 @@ void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
 
         const QString token = data_obj["token"].toString();
         network_manager_->setToken(token);
-        emit authenticated(token);
 
-        if (sync_coordinator_) {
-            sync_coordinator_->saveUserFromLogin(data_obj["user"].toObject());
-            sync_coordinator_->loadAll();
+        if (sync_coordinator_ != nullptr) {
+            sync_coordinator_->beginUserSession(data_obj["user"].toObject());
         }
+
+        emit authenticated(token);
 
         qDebug() << "LoginScreen: успешный вход";
     } else {

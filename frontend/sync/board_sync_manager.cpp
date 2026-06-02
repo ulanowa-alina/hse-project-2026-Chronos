@@ -1,5 +1,7 @@
 #include "board_sync_manager.hpp"
 
+#include "sync_json_helpers.hpp"
+
 #include <QJsonDocument>
 #include <QUrl>
 
@@ -23,9 +25,10 @@ bool BoardSyncManager::handlesLoadEndpoint(const QString& endpoint) const {
 LocalBoard BoardSyncManager::boardFromJson(const QJsonObject& obj) const {
     const int is_private = obj["is_private"].isBool() ? (obj["is_private"].toBool() ? 1 : 0)
                                                       : obj["is_private"].toInt();
+    const QString created_at = jsonTimestamp(obj, "created_at");
+    const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
     return LocalBoard(obj["id"].toInt(), obj["title"].toString(), obj["description"].toString(),
-                      is_private, obj["created_at"].toString(), obj["updated_at"].toString(),
-                      QString(), SyncStatus::SYNCED, 1);
+                      is_private, created_at, updated_at, QString(), SyncStatus::SYNCED, 1);
 }
 
 void BoardSyncManager::saveFromServer(const LocalBoard& board) {
@@ -63,6 +66,10 @@ void BoardSyncManager::sync() {
     const std::vector<LocalBoard> pending = repo.findUnsynced();
 
     for (const auto& board : pending) {
+        if (board.title_.trimmed().isEmpty() && board.deleted_at_.isEmpty()) {
+            continue;
+        }
+
         if (!board.deleted_at_.isEmpty()) {
             QJsonObject json;
             json["board_id"] = board.id_;

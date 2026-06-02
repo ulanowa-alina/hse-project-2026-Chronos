@@ -49,7 +49,12 @@ void TaskCard::updateTaskStatus() {
     LocalTask task = *existing;
     task.status_id_ = status_id_;
     task.sync_status_ = SyncStatus::PENDING;
-    repo.save(task);
+    try {
+        repo.save(task);
+    } catch (const std::exception& e) {
+        qDebug() << "TaskCard: failed to update task status:" << e.what();
+        return;
+    }
     sync_coordinator_->syncTasks();
 }
 
@@ -73,11 +78,16 @@ void TaskCard::onTaskSaveRequest() {
 
     LocalTaskRepository repo(db_);
     if (task_id_ < 0) {
-        LocalTask task(task_id_, board_id_, title, status_id_, "gray",
+        LocalTask task(task_id_, board_id_, title, status_id_, QStringLiteral("gray"),
                        description_edit_->toPlainText());
         task.sync_status_ = SyncStatus::PENDING;
         task.server_version_ = 0;
-        repo.save(task);
+        try {
+            repo.save(task);
+        } catch (const std::exception& e) {
+            qDebug() << "TaskCard: failed to save task:" << e.what();
+            return;
+        }
     } else {
         const auto existing = repo.findById(task_id_);
         if (!existing) {
@@ -88,7 +98,12 @@ void TaskCard::onTaskSaveRequest() {
         task.description_ = description_edit_->toPlainText();
         task.status_id_ = status_id_;
         task.sync_status_ = SyncStatus::PENDING;
-        repo.save(task);
+        try {
+            repo.save(task);
+        } catch (const std::exception& e) {
+            qDebug() << "TaskCard: failed to save task:" << e.what();
+            return;
+        }
     }
 
     sync_coordinator_->syncTasks();

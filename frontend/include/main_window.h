@@ -29,9 +29,11 @@ class MainWindow : public QMainWindow {
     void onInitialDataReady(int board_id);
     void onDataChanged();
 
+  private slots:
+    void onAuthenticated(const QString& token);
+
   private:
     void restoreSession();
-    void saveToken(const QString& token);
     void clearSession();
 
     NetworkManager* network_manager_;

@@ -30,17 +30,11 @@ void StatusWindow::onCreateTaskRequest() {
 
     LocalTaskRepository repo(db_);
     const int temp_id = repo.createLocalId();
-    LocalTask task(temp_id, board_id_, QString(), status_id_, "gray");
-    task.sync_status_ = SyncStatus::PENDING;
-    task.server_version_ = 0;
-    repo.save(task);
 
     auto* card = new TaskCard(temp_id, board_id_, status_id_, db_, this);
     card->setSyncCoordinator(sync_coordinator_);
     tasks_layout_->insertWidget(0, card);
     updateGeometry();
-
-    sync_coordinator_->syncTasks();
 }
 
 void StatusWindow::onOpenSettings() {
@@ -85,10 +79,30 @@ void StatusWindow::onStatusNameSaved() {
         return;
     }
 
+    const QString name = status_name_->text().trimmed();
+    if (name.isEmpty()) {
+        status_name_->setText(existing->name_);
+        status_name_->setReadOnly(true);
+        status_name_->setStyleSheet(
+            "QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "
+            "border: none; background: transparent; }");
+        return;
+    }
+
     LocalStatus status = *existing;
-    status.name_ = status_name_->text().trimmed();
+    status.name_ = name;
     status.sync_status_ = SyncStatus::PENDING;
-    repo.save(status);
+    try {
+        repo.save(status);
+    } catch (const std::exception& e) {
+        qDebug() << "StatusWindow: failed to save status:" << e.what();
+        status_name_->setText(existing->name_);
+        status_name_->setReadOnly(true);
+        status_name_->setStyleSheet(
+            "QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "
+            "border: none; background: transparent; }");
+        return;
+    }
 
     status_name_->setReadOnly(true);
     status_name_->setStyleSheet("QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "

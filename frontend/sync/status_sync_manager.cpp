@@ -1,6 +1,7 @@
 #include "status_sync_manager.hpp"
 
 #include "../local_repositories/local_board_repository.hpp"
+#include "sync_json_helpers.hpp"
 
 #include <QDebug>
 #include <QJsonDocument>
@@ -29,9 +30,11 @@ bool StatusSyncManager::isParentBoardSynced(int board_id) const {
 }
 
 LocalStatus StatusSyncManager::statusFromJson(const QJsonObject& obj) const {
+    const QString created_at = jsonTimestamp(obj, "created_at");
+    const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
     return LocalStatus(obj["id"].toInt(), obj["board_id"].toInt(), obj["name"].toString(),
-                       obj["position"].toInt(), obj.value("created_at").toString(),
-                       obj.value("updated_at").toString(), QString(), SyncStatus::SYNCED, 1);
+                       obj["position"].toInt(), created_at, updated_at, QString(),
+                       SyncStatus::SYNCED, 1);
 }
 
 void StatusSyncManager::saveFromServer(const LocalStatus& status) {
@@ -80,6 +83,10 @@ void StatusSyncManager::sync() {
 
     for (const auto& status : pending) {
         if (status.board_id_ < 0 || !isParentBoardSynced(status.board_id_)) {
+            continue;
+        }
+
+        if (status.name_.trimmed().isEmpty() && status.deleted_at_.isEmpty()) {
             continue;
         }
 

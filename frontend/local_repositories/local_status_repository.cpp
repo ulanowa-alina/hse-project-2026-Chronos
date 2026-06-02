@@ -1,5 +1,7 @@
 #include "local_status_repository.hpp"
 
+#include "repository_utils.hpp"
+
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -18,6 +20,14 @@ LocalStatusRepository::LocalStatusRepository(QSqlDatabase& db)
 }
 
 LocalStatus LocalStatusRepository::insert(const LocalStatus& status) {
+    if (status.name_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalStatusRepository: name must not be empty");
+    }
+
+    const QString created_at = processingTimestamp(status.created_at_);
+    const QString updated_at =
+        processingTimestamp(status.updated_at_.isEmpty() ? created_at : status.updated_at_);
+
     QSqlQuery query(db_);
     query.prepare("INSERT INTO statuses ("
                   "id, board_id, name, position, created_at, updated_at, deleted_at, "
@@ -27,10 +37,10 @@ LocalStatus LocalStatusRepository::insert(const LocalStatus& status) {
                   ":sync_status, :server_version)");
     query.bindValue(":id", status.id_);
     query.bindValue(":board_id", status.board_id_);
-    query.bindValue(":name", status.name_);
+    query.bindValue(":name", status.name_.trimmed());
     query.bindValue(":position", status.position_);
-    query.bindValue(":created_at", status.created_at_);
-    query.bindValue(":updated_at", status.updated_at_);
+    query.bindValue(":created_at", created_at);
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", status.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : status.deleted_at_);
@@ -43,10 +53,20 @@ LocalStatus LocalStatusRepository::insert(const LocalStatus& status) {
             ("LocalStatusRepository: insert error: " + query.lastError().text()).toStdString());
     }
 
-    return status;
+    LocalStatus saved = status;
+    saved.name_ = status.name_.trimmed();
+    saved.created_at_ = created_at;
+    saved.updated_at_ = updated_at;
+    return saved;
 }
 
 LocalStatus LocalStatusRepository::update(const LocalStatus& status) {
+    if (status.name_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalStatusRepository: name must not be empty");
+    }
+
+    const QString updated_at = processingTimestamp(status.updated_at_);
+
     QSqlQuery query(db_);
     query.prepare("UPDATE statuses SET "
                   "board_id = :board_id, "
@@ -60,10 +80,10 @@ LocalStatus LocalStatusRepository::update(const LocalStatus& status) {
                   "WHERE id = :id");
     query.bindValue(":id", status.id_);
     query.bindValue(":board_id", status.board_id_);
-    query.bindValue(":name", status.name_);
+    query.bindValue(":name", status.name_.trimmed());
     query.bindValue(":position", status.position_);
-    query.bindValue(":created_at", status.created_at_);
-    query.bindValue(":updated_at", status.updated_at_);
+    query.bindValue(":created_at", processingTimestamp(status.created_at_));
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", status.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : status.deleted_at_);
@@ -109,25 +129,6 @@ std::optional<LocalStatus> LocalStatusRepository::findById(int status_id) {
     }
 
     return createStatus(query);
-}
-
-std::vector<LocalStatus> LocalStatusRepository::findAll() {
-    QSqlQuery query(db_);
-
-    query.prepare("SELECT id, board_id, name, position, created_at, updated_at, deleted_at, "
-                  "sync_status, server_version FROM statuses "
-                  "WHERE deleted_at IS NULL");
-
-    if (!query.exec()) {
-        throw std::runtime_error(
-            ("LocalStatusRepository: Error find all: " + query.lastError().text()).toStdString());
-    }
-
-    std::vector<LocalStatus> statuses;
-    while (query.next()) {
-        statuses.push_back(createStatus(query));
-    }
-    return statuses;
 }
 
 std::vector<LocalStatus> LocalStatusRepository::findByBoardId(int board_id) {

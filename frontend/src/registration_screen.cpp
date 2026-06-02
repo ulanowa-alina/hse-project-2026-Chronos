@@ -49,12 +49,12 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
 
             const QString token = data_obj["token"].toString();
             network_manager_->setToken(token);
-            emit authenticated(token);
 
             if (sync_coordinator_) {
-                sync_coordinator_->saveUserFromLogin(data_obj["user"].toObject());
-                sync_coordinator_->loadAll();
+                sync_coordinator_->beginUserSession(data_obj["user"].toObject());
             }
+
+            emit authenticated(token);
 
             qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен";
         } else {

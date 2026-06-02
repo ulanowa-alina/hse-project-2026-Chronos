@@ -21,7 +21,12 @@ void ProfileScreen::reloadFromLocal() {
     }
 
     LocalUserRepository repo(db_);
-    const auto user = repo.getCurrentUser();
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
     if (!user) {
         name_label_->setText("Нет данных");
         email_label_->setText("");
@@ -32,10 +37,6 @@ void ProfileScreen::reloadFromLocal() {
     name_label_->setText(user->name_);
     email_label_->setText(user->email_);
     status_label_->setText(user->status_);
-
-    if (sync_coordinator_) {
-        sync_coordinator_->loadAll();
-    }
 }
 
 void ProfileScreen::setupLayout() {

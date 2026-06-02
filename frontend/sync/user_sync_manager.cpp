@@ -1,5 +1,7 @@
 #include "user_sync_manager.hpp"
 
+#include "sync_json_helpers.hpp"
+
 #include <QDebug>
 #include <QJsonDocument>
 
@@ -21,9 +23,11 @@ bool UserSyncManager::handlesLoadEndpoint(const QString& endpoint) const {
 }
 
 LocalUser UserSyncManager::userFromJson(const QJsonObject& obj) const {
+    const QString created_at = jsonTimestamp(obj, "created_at");
+    const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
     return LocalUser(obj["id"].toInt(), obj["email"].toString(), obj["name"].toString(),
-                     obj["status"].toString(), obj["created_at"].toString(),
-                     obj.value("updated_at").toString(), QString(), SyncStatus::SYNCED, 1);
+                     obj["status"].toString(), created_at, updated_at, QString(),
+                     SyncStatus::SYNCED, 1);
 }
 
 void UserSyncManager::saveFromServer(const LocalUser& user) {
@@ -74,6 +78,11 @@ void UserSyncManager::sync() {
     const std::vector<LocalUser> pending = repo.findUnsynced();
 
     for (const auto& user : pending) {
+        if (user.email_.trimmed().isEmpty() || user.name_.trimmed().isEmpty() ||
+            user.status_.trimmed().isEmpty()) {
+            continue;
+        }
+
         QJsonObject json;
         json["name"] = user.name_;
         json["email"] = user.email_;

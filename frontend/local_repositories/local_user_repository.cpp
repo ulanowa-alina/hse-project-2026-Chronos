@@ -1,5 +1,7 @@
 #include "local_user_repository.hpp"
 
+#include "repository_utils.hpp"
+
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -19,6 +21,15 @@ LocalUserRepository::LocalUserRepository(QSqlDatabase& db)
 }
 
 LocalUser LocalUserRepository::insert(const LocalUser& user) {
+    if (user.email_.trimmed().isEmpty() || user.name_.trimmed().isEmpty() ||
+        user.status_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalUserRepository: email, name and status must not be empty");
+    }
+
+    const QString created_at = processingTimestamp(user.created_at_);
+    const QString updated_at =
+        processingTimestamp(user.updated_at_.isEmpty() ? created_at : user.updated_at_);
+
     QSqlQuery query(db_);
 
     query.prepare("INSERT INTO users ("
@@ -30,11 +41,11 @@ LocalUser LocalUserRepository::insert(const LocalUser& user) {
                   ")");
 
     query.bindValue(":id", user.id_);
-    query.bindValue(":email", user.email_);
-    query.bindValue(":name", user.name_);
-    query.bindValue(":status", user.status_);
-    query.bindValue(":created_at", user.created_at_);
-    query.bindValue(":updated_at", user.updated_at_);
+    query.bindValue(":email", user.email_.trimmed());
+    query.bindValue(":name", user.name_.trimmed());
+    query.bindValue(":status", user.status_.trimmed());
+    query.bindValue(":created_at", created_at);
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", user.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : user.deleted_at_);
@@ -47,10 +58,23 @@ LocalUser LocalUserRepository::insert(const LocalUser& user) {
             ("LocalUserRepository: insert error: " + query.lastError().text()).toStdString());
     }
 
-    return user;
+    LocalUser saved = user;
+    saved.email_ = user.email_.trimmed();
+    saved.name_ = user.name_.trimmed();
+    saved.status_ = user.status_.trimmed();
+    saved.created_at_ = created_at;
+    saved.updated_at_ = updated_at;
+    return saved;
 }
 
 LocalUser LocalUserRepository::update(const LocalUser& user) {
+    if (user.email_.trimmed().isEmpty() || user.name_.trimmed().isEmpty() ||
+        user.status_.trimmed().isEmpty()) {
+        throw std::runtime_error("LocalUserRepository: email, name and status must not be empty");
+    }
+
+    const QString updated_at = processingTimestamp(user.updated_at_);
+
     QSqlQuery query(db_);
 
     query.prepare("UPDATE users SET "
@@ -65,11 +89,11 @@ LocalUser LocalUserRepository::update(const LocalUser& user) {
                   "WHERE id = :id");
 
     query.bindValue(":id", user.id_);
-    query.bindValue(":email", user.email_);
-    query.bindValue(":name", user.name_);
-    query.bindValue(":status", user.status_);
-    query.bindValue(":created_at", user.created_at_);
-    query.bindValue(":updated_at", user.updated_at_);
+    query.bindValue(":email", user.email_.trimmed());
+    query.bindValue(":name", user.name_.trimmed());
+    query.bindValue(":status", user.status_.trimmed());
+    query.bindValue(":created_at", processingTimestamp(user.created_at_));
+    query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", user.deleted_at_.isEmpty()
                                        ? QVariant(QMetaType(QMetaType::QString))
                                        : user.deleted_at_);

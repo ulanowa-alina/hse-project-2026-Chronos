@@ -13,9 +13,7 @@ class LocalTaskRepository {
 
     LocalTask save(const LocalTask& task);
     std::optional<LocalTask> findById(int task_id);
-    std::vector<LocalTask> findAll();
     std::vector<LocalTask> findByBoardId(int board_id);
-    std::vector<LocalTask> findByStatusId(int status_id);
     std::vector<LocalTask> findUnsynced();
     int createLocalId();
     void replaceId(int old_id, int new_id);

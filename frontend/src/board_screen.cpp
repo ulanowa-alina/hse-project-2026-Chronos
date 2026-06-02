@@ -28,11 +28,6 @@ void BoardScreen::reloadBoardData() {
     }
 
     loadFromLocalDatabase();
-
-    if (sync_coordinator_ && network_manager_ && network_manager_->hasToken()) {
-        sync_coordinator_->syncAll();
-        sync_coordinator_->loadAll();
-    }
 }
 
 void BoardScreen::loadFromLocalDatabase() {
@@ -50,7 +45,7 @@ void BoardScreen::loadFromLocalDatabase() {
     const std::vector<LocalStatus> statuses = status_repo.findByBoardId(board_id_);
     for (const LocalStatus& status : statuses) {
         status_names_.insert(status.id_, status.name_);
-        ensureStatusWindow(status.id_, status.name_);
+        showStatusWindow(status.id_, status.name_);
     }
 
     LocalTaskRepository task_repo(db_);
@@ -60,7 +55,7 @@ void BoardScreen::loadFromLocalDatabase() {
                                         ? status_names_.value(task.status_id_)
                                         : "Status " + QString::number(task.status_id_);
 
-        StatusWindow* status = ensureStatusWindow(task.status_id_, status_name);
+        StatusWindow* status = showStatusWindow(task.status_id_, status_name);
 
         auto* card = new TaskCard(task.id_, task.board_id_, task.status_id_, db_, status);
         if (sync_coordinator_) {
@@ -88,7 +83,7 @@ void BoardScreen::clearBoardData() {
     }
 }
 
-StatusWindow* BoardScreen::ensureStatusWindow(int status_id, const QString& name) {
+StatusWindow* BoardScreen::showStatusWindow(int status_id, const QString& name) {
     if (status_windows_.contains(status_id)) {
         return status_windows_.value(status_id);
     }
@@ -184,18 +179,24 @@ void BoardScreen::onStatusCreateRequest() {
     const QString name =
         QInputDialog::getText(this, "New Status", "Column Name:", QLineEdit::Normal, "", &flag);
 
-    if (!flag || name.isEmpty()) {
+    const QString trimmed_name = name.trimmed();
+    if (!flag || trimmed_name.isEmpty()) {
         return;
     }
 
     LocalStatusRepository repo(db_);
     const int temp_id = repo.createLocalId();
-    LocalStatus status(temp_id, board_id_, name, 0);
+    LocalStatus status(temp_id, board_id_, trimmed_name, 0);
     status.sync_status_ = SyncStatus::PENDING;
     status.server_version_ = 0;
-    repo.save(status);
+    try {
+        repo.save(status);
+    } catch (const std::exception& e) {
+        qDebug() << "BoardScreen: failed to save status:" << e.what();
+        return;
+    }
 
-    auto* new_status = new StatusWindow(temp_id, board_id_, name, db_, this);
+    auto* new_status = new StatusWindow(temp_id, board_id_, trimmed_name, db_, this);
     new_status->setSyncCoordinator(sync_coordinator_);
     board_layout_->insertWidget(board_layout_->count() - 1, new_status);
     status_windows_.insert(temp_id, new_status);
