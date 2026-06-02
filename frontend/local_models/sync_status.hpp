@@ -3,27 +3,23 @@
 
 #include <QString>
 
-enum class SyncStatus{
-    PENDING,
-    SYNCED,
-    CONFLICT
-};
+enum class SyncStatus { PENDING, SYNCED, CONFLICT };
 
-inline QString syncStatusToString(const SyncStatus& sync_status){
-    if (sync_status == SyncStatus::SYNCED){
+inline QString syncStatusToString(const SyncStatus& sync_status) {
+    if (sync_status == SyncStatus::SYNCED) {
         return "synced";
     }
-    if(sync_status == SyncStatus::CONFLICT){
+    if (sync_status == SyncStatus::CONFLICT) {
         return "conflict";
     }
     return "pending";
 }
 
-inline SyncStatus stringToSyncStatus(const QString& s){
-    if(s == "synced"){
+inline SyncStatus stringToSyncStatus(const QString& s) {
+    if (s == "synced") {
         return SyncStatus::SYNCED;
     }
-    if(s == "conflict"){
+    if (s == "conflict") {
         return SyncStatus::CONFLICT;
     }
     return SyncStatus::PENDING;

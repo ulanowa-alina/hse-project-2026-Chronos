@@ -1,8 +1,9 @@
 #ifndef LOCAL_TASK_HPP
 #define LOCAL_TASK_HPP
 
-#include <QString>
 #include "sync_status.hpp"
+
+#include <QString>
 
 struct LocalTask {
     int id_;
@@ -21,14 +22,10 @@ struct LocalTask {
     LocalTask() = default;
 
     LocalTask(int id, int board_id, const QString& title, int status_id,
-              const QString& priority_color,
-              const QString& description = QString(),
-              const QString& deadline = QString(),
-              const QString& created_at = QString(),
-              const QString& updated_at = QString(),
-              const QString& deleted_at = QString(),
-              const SyncStatus& sync_status = SyncStatus::PENDING,
-              int server_version = 0)
+              const QString& priority_color, const QString& description = QString(),
+              const QString& deadline = QString(), const QString& created_at = QString(),
+              const QString& updated_at = QString(), const QString& deleted_at = QString(),
+              const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
         : id_(id)
         , board_id_(board_id)
         , title_(title)
@@ -40,9 +37,8 @@ struct LocalTask {
         , updated_at_(updated_at)
         , deleted_at_(deleted_at)
         , sync_status_(sync_status)
-        , server_version_(server_version){
+        , server_version_(server_version) {
     }
-
 };
 
 #endif // LOCAL_TASK_HPP

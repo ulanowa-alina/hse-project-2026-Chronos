@@ -1,8 +1,9 @@
 #ifndef LOCAL_STATUS_HPP
 #define LOCAL_STATUS_HPP
 
-#include <QString>
 #include "sync_status.hpp"
+
+#include <QString>
 
 struct LocalStatus {
     int id_;
@@ -17,11 +18,10 @@ struct LocalStatus {
 
     LocalStatus() = default;
 
-    LocalStatus(int id, int board_id, const QString& name, int position,  const QString& created_at = QString(),
-                const QString& updated_at = QString(),
+    LocalStatus(int id, int board_id, const QString& name, int position,
+                const QString& created_at = QString(), const QString& updated_at = QString(),
                 const QString& deleted_at = QString(),
-                const SyncStatus& sync_status = SyncStatus::PENDING,
-                int server_version = 0)
+                const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
         : id_(id)
         , board_id_(board_id)
         , name_(name)

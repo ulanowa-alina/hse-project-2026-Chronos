@@ -2,9 +2,10 @@
 #define LOCAL_USER_HPP
 
 #include "sync_status.hpp"
+
 #include <QString>
 
-struct LocalUser{
+struct LocalUser {
     int id_;
     QString email_;
     QString name_;
@@ -17,17 +18,19 @@ struct LocalUser{
 
     LocalUser() = default;
 
-    LocalUser(int id, const QString& email, const QString& name, const QString& status, const QString& created_at = QString(), const QString& updated_at = QString(), const QString& deleted_at = QString(), const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0):
-    id_(id),
-        email_(email),
-        name_(name),
-        status_(status),
-        created_at_(created_at),
-        updated_at_(updated_at),
-        deleted_at_(deleted_at),
-        sync_status_(sync_status),
-        server_version_(server_version){
+    LocalUser(int id, const QString& email, const QString& name, const QString& status,
+              const QString& created_at = QString(), const QString& updated_at = QString(),
+              const QString& deleted_at = QString(),
+              const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
+        : id_(id)
+        , email_(email)
+        , name_(name)
+        , status_(status)
+        , created_at_(created_at)
+        , updated_at_(updated_at)
+        , deleted_at_(deleted_at)
+        , sync_status_(sync_status)
+        , server_version_(server_version) {
     }
-
 };
 #endif // LOCAL_USER_HPP

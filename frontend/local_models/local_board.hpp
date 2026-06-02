@@ -1,8 +1,9 @@
 #ifndef LOCAL_BOARD_HPP
 #define LOCAL_BOARD_HPP
 
-#include <QString>
 #include "sync_status.hpp"
+
+#include <QString>
 
 struct LocalBoard {
     int id_;
@@ -18,11 +19,9 @@ struct LocalBoard {
     LocalBoard() = default;
 
     LocalBoard(int id, const QString& title, const QString desc, int is_private,
-               const QString& created_at = QString(),
-               const QString& updated_at = QString(),
+               const QString& created_at = QString(), const QString& updated_at = QString(),
                const QString& deleted_at = QString(),
-               const SyncStatus& sync_status = SyncStatus::PENDING,
-               int server_version = 0)
+               const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
         : id_(id)
         , title_(title)
         , description_(desc)
@@ -31,7 +30,7 @@ struct LocalBoard {
         , updated_at_(updated_at)
         , deleted_at_(deleted_at)
         , sync_status_(sync_status)
-        , server_version_(server_version){
+        , server_version_(server_version) {
     }
 };
 #endif // LOCAL_BOARD_HPP
