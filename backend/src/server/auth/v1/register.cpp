@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <nlohmann/json.hpp>
 #include <pqxx/pqxx>
+#include <spdlog/spdlog.h>
 #include <sstream>
 
 namespace auth::v1 {
@@ -99,7 +100,7 @@ User createUser(ConnectionPool& pool, const User& user) {
     UserRepository repo(pool);
     return repo.save(user);
 }
-// TODO: после предзащит норм ручку сделать
+
 void create_board(ConnectionPool& pool, int user_id) {
     BoardRepository repo(pool);
     const std::time_t now = std::time(nullptr);
@@ -112,32 +113,44 @@ void create_board(ConnectionPool& pool, int user_id) {
 auto handleRegister(const http::request<http::string_body>& req,
                     ConnectionPool& pool) -> http::response<http::string_body> {
     try {
+        spdlog::info("Register request received");
+
         const json body = parse_body(req);
         const json missing_fields = collect_missing_fields(body);
+
         if (!missing_fields.empty()) {
+            spdlog::error("Request rejected: mising required fields");
             return build_api_error(req, http::status::bad_request, "MISSING_FIELD",
                                    "Missing required fields",
                                    json{{"missing_fields", missing_fields}});
         }
+
         const User new_user = parse_new_user(body);
         const User created = createUser(pool, new_user);
         create_board(pool, created.id_);
+
+        spdlog::info("Register succeeded for user_id={}", created.id_);
         return build_create_response(req, created);
     } catch (const nlohmann::json::exception&) {
+        spdlog::error("Request rejected: Invalid JSON format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid JSON format");
+
     } catch (const std::invalid_argument& e) {
         const std::string reason = e.what();
 
         if (reason == "Invalid email format") {
+            spdlog::error("Request rejected: Invalid email format");
             return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                    "Invalid email format", json{{"email", "Invalid email format"}});
         }
 
+        spdlog::error("Request rejected: Invalid register credential");
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed", json{{"name_or_status", reason}});
 
     } catch (const std::length_error&) {
+        spdlog::error("Request rejected: Password length is less then 8 simbols");
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed",
                                json{{"password", "Minimum length is 8 symbols"}});
@@ -145,14 +158,16 @@ auto handleRegister(const http::request<http::string_body>& req,
         const std::string msg = e.what();
         if (msg.find("users_email_key") != std::string::npos ||
             msg.find("duplicate key") != std::string::npos) {
+            spdlog::error("Request rejected: User with this email already exists");
             return build_api_error(req, static_cast<http::status>(405), "EMAIL_ALREADY_EXISTS",
                                    "User with this email already exists",
                                    json{{"email", "already exists"}});
         }
-
+        spdlog::error("Register failed with database error: {}", e.what());
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::error(" Register failed with unexpected error: {}", e.what());
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");
     }
