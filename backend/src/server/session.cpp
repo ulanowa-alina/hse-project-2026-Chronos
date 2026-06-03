@@ -47,7 +47,7 @@ void Session::handleRequest() {
     if (it != router_.end()) {
         sendResponse(it->second(req_));
     } else {
-        spdlog::warn("Route not found: {} {}", req_.method_string(), req_.target());
+        spdlog::error("Route not found: {} {}", req_.method_string(), req_.target());
         http::response<http::string_body> res{http::status::not_found, req_.version()};
         res.set(http::field::content_type, "application/json");
         res.keep_alive(req_.keep_alive());

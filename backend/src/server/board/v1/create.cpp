@@ -15,6 +15,8 @@ using json = nlohmann::json;
 namespace board::v1 {
 
 namespace {
+const size_t MAX_TITLE_SIZE = 100;
+const size_t MAX_DESCRIPTION_SIZE = 1000;
 
 std::string time_to_string_iso8601(std::time_t t) {
     std::array<char, 25> buffer{};
@@ -88,7 +90,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
     spdlog::info("Board create request received");
 
     if (req.method() != http::verb::post) {
-        spdlog::warn("Board create rejected: method not allowed");
+        spdlog::error("Board create rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -97,20 +99,20 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
-        spdlog::warn("Board create rejected: invalid JSON format");
+        spdlog::error("Board create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     if (!body.is_object()) {
-        spdlog::warn("Board create rejected: invalid JSON format");
+        spdlog::error("Board create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     const json missing_fields = collect_missing_fields(body);
     if (!missing_fields.empty()) {
-        spdlog::warn("Board create rejected: missing required fields");
+        spdlog::error("Board create rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
                                                    "Missing required fields",
                                                    json{{"missing_fields", missing_fields}});
@@ -121,15 +123,15 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::string description = optional_string_field(body, "description");
         const bool is_private = require_bool_field(body, "is_private");
 
-        if (title.empty() || title.size() > 100) {
-            spdlog::warn("Board create rejected: invalid title length");
+        if (title.empty() || title.size() > MAX_TITLE_SIZE) {
+            spdlog::error("Board create rejected: invalid title length");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"title", "Title length must be between 1 and 100 symbols"}});
         }
 
-        if (description.size() > 1000) {
-            spdlog::warn("Board create rejected: description too long");
+        if (description.size() > MAX_DESCRIPTION_SIZE) {
+            spdlog::error("Board create rejected: description too long");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"description", "Description cannot exceed 1000 symbols"}});
@@ -146,7 +148,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
-            spdlog::warn("Board create rejected: missing required fields");
+            spdlog::error("Board create rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
@@ -154,7 +156,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         }
 
         if (message.rfind("type:", 0) == 0) {
-            spdlog::warn("Board create rejected: invalid field format");
+            spdlog::error("Board create rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",

@@ -66,7 +66,7 @@ auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& poo
                 int user_id) -> http::response<http::string_body> {
     spdlog::info("User get request received");
     if (req.method() != http::verb::get) {
-        spdlog::warn("Board get rejected: method not allowed");
+        spdlog::error("Board get rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }

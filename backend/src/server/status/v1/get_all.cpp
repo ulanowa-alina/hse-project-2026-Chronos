@@ -66,7 +66,7 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
                   int user_id) -> http::response<http::string_body> {
     spdlog::info("Status get all request received");
     if (req.method() != http::verb::get) {
-        spdlog::warn("Status get all rejected: method not allowed");
+        spdlog::error("Status get all rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "METHOD_NOT_ALLOWED",
                                                    "Only GET is supported for this endpoint");
@@ -75,7 +75,7 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
     try {
         const auto url_view_result = boost::urls::parse_origin_form(req.target());
         if (!url_view_result) {
-            spdlog::warn("Status get all rejected: Invalid field format");
+            spdlog::error("Status get all rejected: Invalid field format");
             return server::utils::build_error_response(req, http::status::bad_request,
                                                        "INVALID_FORMAT", "Invalid field format",
                                                        json{{"query", "Invalid query format"}});
@@ -93,15 +93,15 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
             BoardRepository board_repository(pool);
             const std::optional<Board> board = board_repository.find_by_id(*board_id);
             if (!board.has_value()) {
-                spdlog::warn("Status get all rejected: board with id={} not found",
-                             board_id.value());
+                spdlog::error("Status get all rejected: board with id={} not found",
+                              board_id.value());
                 return server::utils::build_error_response(req, http::status::not_found,
                                                            "BOARD_NOT_FOUND", "Board not found");
             }
 
             if (board->user_id_ != user_id) {
-                spdlog::warn("Status get all rejected: board with id={} belongs to another user",
-                             board->id_);
+                spdlog::error("Status get all rejected: board with id={} belongs to another user",
+                              board->id_);
                 return server::utils::build_error_response(req, http::status::forbidden,
                                                            "RESOURCE_NOT_OWNED",
                                                            "Resource belongs to another user");
@@ -123,7 +123,7 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
         const std::string message = e.what();
 
         if (message.rfind("type:", 0) == 0) {
-            spdlog::warn("Status get all rejected: Invalid field format");
+            spdlog::error("Status get all rejected: Invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
@@ -131,14 +131,14 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
         }
 
         if (message.rfind("value:", 0) == 0) {
-            spdlog::warn("Status get all rejected: Invalid field value");
+            spdlog::error("Status get all rejected: Invalid field value");
             const std::string field = message.substr(6);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{field, "Field " + field + " must be a positive integer"}});
         }
 
-        spdlog::warn("Status get all rejected: validation error");
+        spdlog::error("Status get all rejected: validation error");
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", message);
     } catch (const std::runtime_error& e) {

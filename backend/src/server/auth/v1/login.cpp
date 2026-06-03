@@ -51,7 +51,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     try {
         body = json::parse(req.body());
     } catch (...) {
-        spdlog::warn("Login rejected: request body contains invalid JSON");
+        spdlog::error("Login rejected: request body contains invalid JSON");
 
         error_response = build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                          "Invalid JSON format");
@@ -62,7 +62,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     const bool has_password = body.contains("password");
 
     if (has_email && !body["email"].is_string()) {
-        spdlog::warn("Login rejected: Invalid email format");
+        spdlog::error("Login rejected: Invalid email format");
 
         error_response =
             build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
@@ -71,7 +71,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     }
 
     if (has_password && !body["password"].is_string()) {
-        spdlog::warn("Login rejected: Invalid password format");
+        spdlog::error("Login rejected: Invalid password format");
 
         error_response = build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                          "Invalid password format",
@@ -88,7 +88,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     }
 
     if (!missing_fields.empty()) {
-        spdlog::warn("Request rejected: Required fields are missing");
+        spdlog::error("Request rejected: Required fields are missing");
 
         error_response =
             build_api_error(req, http::status::bad_request, "MISSING_FIELD",
@@ -104,7 +104,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
                              out.email.find('.', out.email.find('@') + 1) != std::string::npos;
 
     if (!valid_email) {
-        spdlog::warn("Request rejected: Invalid email format");
+        spdlog::error("Request rejected: Invalid email format");
 
         error_response =
             build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
@@ -113,7 +113,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     }
 
     if (out.password.empty()) {
-        spdlog::warn("Request rejected: Empty password's field");
+        spdlog::error("Request rejected: Empty password's field");
 
         error_response =
             build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
@@ -169,7 +169,7 @@ auto handleLogin(const http::request<http::string_body>& req,
         const auto user = repo.find_by_email(login_request.email);
 
         if (!user.has_value() || !is_password_valid(*user, login_request.password)) {
-            spdlog::warn("Login failed: invalid login Credentials");
+            spdlog::error("Login failed: invalid login Credentials");
             return build_api_error(req, http::status::unauthorized, "UNAUTHORIZED",
                                    "Invalid email or password");
         }

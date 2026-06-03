@@ -40,7 +40,7 @@ auto handleGetAll(const http::request<http::string_body>& req, ConnectionPool& p
     spdlog::info("Board get all request received");
 
     if (req.method() != http::verb::get) {
-        spdlog::warn("Board get all rejected: method not allowed");
+        spdlog::error("Board get all rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }

@@ -22,6 +22,10 @@ namespace task::v1 {
 
 namespace {
 
+const size_t MAX_TITLE_SIZE = 100;
+const size_t MAX_DESCRIPTION_SIZE = 1000;
+const size_t MAX_PRIORITY_COLOR_SIZE = 500;
+
 std::string time_to_string_iso8601(std::time_t t) {
     std::array<char, 25> buffer{};
     if (std::strftime(buffer.data(), buffer.size(), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&t))) {
@@ -132,7 +136,7 @@ auto handleCreate(const http::request<http::string_body>& req,
     spdlog::info("Task create request received");
 
     if (req.method() != http::verb::post) {
-        spdlog::warn("Task create rejected: method not allowed");
+        spdlog::error("Task create rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "METHOD_NOT_ALLOWED",
                                                    "Only POST is supported for this endpoint");
@@ -142,13 +146,13 @@ auto handleCreate(const http::request<http::string_body>& req,
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
-        spdlog::warn("Task create rejected: invalid JSON format");
+        spdlog::error("Task create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body contains invalid JSON");
     }
 
     if (!body.is_object()) {
-        spdlog::warn("Task create rejected: invalid JSON format");
+        spdlog::error("Task create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body must be a JSON object");
     }
@@ -161,20 +165,20 @@ auto handleCreate(const http::request<http::string_body>& req,
         const std::string priority_color = require_string_field(body, "priority_color");
         const std::optional<std::time_t> deadline = optional_deadline_field(body);
 
-        if (title.empty() || title.size() > 100) {
-            spdlog::warn("Task create rejected: invalid title length");
+        if (title.empty() || title.size() > MAX_TITLE_SIZE) {
+            spdlog::error("Task create rejected: invalid title length");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"title", "Title must be between 1 and 100 characters"}});
         }
-        if (description.size() > 1000) {
-            spdlog::warn("Task create rejected: description is too long");
+        if (description.size() > MAX_DESCRIPTION_SIZE) {
+            spdlog::error("Task create rejected: description is too long");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"description", "Description cannot exceed 1000 characters"}});
         }
-        if (priority_color.empty() || priority_color.size() > 50) {
-            spdlog::warn("Task create rejected: invalid priority color format");
+        if (priority_color.empty() || priority_color.size() > MAX_PRIORITY_COLOR_SIZE) {
+            spdlog::error("Task create rejected: invalid priority color format");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"priority_color", "Priority color must be between 1 and 50 characters"}});
@@ -182,7 +186,7 @@ auto handleCreate(const http::request<http::string_body>& req,
 
         BoardRepository board_repository(pool);
         if (!board_repository.find_by_id(board_id).has_value()) {
-            spdlog::warn("Task create rejected: board with id={} not found", board_id);
+            spdlog::error("Task create rejected: board with id={} not found", board_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
@@ -190,7 +194,7 @@ auto handleCreate(const http::request<http::string_body>& req,
         StatusRepository status_repository(pool);
         const auto status = status_repository.find_by_id(status_id);
         if (!status.has_value() || status->board_id_ != board_id) {
-            spdlog::warn("Task create rejected: invalid status_id");
+            spdlog::error("Task create rejected: invalid status_id");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"status_id", "status_id must reference a status from this board"}});
@@ -208,21 +212,21 @@ auto handleCreate(const http::request<http::string_body>& req,
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
-            spdlog::warn("Task create rejected: missing required fields");
+            spdlog::error("Task create rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
                 json{{field, "Field " + field + " is required"}});
         }
         if (message.rfind("type:", 0) == 0) {
-            spdlog::warn("Task create rejected: invalid field format");
+            spdlog::error("Task create rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
                 json{{field, "Field " + field + " has invalid type"}});
         }
         if (message.rfind("value:", 0) == 0) {
-            spdlog::warn("Task create rejected: invalid field value");
+            spdlog::error("Task create rejected: invalid field value");
             const std::string field = message.substr(6);
             const std::string detail = field == "deadline"
                                            ? "Field deadline must be a valid ISO 8601 UTC datetime"

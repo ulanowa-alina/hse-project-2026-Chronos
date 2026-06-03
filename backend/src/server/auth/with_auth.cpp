@@ -30,7 +30,7 @@ RequestHandler with_auth(AuthorizedHandler handler) {
 
         const auto auth_header = req[http::field::authorization];
         if (auth_header.empty()) {
-            spdlog::warn(
+            spdlog::error(
                 "Authorization rejected: missing authorization header (user is not authorized)");
             return build_auth_error(req, http::status::unauthorized, "UNAUTHORIZED",
                                     "User is not authorized");
@@ -39,7 +39,7 @@ RequestHandler with_auth(AuthorizedHandler handler) {
         const std::string auth_value = std::string(auth_header);
         const std::string prefix = "Bearer ";
         if (auth_value.rfind(prefix, 0) != 0) {
-            spdlog::warn("Authorization rejected: invalid bearer token format");
+            spdlog::error("Authorization rejected: invalid bearer token format");
             return build_auth_error(req, http::status::unauthorized, "INVALID_TOKEN",
                                     "Invalid token");
         }
@@ -48,11 +48,11 @@ RequestHandler with_auth(AuthorizedHandler handler) {
         TokenError token_error = TokenError::InvalidToken;
         if (!parse_and_validate_token(auth_value.substr(prefix.size()), payload, token_error)) {
             if (token_error == TokenError::ExpiredToken) {
-                spdlog::warn("Authorization rejected: token expired");
+                spdlog::error("Authorization rejected: token expired");
                 return build_auth_error(req, http::status::unauthorized, "INVALID_TOKEN",
                                         "Token is expired");
             }
-            spdlog::warn("Authorization rejected: invalid token");
+            spdlog::error("Authorization rejected: invalid token");
             return build_auth_error(req, http::status::unauthorized, "INVALID_TOKEN",
                                     "Invalid token");
         }

@@ -74,7 +74,7 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
                int user_id) -> http::response<http::string_body> {
     spdlog::info("Board get request received");
     if (req.method() != http::verb::get) {
-        spdlog::warn("Board get rejected: method not allowed");
+        spdlog::error("Board get rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -88,15 +88,15 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
                                          : board_repository.find_by_user_id(user_id);
 
         if (!board.has_value()) {
-            spdlog::warn("Board get rejected: board with id={} not found",
-                         requested_board_id.value());
+            spdlog::error("Board get rejected: board with id={} not found",
+                          requested_board_id.value());
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (board->user_id_ != user_id) {
-            spdlog::warn("Board get rejected: board with id={} belongs to another user",
-                         board->id_);
+            spdlog::error("Board get rejected: board with id={} belongs to another user",
+                          board->id_);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
@@ -109,13 +109,13 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
         if (message.rfind("type:", 0) == 0) {
-            spdlog::warn("Board get rejected: invalid field format");
+            spdlog::error("Board get rejected: invalid field format");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
                 json{{"board_id", "Invalid board_id format"}});
         }
         if (message.rfind("value:", 0) == 0) {
-            spdlog::warn("Board get rejected: invalid field value");
+            spdlog::error("Board get rejected: invalid field value");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"board_id", "Board id must be positive"}});

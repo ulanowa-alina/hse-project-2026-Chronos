@@ -34,7 +34,7 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
                   int user_id) -> http::response<http::string_body> {
     spdlog::info("Status delete request received");
     if (req.method() != http::verb::delete_) {
-        spdlog::warn("Status delete rejected: method not allowed");
+        spdlog::error("Status delete rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -43,13 +43,13 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
-        spdlog::warn("Status delete rejected: invalid JSON format");
+        spdlog::error("Status delete rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body contains invalid JSON");
     }
 
     if (!body.is_object()) {
-        spdlog::warn("Status delete rejected: invalid JSON format");
+        spdlog::error("Status delete rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body must be a JSON object");
     }
@@ -60,7 +60,7 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
         StatusRepository status_repository(pool);
         const std::optional<Status> status = status_repository.find_by_id(status_id);
         if (!status.has_value()) {
-            spdlog::warn("Status delete rejected: status with id={} not found", status_id);
+            spdlog::error("Status delete rejected: status with id={} not found", status_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "STATUS_NOT_FOUND", "Status not found");
         }
@@ -68,22 +68,22 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
         BoardRepository board_repository(pool);
         const std::optional<Board> board = board_repository.find_by_id(status->board_id_);
         if (!board.has_value()) {
-            spdlog::warn("Status delete rejected: board with board_id={} not found",
-                         status->board_id_);
+            spdlog::error("Status delete rejected: board with board_id={} not found",
+                          status->board_id_);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "STATUS_NOT_FOUND", "Status not found");
         }
 
         if (board->user_id_ != user_id) {
-            spdlog::warn("Status delete rejected: board with board_id={} belongs to another user",
-                         status->board_id_);
+            spdlog::error("Status delete rejected: board with board_id={} belongs to another user",
+                          status->board_id_);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
         }
 
         if (!status_repository.delete_by_id(status_id)) {
-            spdlog::warn(
+            spdlog::error(
                 "Status delete rejected: status with id={} not belongs to board with id={}",
                 status_id, status->board_id_);
             return server::utils::build_error_response(req, http::status::not_found,
@@ -98,28 +98,28 @@ auto handleDelete(const http::request<http::string_body>& req, ConnectionPool& p
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
         if (message.rfind("missing:", 0) == 0) {
-            spdlog::warn("Status delete rejected: missing required fields");
+            spdlog::error("Status delete rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
                 json{{field, "Field " + field + " is required"}});
         }
         if (message.rfind("type:", 0) == 0) {
-            spdlog::warn("Status delete rejected: invalid field format");
+            spdlog::error("Status delete rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
                 json{{field, "Field " + field + " has invalid type"}});
         }
         if (message.rfind("value:", 0) == 0) {
-            spdlog::warn("Status delete rejected: invalid field value");
+            spdlog::error("Status delete rejected: invalid field value");
             const std::string field = message.substr(6);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{field, "Field " + field + " must be a positive integer"}});
         }
 
-        spdlog::warn("Status delete rejected: validation error");
+        spdlog::error("Status delete rejected: validation error");
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", e.what());
     } catch (const std::runtime_error& e) {
