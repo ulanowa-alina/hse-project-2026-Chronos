@@ -1,37 +1,43 @@
-
 #ifndef BOARD_CARD_HPP
 #define BOARD_CARD_HPP
 
-#include "board_screen.h"
-#include "dd_task_card.hpp"
-#include "network_manager.h"
-
+#include <QDateTime>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
-#include <QMap>
-#include <QScrollArea>
+#include <QProgressBar>
+#include <QVBoxLayout>
 
 class BoardCard : public QFrame {
     Q_OBJECT
 
   public:
     explicit BoardCard(int board_id, QWidget* parent = nullptr);
-    void setNetworkManager(NetworkManager* manager);
+
+    int getBoardId() const {
+        return board_id_;
+    }
+
+    void setBoardData(const QString& title, const QString& description, int active_tasks,
+                      int completed_tasks, const QDateTime& nearest_deadline);
+
+  signals:
+    void openBoardRequested(int board_id);
+
+  protected:
+    void mousePressEvent(QMouseEvent* event) override;
 
   private:
     int board_id_;
 
-    bool should_be_delete_{false};
+    QLabel* title_label_{nullptr};
+    QLabel* description_label_{nullptr};
+    QProgressBar* progress_bar_{nullptr};
+    QLabel* progress_text_label_{nullptr};
+    QLabel* active_tasks_label_{nullptr};
+    QLabel* deadline_label_{nullptr};
 
-    NetworkManager* network_manager_{nullptr};
-
-    QLabel* title_{nullptr};
-    QLabel* active_tasks_count_{nullptr};
-    QLabel* next_deadline_{nullptr};
-
-    QScrollArea* boards_scroll_area{nullptr};
-    QMap<int, DdTaskCard*> dd_task_cards_;
-    QMap<int, BoardCard*> board_cards_;
+    void setupLayout();
 };
 
 #endif // BOARD_CARD_HPP
