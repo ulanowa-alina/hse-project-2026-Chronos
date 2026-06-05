@@ -29,11 +29,13 @@ class BoardScreen : public QWidget {
 
   signals:
     void openProfileScreen();
+    void openPomodoroScreen();
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onStatusCreateRequest();
     void onProfileRequest();
+    void onPomodoroRequest();
 
   private:
     int board_id_;
@@ -42,6 +44,7 @@ class BoardScreen : public QWidget {
 
     QPushButton* profile_button_{nullptr};
     QPushButton* status_create_button_{nullptr};
+    QPushButton* pomodoro_button_{nullptr};
 
     QLabel* logo_label_{nullptr};
     QLabel* board_name_label_{nullptr};

@@ -4,6 +4,7 @@
 #include "board_screen.h"
 #include "login_screen.h"
 #include "network_manager.h"
+#include "pomodoro_screen.h"
 #include "profile_edit_screen.h"
 #include "profile_screen.h"
 #include "registration_screen.h"
@@ -22,6 +23,7 @@ class MainWindow : public QMainWindow {
     void switchToRegistration();
     void switchToBoard(int board_id);
     void switchToProfileEdit();
+    void switchToPomodoro();
 
   private:
     NetworkManager* network_manager_;
@@ -32,6 +34,7 @@ class MainWindow : public QMainWindow {
     RegistrationScreen* registration_screen_{nullptr};
     BoardScreen* board_screen_{nullptr};
     ProfileEditScreen* profile_edit_screen_{nullptr};
+    PomodoroScreen* pomodoro_screen_{nullptr};
 
     int current_board_id_ = -1;
 };

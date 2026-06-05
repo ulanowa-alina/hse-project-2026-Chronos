@@ -16,18 +16,21 @@ MainWindow::MainWindow(QWidget* parent)
     profile_edit_screen_ = new ProfileEditScreen(this);
     registration_screen_ = new RegistrationScreen(this);
     board_screen_ = new BoardScreen(current_board_id_, this);
+    pomodoro_screen_ = new PomodoroScreen(this);
 
     login_screen_->setNetworkManager(network_manager_);
     profile_screen_->setNetworkManager(network_manager_);
     profile_edit_screen_->setNetworkManager(network_manager_);
     registration_screen_->setNetworkManager(network_manager_);
     board_screen_->setNetworkManager(network_manager_);
+    pomodoro_screen_->setNetworkManager(network_manager_);
 
     stacked_widget_->addWidget(login_screen_);
     stacked_widget_->addWidget(registration_screen_);
     stacked_widget_->addWidget(board_screen_);
     stacked_widget_->addWidget(profile_screen_);
     stacked_widget_->addWidget(profile_edit_screen_);
+    stacked_widget_->addWidget(pomodoro_screen_);
 
     connect(login_screen_, &LoginScreen::loginRequested, this, &MainWindow::switchToBoard);
     connect(profile_screen_, &ProfileScreen::logoutRequested, this, &MainWindow::switchToLogin);
@@ -40,9 +43,12 @@ MainWindow::MainWindow(QWidget* parent)
     connect(login_screen_, &LoginScreen::registrationRequested, this,
             &MainWindow::switchToRegistration);
     connect(board_screen_, &BoardScreen::openProfileScreen, this, &MainWindow::switchToProfile);
+    connect(board_screen_, &BoardScreen::openPomodoroScreen, this, &MainWindow::switchToPomodoro);
     connect(profile_screen_, &ProfileScreen::profileEditRequested, this,
             &MainWindow::switchToProfileEdit);
     connect(profile_edit_screen_, &ProfileEditScreen::profileRequested, this,
+            &MainWindow::switchToProfile);
+    connect(pomodoro_screen_, &PomodoroScreen::openProfileScreen, this,
             &MainWindow::switchToProfile);
 
     setWindowTitle("Chronos");
@@ -104,5 +110,15 @@ void MainWindow::switchToBoard(int board_id) {
     stacked_widget_->setCurrentWidget(board_screen_);
     setWindowTitle("Chronos - Доска");
     showMaximized();
+}
+
+void MainWindow::switchToPomodoro() {
+    stacked_widget_->setCurrentWidget(pomodoro_screen_);
+    setWindowTitle("Chronos - Pomodoro");
+
+    if (isMaximized()) {
+        showNormal();
+    }
+    resize(500, 700);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

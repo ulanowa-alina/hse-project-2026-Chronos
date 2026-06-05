@@ -135,6 +135,15 @@ void BoardScreen::setupLayout() {
             &BoardScreen::onStatusCreateRequest);
     header_layout->addWidget(status_create_button_);
 
+    pomodoro_button_ = new QPushButton("🍅", this);
+    pomodoro_button_->setFixedSize(40, 40);
+    pomodoro_button_->setStyleSheet(
+        "QPushButton { background: #dfe1e6; border: 2px solid transparent; border-radius: 20px; "
+        "font-size: 18px; }"
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
+    connect(pomodoro_button_, &QPushButton::clicked, this, &BoardScreen::onPomodoroRequest);
+    header_layout->addWidget(pomodoro_button_);
+
     profile_button_ = new QPushButton("👤", this);
     profile_button_->setFixedSize(40, 40);
     profile_button_->setStyleSheet(
@@ -200,6 +209,10 @@ void BoardScreen::onStatusCreateRequest() {
 
 void BoardScreen::onProfileRequest() {
     emit openProfileScreen();
+}
+
+void BoardScreen::onPomodoroRequest() {
+    emit openPomodoroScreen();
 }
 
 void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {

@@ -29,13 +29,25 @@ CREATE TABLE statuses (
 CREATE TABLE tasks (
                        id SERIAL PRIMARY KEY,
                        board_id INT NOT NULL,
+                       status_id INT NOT NULL,
                        title VARCHAR(255) NOT NULL CHECK (char_length(title) BETWEEN 1 AND 100),
                        description TEXT CHECK (description IS NULL OR char_length(description) <= 1000),
-                       status_id INT NOT NULL,
                        priority_color VARCHAR(50) NOT NULL CHECK (char_length(priority_color) BETWEEN 1 AND 50),
                        deadline TIMESTAMP,
                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
                        CONSTRAINT fk_board FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
                        CONSTRAINT fk_status FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE
+);
+
+CREATE TABLE pomodoro_sessions (
+                                   id SERIAL PRIMARY KEY,
+                                   user_id INT NOT NULL,
+                                   goal_minutes INT CHECK (goal_minutes IS NULL OR goal_minutes > 0),
+                                   work_duration_seconds INT NOT NULL CHECK (work_duration_seconds > 0),
+                                   break_duration_seconds INT NOT NULL CHECK (break_duration_seconds > 0),
+                                   completed_cycles INT NOT NULL DEFAULT 0 CHECK (completed_cycles >= 0),
+                                   started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                                   completed_at TIMESTAMP,
+                                   CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)
 );

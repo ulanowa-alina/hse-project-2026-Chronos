@@ -37,6 +37,8 @@ add_executable(ChronosClient
         include/board_card.hpp
         src/dd_task_card.cpp
         include/dd_task_card.hpp
+        include/pomodoro_screen.h
+        src/pomodoro_screen.cpp
 )
 
 

@@ -40,6 +40,7 @@ class NetworkManager : public QObject {
     const QString statuses_delete_url_ = "/status/v1/delete";
     const QString statieses_edit_url_ = "/status/v1/edit";
     const QString user_edit_info_url_ = "/personal/v1/edit";
+    const QString pomodoro_create_url_ = "/pomodoro/v1/create";
 
     void GET(const QString& endpoint);
     void POST(const QString& endpoint, const QJsonObject& data);
