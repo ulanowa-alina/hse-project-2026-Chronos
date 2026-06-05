@@ -1,8 +1,9 @@
-#ifndef TASK_WINDOW_H
-#define TASK_WINDOW_H
+#ifndef TASK_CARD_H
+#define TASK_CARD_H
 
 #include "network_manager.h"
 
+#include <QDateTime>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
@@ -11,6 +12,7 @@
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QTextEdit>
+#include <QTimer>
 #include <QWidget>
 
 class TaskCard : public QFrame {
@@ -29,16 +31,17 @@ class TaskCard : public QFrame {
     void setStatusId(int new_status_id) {
         status_id_ = new_status_id;
     }
-    void setData(const QString& title, const QString& description);
+    void setData(const QString& title, const QString& description,
+                 const QDateTime& deadline = QDateTime(), bool is_completed = false);
     void updateTaskStatus();
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
-    void onTaskSaveRequest();
     void onOpenSettings();
     void onTitleEditRequest();
-    void onDescriptionEditRequest();
     void onDeleteTaskRequest();
+    void onMarkDoneRequest();
+    void onUpdateTimer();
 
   protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -48,16 +51,27 @@ class TaskCard : public QFrame {
     int task_id_;
     int board_id_;
     int status_id_;
+    bool is_completed_{false};
     QPoint drag_start_position_;
     bool should_be_delete_{false};
 
     NetworkManager* network_manager_{nullptr};
 
+    QDateTime deadline_;
+    QTimer* timer_{nullptr};
+    QLabel* deadline_label_{nullptr};
+
+    QWidget* description_text_{nullptr};
+    QLabel* description_label_{nullptr};
+    QWidget* blue_line_{nullptr};
+
     QLineEdit* title_{nullptr};
-    QTextEdit* description_edit_{nullptr};
+
     QPushButton* settings_button_{nullptr};
+    QPushButton* complete_button_{nullptr};
 
     void setupLayout();
+    void doneVisualState();
 };
 
-#endif // TASK_WINDOW_H
+#endif // TASK_CARD_H

@@ -31,6 +31,12 @@ add_executable(ChronosClient
         src/task_card.cpp
         src/profile_edit_screen.cpp
         include/profile_edit_screen.h
+        include/dashboard_screen.hpp
+        src/dashboard_screen.cpp
+        src/board_card.cpp
+        include/board_card.hpp
+        src/dd_task_card.cpp
+        include/dd_task_card.hpp
 )
 
 
