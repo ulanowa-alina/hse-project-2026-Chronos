@@ -1,13 +1,13 @@
-
-#ifndef DD_TASK_CARD_HPP
-#define DD_TASK_CARD_HPP
+#ifndef DD_TASK_CARD_H
+#define DD_TASK_CARD_H
 
 #include "network_manager.h"
 #include "task_card.h"
 
 #include <QFrame>
+#include <QVBoxLayout>
 
-class DdTaskCard : public TaskCard {
+class DdTaskCard : public QFrame {
     Q_OBJECT
 
   public:
@@ -15,7 +15,29 @@ class DdTaskCard : public TaskCard {
 
     void setNetworkManager(NetworkManager* manager);
 
+    void setCardData(const QString& title, const QString& description,
+                     const QDateTime& deadline = QDateTime(), bool is_completed = false);
+
+  signals:
+    void openBoardRequested(int board_id);
+
+  private slots:
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onBoardButtonClicked();
+
   private:
+    int task_id_;
+    int board_id_;
+    int status_id_;
+
+    NetworkManager* network_manager_{nullptr};
+
+    QPushButton* board_button_{nullptr};
+    TaskCard* inner_task_card_{nullptr};
+    QVBoxLayout* main_layout_{nullptr};
+
+    void setupLayout();
+    void freezeTaskCard();
 };
 
-#endif // DD_TASK_CARD_HPP
+#endif // DD_TASK_CARD_H
