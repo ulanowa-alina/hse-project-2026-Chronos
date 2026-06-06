@@ -6,6 +6,8 @@
 #include <QByteArray>
 #include <QLabel>
 #include <QLineEdit>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QPushButton>
 #include <QWidget>
 
@@ -25,9 +27,11 @@ class ProfileEditScreen : public QWidget {
     void onProfileEditRequest();
     void onAvatarPickRequested();
     void onAvatarDeleteRequested();
+    void onAvatarImageDownloaded(QNetworkReply* reply);
 
   private:
     NetworkManager* network_manager_{nullptr};
+    QNetworkAccessManager* avatar_network_manager_{nullptr};
     QString current_avatar_s3_key_;
     QString selected_avatar_file_path_;
     QString original_name_;
@@ -58,6 +62,7 @@ class ProfileEditScreen : public QWidget {
     auto parseErrorMessage(const QByteArray& data) const -> QString;
     void resetAvatarSelection();
     void updateAvatarDeleteButtonState();
+    void loadRemoteAvatar(const QString& avatar_s3_key);
 };
 
 #endif // PROFILE_EDIT_SCREEN_H

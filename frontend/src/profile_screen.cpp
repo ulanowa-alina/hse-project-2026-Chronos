@@ -1,13 +1,21 @@
 #include "profile_screen.h"
 
 #include <QDebug>
+#include <QNetworkRequest>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QShowEvent>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 
 ProfileScreen::ProfileScreen(QWidget* parent)
-    : QWidget(parent) {
+    : QWidget(parent)
+    , avatar_network_manager_(new QNetworkAccessManager(this)) {
     setupLayout();
+
+    connect(avatar_network_manager_, &QNetworkAccessManager::finished, this,
+            &ProfileScreen::onAvatarImageDownloaded);
 }
 
 void ProfileScreen::setNetworkManager(NetworkManager* manager) {
@@ -45,12 +53,82 @@ void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray&
         name_label_->setText(name);
         email_label_->setText(email);
         status_label_->setText(status);
+        updateAvatarPreview(avatar_s3_key);
         qDebug() << "ProfileScreen avatar_s3_key:" << avatar_s3_key;
         qDebug() << "ProfileScreen: Данные получены";
     } else {
         qDebug() << "Ошибка сервера, код:" << code;
         name_label_->setText("Ошибка загрузки");
     }
+}
+
+void ProfileScreen::updateAvatarPreview(const QString& avatar_s3_key) {
+    if (avatar_s3_key.isEmpty() || !network_manager_ || !avatar_network_manager_) {
+        setDefaultAvatar();
+        return;
+    }
+
+    const QUrl avatar_url(network_manager_->avatar_public_base_url_ + avatar_s3_key);
+    avatar_network_manager_->get(QNetworkRequest(avatar_url));
+}
+
+void ProfileScreen::setDefaultAvatar() {
+    avatar_label_->clear();
+    avatar_label_->setText("🐶");
+}
+
+void ProfileScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
+    if (!reply) {
+        setDefaultAvatar();
+        return;
+    }
+
+    const QByteArray image_data = reply->readAll();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        setDefaultAvatar();
+        reply->deleteLater();
+        return;
+    }
+
+    QPixmap pixmap;
+    if (!pixmap.loadFromData(image_data)) {
+        setDefaultAvatar();
+        reply->deleteLater();
+        return;
+    }
+
+    const int size = 120;
+    const int border_width = 4;
+    const int image_size = size - border_width * 2;
+
+    QPixmap scaled = pixmap.scaled(image_size, image_size, Qt::KeepAspectRatioByExpanding,
+                                   Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor("#305CDE"));
+    painter.drawEllipse(0, 0, size, size);
+
+    QPainterPath path;
+    path.addEllipse(border_width, border_width, image_size, image_size);
+    painter.setClipPath(path);
+
+    const int x = border_width + (image_size - scaled.width()) / 2;
+    const int y = border_width + (image_size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
+    avatar_label_->setText("");
+    avatar_label_->setPixmap(rounded);
+
+    reply->deleteLater();
 }
 
 void ProfileScreen::setupLayout() {
@@ -93,10 +171,7 @@ void ProfileScreen::setupLayout() {
     avatar_label_ = new QLabel("🐶");
     avatar_label_->setFixedSize(120, 120);
     avatar_label_->setAlignment(Qt::AlignCenter);
-    avatar_label_->setStyleSheet("background-color: #f0f2f5; "
-                                 "border: 4px solid #305CDE; "
-                                 "border-radius: 60px; "
-                                 "font-size: 50px;");
+    avatar_label_->setStyleSheet("background: transparent; border: none; font-size: 50px;");
 
     name_label_ = new QLabel("Иван Иванов");
     name_label_->setStyleSheet("font-size: 24px; font-weight: bold; color: #333;");

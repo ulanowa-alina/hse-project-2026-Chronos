@@ -9,6 +9,8 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QMap>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -34,11 +36,13 @@ class BoardScreen : public QWidget {
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onStatusCreateRequest();
     void onProfileRequest();
+    void onAvatarImageDownloaded(QNetworkReply* reply);
 
   private:
     int board_id_;
 
     NetworkManager* network_manager_{nullptr};
+    QNetworkAccessManager* avatar_network_manager_{nullptr};
 
     QPushButton* profile_button_{nullptr};
     QPushButton* status_create_button_{nullptr};
@@ -53,6 +57,8 @@ class BoardScreen : public QWidget {
 
     StatusWindow* ensureStatusWindow(int status_id, const QString& name);
     void loadTasksFromResponse(const QByteArray& data);
+    void loadAvatar(const QString& avatar_s3_key);
+    void setDefaultAvatar();
     void setupLayout();
 };
 

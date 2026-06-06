@@ -1,7 +1,16 @@
 #include "registration_screen.h"
 
 #include <QDebug>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QIcon>
 #include <QJsonArray>
+#include <QMessageBox>
+#include <QMimeDatabase>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 
@@ -26,8 +35,10 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
     }
 
     if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_ &&
-        endpoint != network_manager_->boards_get_all_url_)
+        endpoint != network_manager_->boards_get_all_url_ &&
+        endpoint != network_manager_->user_avatar_upload_url_) {
         return;
+    }
     if (endpoint == network_manager_->register_url_) {
         if (code == 200) {
             qDebug() << "RegistrationScreen: Успешная регистрация. Входим в аккаунт...";
@@ -47,10 +58,57 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
             QString token = data_obj["token"].toString();
             network_manager_->setToken(token);
 
-            qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен, перехожу на доску";
-            network_manager_->GET(network_manager_->boards_get_all_url_);
+            qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен";
+
+            if (avatar_file_path_.isEmpty()) {
+                qDebug() << "RegistrationScreen: Фото не выбрано, перехожу на доску";
+                network_manager_->GET(network_manager_->boards_get_all_url_);
+            } else {
+                QFile file(avatar_file_path_);
+                if (!file.open(QIODevice::ReadOnly)) {
+                    qDebug() << "RegistrationScreen: Не удалось открыть файл аватара:"
+                             << avatar_file_path_;
+                    QMessageBox::warning(this, "Ошибка чтения файла",
+                                         "Аккаунт создан, но выбранное фото открыть не удалось.");
+                    network_manager_->GET(network_manager_->boards_get_all_url_);
+                    return;
+                }
+
+                const QByteArray raw_bytes = file.readAll();
+                file.close();
+
+                QFileInfo file_info(avatar_file_path_);
+                QMimeDatabase mime_db;
+                const QString content_type = mime_db.mimeTypeForFile(avatar_file_path_).name();
+
+                QJsonObject json;
+                json["file_name"] = file_info.fileName();
+                json["content_type"] =
+                    content_type.isEmpty() ? "application/octet-stream" : content_type;
+                json["file_base64"] = QString::fromLatin1(raw_bytes.toBase64());
+                json["name"] = name_input_->text();
+                json["email"] = email_input_->text();
+                json["status"] = status_input_->text();
+
+                if (!password_input_->text().isEmpty()) {
+                    json["password"] = password_input_->text();
+                }
+
+                qDebug() << "RegistrationScreen: Аккаунт создан, отправляю фото профиля...";
+                network_manager_->POST(network_manager_->user_avatar_upload_url_, json);
+            }
         } else {
             qDebug() << "RegistrationScreen: Ошибка входа после регистрации:" << code;
+        }
+    } else if (endpoint == network_manager_->user_avatar_upload_url_) {
+        if (code == 200) {
+            qDebug() << "RegistrationScreen: Фото профиля успешно загружено";
+            network_manager_->GET(network_manager_->boards_get_all_url_);
+        } else {
+            qDebug() << "RegistrationScreen: Ошибка загрузки фото после регистрации:" << code;
+            QMessageBox::warning(this, "Ошибка загрузки фото",
+                                 "Аккаунт создан, но фото профиля загрузить не удалось.");
+            network_manager_->GET(network_manager_->boards_get_all_url_);
         }
     } else if (endpoint == network_manager_->boards_get_all_url_) {
         if (code == 200) {
@@ -88,6 +146,56 @@ void RegistrationScreen::onRegisterRequest() {
     network_manager_->POST(network_manager_->register_url_, json);
 }
 
+void RegistrationScreen::onAvatarPickRequested() {
+    const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
+                                                           "Images (*.png *.jpg *.jpeg *.webp)");
+
+    if (file_path.isEmpty()) {
+        return;
+    }
+
+    avatar_file_path_ = file_path;
+    qDebug() << "RegistrationScreen avatar file:" << avatar_file_path_;
+    updateAvatarButton(avatar_file_path_);
+}
+
+void RegistrationScreen::updateAvatarButton(const QString& file_path) {
+    QPixmap pixmap(file_path);
+
+    if (pixmap.isNull()) {
+        avatar_button_->setText("!");
+        avatar_button_->setIcon(QIcon());
+        return;
+    }
+
+    const int size = 100;
+    const int border_width = 2;
+    const int image_size = size - border_width * 2;
+
+    QPixmap scaled = pixmap.scaled(image_size, image_size, Qt::KeepAspectRatioByExpanding,
+                                   Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPainterPath path;
+    path.addEllipse(border_width, border_width, image_size, image_size);
+    painter.setClipPath(path);
+
+    const int x = border_width + (image_size - scaled.width()) / 2;
+    const int y = border_width + (image_size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
+    avatar_button_->setText("");
+    avatar_button_->setIcon(QIcon(rounded));
+    avatar_button_->setIconSize(QSize(size, size));
+}
+
 void RegistrationScreen::setupLayout() {
     auto* main_layout = new QVBoxLayout(this);
     main_layout->setContentsMargins(20, 15, 20, 20);
@@ -119,6 +227,7 @@ void RegistrationScreen::setupLayout() {
     int avatar_size = 100;
     avatar_button_->setFixedSize(avatar_size, avatar_size);
     avatar_button_->setCursor(Qt::PointingHandCursor);
+    avatar_button_->setIconSize(QSize(100, 100));
 
     avatar_button_->setStyleSheet("QPushButton {"
                                   "   background-color: #F0F2F5;"
@@ -197,6 +306,8 @@ void RegistrationScreen::setupLayout() {
     connect(registration_button_, &QPushButton::clicked, this,
             &RegistrationScreen::onRegisterRequest);
     connect(login_button_, &QPushButton::clicked, this, &RegistrationScreen::loginRequested);
+    connect(avatar_button_, &QPushButton::clicked, this,
+            &RegistrationScreen::onAvatarPickRequested);
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

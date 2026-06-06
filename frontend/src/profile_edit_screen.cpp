@@ -9,13 +9,20 @@
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QMimeDatabase>
+#include <QNetworkRequest>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPixmap>
 #include <QShowEvent>
 #include <QVBoxLayout>
 
 ProfileEditScreen::ProfileEditScreen(QWidget* parent)
-    : QWidget(parent) {
+    : QWidget(parent)
+    , avatar_network_manager_(new QNetworkAccessManager(this)) {
     setupLayout();
+
+    connect(avatar_network_manager_, &QNetworkAccessManager::finished, this,
+            &ProfileEditScreen::onAvatarImageDownloaded);
 }
 
 void ProfileEditScreen::setNetworkManager(NetworkManager* manager) {
@@ -55,6 +62,7 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
             name_input_->setText(original_name_);
             email_input_->setText(original_email_);
             status_input_->setText(original_status_);
+            loadRemoteAvatar(avatar_s3_key);
         }
         return;
     }
@@ -234,6 +242,7 @@ void ProfileEditScreen::onAvatarDeleteRequested() {
     if (avatar_delete_requested_) {
         avatar_delete_requested_ = false;
         updateAvatarDeleteButtonState();
+        loadRemoteAvatar(current_avatar_s3_key_);
         return;
     }
 
@@ -253,7 +262,19 @@ void ProfileEditScreen::onAvatarDeleteRequested() {
     }
 
     avatar_delete_requested_ = true;
+    avatar_button_->setText("Выбрать фото");
+    avatar_button_->setIcon(QIcon());
     updateAvatarDeleteButtonState();
+}
+
+void ProfileEditScreen::loadRemoteAvatar(const QString& avatar_s3_key) {
+    if (avatar_s3_key.isEmpty() || !network_manager_ || !avatar_network_manager_) {
+        return;
+    }
+
+    const QUrl avatar_url(network_manager_->avatar_public_base_url_ + avatar_s3_key);
+    qDebug() << "ProfileEditScreen: loading avatar from" << avatar_url.toString();
+    avatar_network_manager_->get(QNetworkRequest(avatar_url));
 }
 
 void ProfileEditScreen::updateAvatarButtonPreview(const QString& file_path) {
@@ -266,10 +287,85 @@ void ProfileEditScreen::updateAvatarButtonPreview(const QString& file_path) {
         return;
     }
 
+    const int size = 140;
+    const int border_width = 2;
+    const int image_size = size - border_width * 2;
+
+    QPixmap scaled = pixmap.scaled(image_size, image_size, Qt::KeepAspectRatioByExpanding,
+                                   Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPainterPath path;
+    path.addEllipse(border_width, border_width, image_size, image_size);
+    painter.setClipPath(path);
+
+    const int x = border_width + (image_size - scaled.width()) / 2;
+    const int y = border_width + (image_size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
     avatar_button_->setText("");
-    avatar_button_->setIcon(QIcon(pixmap));
-    avatar_button_->setIconSize(QSize(136, 136));
+    avatar_button_->setIcon(QIcon(rounded));
+    avatar_button_->setIconSize(QSize(size, size));
+
     updateAvatarDeleteButtonState();
+}
+
+void ProfileEditScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
+    if (!reply) {
+        return;
+    }
+
+    const QByteArray image_data = reply->readAll();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        qDebug() << "ProfileEditScreen: avatar download error:" << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+
+    QPixmap pixmap;
+    if (!pixmap.loadFromData(image_data)) {
+        qDebug() << "ProfileEditScreen: failed to load avatar from data, bytes ="
+                 << image_data.size();
+        reply->deleteLater();
+        return;
+    }
+
+    const int size = 140;
+    const int border_width = 2;
+    const int image_size = size - border_width * 2;
+
+    QPixmap scaled = pixmap.scaled(image_size, image_size, Qt::KeepAspectRatioByExpanding,
+                                   Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPainterPath path;
+    path.addEllipse(border_width, border_width, image_size, image_size);
+    painter.setClipPath(path);
+
+    const int x = border_width + (image_size - scaled.width()) / 2;
+    const int y = border_width + (image_size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
+    avatar_button_->setText("");
+    avatar_button_->setIcon(QIcon(rounded));
+    avatar_button_->setIconSize(QSize(size, size));
+
+    reply->deleteLater();
 }
 
 auto ProfileEditScreen::hasPendingTextChanges() const -> bool {
