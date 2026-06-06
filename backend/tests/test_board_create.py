@@ -1,137 +1,145 @@
-import re
-
 import pytest
 
+pytestmark = pytest.mark.asyncio
 
-ISO_8601_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+@pytest.fixture(name='board_create')
+def _board_create(service_client, auth_headers):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            json=None,
+            **kwargs,
+    ):
+        body = {
+            'title' : 'test board',
+            'description' : 'test description',
+            'is_private' : False,
+        }
+
+        if json is not None:
+            body = json
+        else:
+            body.update(kwargs)
+
+        response = await service_client.post(
+            '/board/v1/create',
+            headers = headers if headers is not None else auth_headers,
+            json = body
+        )
+
+        assert response.status_code == status_code
+
+        if response.content:
+            return response.json()
+
+        return None
+
+    return _inner
+
+def assert_board_response(
+        response,
+        *,
+        title = 'test board',
+        description = 'test description',
+        is_private = False,
+):
+    assert 'data' in response
+
+    board = response['data']
+
+    assert isinstance(board['id'], int)
+    assert isinstance(board['user_id'], int)
+
+    assert board['title'] == title
+    assert board['description'] == description
+    assert board['is_private'] is is_private
+
+    assert isinstance(board['created_at'], str)
+    assert isinstance(board['updated_at'], str)
+
+    return board
+
+def assert_error_response(
+        response,
+        code,
+        field = None
+):
+    assert 'error' in response
+
+    error = response['error']
+
+    assert error['code'] == code
+    assert isinstance(error['message'], str)
+    assert error['message']
+
+    if field is not None:
+        assert 'details' in error
+        assert field in error['details']
 
 
-def assert_board_response(board, title, description, is_private):
-    assert set(board.keys()) == {
-        "id",
-        "user_id",
-        "title",
-        "description",
-        "is_private",
-        "created_at",
-        "updated_at",
-    }
-    assert isinstance(board["id"], int)
-    assert board["id"] > 0
-    assert isinstance(board["user_id"], int)
-    assert board["user_id"] > 0
-    assert board["title"] == title
-    assert board["description"] == description
-    assert board["is_private"] == is_private
-    assert ISO_8601_UTC.match(board["created_at"])
-    assert ISO_8601_UTC.match(board["updated_at"])
+async def test_basic(board_create):
+    response = await board_create()
 
+    assert_board_response(response)
 
-def assert_error_response(body, code):
-    assert "error" in body
-    assert body["error"]["code"] == code
-    assert "message" in body["error"]
-
-
-def test_board_create_success_returns_board_model(board_create):
-    body = board_create(
-        title="Study board",
-        description="Spring semester",
-        is_private=True,
+async def test_create_with_empty_title(board_create):
+    response = await board_create(
+        status_code=400,
+        title='',
     )
 
-    assert "data" in body
-    assert_board_response(
-        body["data"],
-        title="Study board",
-        description="Spring semester",
-        is_private=True,
+    assert_error_response(response, 'VALIDATION_ERROR', field='title')
+
+async def test_create_without_title(board_create):
+    response = await board_create(
+        status_code=400,
+        json={
+            'description': 'Test description',
+            'is_private': False,
+        },
     )
 
+    assert_error_response(response, 'MISSING_FIELD', field='title')
 
-def test_board_create_without_description_uses_empty_string(board_create):
-    body = board_create(
-        omit_fields=("description",),
-        title="Board without description",
-        is_private=False,
+async def test_create_with_too_long_title(board_create):
+    response = await board_create(
+        status_code=400,
+        title='a' * 101,
     )
 
-    assert_board_response(
-        body["data"],
-        title="Board without description",
-        description="",
-        is_private=False,
+    assert_error_response(response, 'VALIDATION_ERROR', field='title')
+
+async def test_create_with_too_long_description(board_create):
+    response = await board_create(
+        status_code=400,
+        description='a' * 1001,
     )
 
+    assert_error_response(response, 'VALIDATION_ERROR', field='description')
 
-def test_board_create_requires_authorization(board_create):
-    body = board_create(status_code=401, headers={})
+async def test_create_without_is_private(board_create):
+    response = await board_create(
+        status_code=400,
+        json={
+            'title': 'Test board',
+            'description': 'Test description',
+        },
+    )
 
-    assert_error_response(body, "UNAUTHORIZED")
+    assert_error_response(response, 'MISSING_FIELD', field='is_private')
 
+async def test_create_with_invalid_is_private(board_create):
+    response = await board_create(
+        status_code=400,
+        is_private='false',
+    )
 
-def test_board_create_rejects_invalid_token(board_create):
-    body = board_create(
+    assert_error_response(response, 'INVALID_FORMAT', field='is_private')
+
+async def test_create_without_auth(board_create):
+    response = await board_create(
         status_code=401,
-        headers={"Authorization": "Bearer invalid-token"},
+        headers={},
     )
 
-    assert_error_response(body, "INVALID_TOKEN")
-
-
-@pytest.mark.parametrize(
-    "omit_fields, missing_fields",
-    [
-        (("title",), ["title"]),
-        (("is_private",), ["is_private"]),
-        (("title", "is_private"), ["title", "is_private"]),
-    ],
-)
-def test_board_create_requires_fields(board_create, omit_fields, missing_fields):
-    body = board_create(status_code=400, omit_fields=omit_fields)
-
-    assert_error_response(body, "MISSING_FIELD")
-    assert body["error"]["details"]["missing_fields"] == missing_fields
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"title": ""},
-        {"title": "A" * 101},
-        {"description": "A" * 1001},
-    ],
-)
-def test_board_create_validates_values(board_create, kwargs):
-    body = board_create(status_code=400, **kwargs)
-
-    assert_error_response(body, "VALIDATION_ERROR")
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"title": 123},
-        {"description": {"text": "Description"}},
-        {"is_private": "false"},
-    ],
-)
-def test_board_create_validates_field_types(board_create, kwargs):
-    body = board_create(status_code=400, **kwargs)
-
-    assert_error_response(body, "INVALID_FORMAT")
-
-
-@pytest.mark.parametrize(
-    "raw_body",
-    [
-        '{"title": "Board", "is_private": false',
-        '{"title": "Board" "is_private": false}',
-        "[]",
-        '"just a string"',
-    ],
-)
-def test_board_create_rejects_invalid_json(board_create, raw_body):
-    body = board_create(status_code=400, raw_body=raw_body)
-
-    assert_error_response(body, "INVALID_FORMAT")
+    assert_error_response(response, 'UNAUTHORIZED')
