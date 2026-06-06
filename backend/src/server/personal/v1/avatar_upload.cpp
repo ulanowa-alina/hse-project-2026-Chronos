@@ -343,19 +343,6 @@ auto handleAvatarDelete(const http::request<http::string_body>& req, ConnectionP
         updated.avatar_s3_key_.clear();
         repo.save(updated);
 
-        if (!existing->avatar_s3_key_.empty()) {
-            try {
-                S3Uploader uploader(load_s3_config_from_env());
-                uploader.delete_object(existing->avatar_s3_key_);
-            } catch (const S3UploadError&) {
-                try {
-                    repo.save(*existing);
-                } catch (...) {
-                }
-                throw;
-            }
-        }
-
         return build_json_response(req, http::status::ok, json{{"data", {{"avatar_s3_key", ""}}}});
     } catch (const pqxx::sql_error& e) {
         const std::string msg = e.what();
@@ -368,9 +355,6 @@ auto handleAvatarDelete(const http::request<http::string_body>& req, ConnectionP
 
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");
-    } catch (const S3UploadError&) {
-        return build_api_error(req, http::status::internal_server_error, "S3_DELETE_ERROR",
-                               "Failed to delete avatar from S3");
     } catch (const std::exception&) {
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");

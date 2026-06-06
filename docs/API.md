@@ -1,4 +1,4 @@
-**Актуальная версия: 1.6**
+**Актуальная версия: 1.7**
 ### Содержание:
 1. [[#История изменений]]
 2. [[#Входные параметры]]<br>
@@ -26,6 +26,7 @@
 | 1.4    | 10.04.2026 | Обновлены endpoint'ы board/task и personal API: унифицированы пути для досок, добавлены `/board/v1/edit` и task endpoint'ы `/task/v1/create`, `/task/v1/edit`, `/task/v1/delete`; обновлены примеры запросов и таблица успешных ответов.                              |
 | 1.5    | 05.05.2026 | Добавлен endpoint `/task/v1/get_all` для получения задач пользователя с фильтрацией по `board_id` и `status_id`; добавлены описание параметров и пример запроса/ответа; еnpoint для получения всех статусов с фильтрацией по доске `board_id`                         |
 | 1.6    | 31.05.2026 | Добавлены endpoint'ы `/personal/v1/avatar/upload` и `/personal/v1/avatar` для загрузки и удаления аватара; обновлена модель `User` полем `avatar_s3_key`; уточнён контракт `PUT /personal/v1/edit`; добавлены новые коды ошибок `S3_UPLOAD_ERROR` и `S3_DELETE_ERROR` |
+| 1.7    | 05.06.2026 | Upload аватара переведён на public PUT в Yandex Object Storage; удаление фото работает как очистка `avatar_s3_key` в БД без физического удаления объекта из bucket; ключи доступа для текущего upload flow не требуются |
 
 
 ### Входные параметры
@@ -292,7 +293,7 @@ HTTP 204 No Content
 | 403 | Ошибки доступа                 | FORBIDDEN<br> RESOURCE_NOT_OWNED                                        |
 | 404 | Запрашиваемый ресурс не найден | USER_NOT_FOUND<br> BOARD_NOT_FOUND<br> TASK_NOT_FOUND<br> STATUS_NOT_FOUND |
 | 405 | Конфликты данных               | DUPLICATE_RESOURCE<br> EMAIL_ALREADY_EXISTS                             |
-| 500 | Внутренняя ошибка сервера      | INTERNAL_ERROR<br> DATABASE_ERROR<br> S3_UPLOAD_ERROR<br> S3_DELETE_ERROR |
+| 500 | Внутренняя ошибка сервера      | INTERNAL_ERROR<br> DATABASE_ERROR<br> S3_UPLOAD_ERROR |
 
 Значения ошибок и их коды:
 
@@ -341,7 +342,6 @@ HTTP 204 No Content
 | INTERNAL_ERROR  | Внутренняя ошибка сервера         |
 | DATABASE_ERROR  | Ошибка работы с базой данных      |
 | S3_UPLOAD_ERROR | Ошибка загрузки файла в S3        |
-| S3_DELETE_ERROR | Ошибка удаления файла из S3       |
 
 
 ### Примеры запросов и ответов
@@ -483,6 +483,10 @@ Content-Type: application/json
 }
 ```
 
+Примечание:
+- Загрузка выполняется backend-прокси через публичный `PUT` в bucket Yandex Object Storage.
+- Для текущего upload flow `S3_ACCESS_KEY` и `S3_SECRET_KEY` не используются.
+
 6. Удаление фото профиля
 
 Запрос:
@@ -506,6 +510,10 @@ Content-Type: application/json
   }
 }
 ```
+
+Примечание:
+- Endpoint очищает `avatar_s3_key` в БД.
+- Физическое удаление объекта из bucket в этой версии не гарантируется.
 
 7. Получение списка досок пользователя
 

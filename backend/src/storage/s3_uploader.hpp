@@ -16,7 +16,6 @@ class S3Uploader {
 
     auto upload_user_avatar(int user_id, const std::string& payload,
                             const std::string& content_type) const -> std::string;
-    void delete_object(const std::string& object_key) const;
 
   private:
     S3Config config_;
