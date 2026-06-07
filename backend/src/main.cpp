@@ -1,7 +1,7 @@
 #include "db/connection_pool.hpp"
 #include "db/db_config.hpp"
-#include "server/server.hpp"
 #include "server/auth/jwt.hpp"
+#include "server/server.hpp"
 
 #include <boost/asio.hpp>
 #include <spdlog/sinks/basic_file_sink.h>

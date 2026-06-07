@@ -5,9 +5,9 @@
 #include <nlohmann/json.hpp>
 #include <openssl/hmac.h>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <stdexcept>
 
 namespace auth {
 
@@ -288,8 +288,8 @@ bool parse_and_validate_token(const std::string& token, TokenPayload& payload, T
 }
 
 void validate_jwt_config() {
-    (void)get_jwt_secret();
-    (void)get_jwt_ttl_seconds();
+    (void) get_jwt_secret();
+    (void) get_jwt_ttl_seconds();
 }
 
 } // namespace auth
