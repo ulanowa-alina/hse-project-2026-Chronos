@@ -13,6 +13,9 @@ AUTH_LOGIN_URL = "/auth/v1/login"
 BOARD_CREATE_URL = "/board/v1/create"
 BOARD_EDIT_URL = "/board/v1/edit"
 BOARD_DELETE_URL = "/board/v1/delete"
+BOARD_GET_URL = "/board/v1/get"
+BOARD_GET_ALL_URL = "/board/v1/get_all"
+BOARD_TASKS_URL = "/board/v1/tasks"
 
 STATUS_CREATE_URL = "/status/v1/create"
 STATUS_EDIT_URL = "/status/v1/edit"
@@ -245,6 +248,113 @@ def _board_delete(service_client, auth_headers, created_board):
         return json_or_none(response)
 
     return _inner
+
+
+@pytest.fixture(name="board_get")
+def _board_get(service_client, auth_headers, created_board):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            params=None,
+            board_id=None,
+            omit_board_id=False,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if params is None:
+            if omit_board_id:
+                request_params = {}
+            else:
+                request_params = {
+                    "board_id": created_board["board_id"] if board_id is None else board_id,
+                }
+        else:
+            request_params = params
+
+        response = await service_client.get(
+            BOARD_GET_URL,
+            headers=request_headers,
+            params=request_params,
+        )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest.fixture(name="board_get_all")
+def _board_get_all(service_client, auth_headers):
+    async def _inner(
+            status_code=200,
+            headers=None,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        response = await service_client.get(
+            BOARD_GET_ALL_URL,
+            headers=request_headers,
+        )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest.fixture(name="board_tasks")
+def _board_tasks(service_client, auth_headers, created_board):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            params=None,
+            board_id=None,
+            omit_board_id=False,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if params is None:
+            if omit_board_id:
+                request_params = {}
+            else:
+                request_params = {
+                    "board_id": created_board["board_id"] if board_id is None else board_id,
+                }
+        else:
+            request_params = params
+
+        response = await service_client.get(
+            BOARD_TASKS_URL,
+            headers=request_headers,
+            params=request_params,
+        )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest_asyncio.fixture
+async def user_without_boards(service_client):
+    user = await create_auth_user(service_client)
+
+    get_response = await service_client.get(
+        BOARD_GET_ALL_URL,
+        headers=user["headers"],
+    )
+    assert get_response.status_code == 200, get_response.text
+
+    for board in get_response.json()["data"]:
+        delete_response = await service_client.request(
+            "DELETE",
+            BOARD_DELETE_URL,
+            headers=user["headers"],
+            json={"board_id": board["id"]},
+        )
+        assert delete_response.status_code == 204, delete_response.text
+
+    return user
 
 
 @pytest_asyncio.fixture

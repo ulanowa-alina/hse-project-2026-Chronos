@@ -75,6 +75,16 @@ async def test_create_with_too_long_title(board_create):
 
     assert_error_response(response, 'VALIDATION_ERROR', field='title')
 
+async def test_create_with_max_title_length(board_create):
+    response = await board_create(
+        title='a' * 100,
+    )
+
+    assert_board_response(
+        response,
+        title='a' * 100,
+    )
+
 async def test_create_with_too_long_description(board_create):
     response = await board_create(
         status_code=400,
@@ -82,6 +92,46 @@ async def test_create_with_too_long_description(board_create):
     )
 
     assert_error_response(response, 'VALIDATION_ERROR', field='description')
+
+async def test_create_with_max_description_length(board_create):
+    response = await board_create(
+        description='a' * 1000,
+    )
+
+    assert_board_response(
+        response,
+        description='a' * 1000,
+    )
+
+async def test_create_without_description(board_create):
+    response = await board_create(
+        omit_fields=('description',),
+    )
+
+    assert_board_response(
+        response,
+        description='',
+    )
+
+async def test_create_with_null_description(board_create):
+    response = await board_create(
+        description=None,
+    )
+
+    assert_board_response(
+        response,
+        description='',
+    )
+
+async def test_create_private_board(board_create):
+    response = await board_create(
+        is_private=True,
+    )
+
+    assert_board_response(
+        response,
+        is_private=True,
+    )
 
 async def test_create_without_is_private(board_create):
     response = await board_create(

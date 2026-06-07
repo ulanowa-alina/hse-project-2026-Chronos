@@ -93,6 +93,18 @@ async def test_edit_with_too_long_title(board_edit):
     assert_error_response(response, "VALIDATION_ERROR", field="title")
 
 
+async def test_edit_with_max_title_length(board_edit, created_board):
+    response = await board_edit(
+        title="a" * 100,
+    )
+
+    assert_board_response(
+        response,
+        board_id=created_board["board_id"],
+        title="a" * 100,
+    )
+
+
 async def test_edit_with_too_long_description(board_edit):
     response = await board_edit(
         status_code=400,
@@ -100,6 +112,45 @@ async def test_edit_with_too_long_description(board_edit):
     )
 
     assert_error_response(response, "VALIDATION_ERROR", field="description")
+
+
+async def test_edit_with_max_description_length(board_edit, created_board):
+    response = await board_edit(
+        description="a" * 1000,
+    )
+
+    assert_board_response(
+        response,
+        board_id=created_board["board_id"],
+        description="a" * 1000,
+    )
+
+
+async def test_edit_without_is_private(board_edit):
+    response = await board_edit(
+        status_code=400,
+        omit_fields=("is_private",),
+    )
+
+    assert_error_response(response, "MISSING_FIELD", field="is_private")
+
+
+async def test_edit_with_invalid_board_id(board_edit):
+    response = await board_edit(
+        status_code=400,
+        board_id="wrong",
+    )
+
+    assert_error_response(response, "INVALID_FORMAT", field="board_id")
+
+
+async def test_edit_with_null_description(board_edit):
+    response = await board_edit(
+        status_code=400,
+        description=None,
+    )
+
+    assert_error_response(response, "INVALID_FORMAT", field="description")
 
 
 async def test_edit_with_invalid_is_private(board_edit):

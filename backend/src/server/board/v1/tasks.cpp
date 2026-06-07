@@ -8,6 +8,7 @@
 #include <array>
 #include <boost/url.hpp>
 #include <ctime>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -51,8 +52,12 @@ int require_int_field(const http::request<http::string_body>& req, const std::st
         }
 
         return static_cast<int>(parsed);
-    } catch (const std::invalid_argument&) {
-        throw;
+    } catch (const std::invalid_argument& e) {
+        const std::string message = e.what();
+        if (message.rfind("type:", 0) == 0 || message.rfind("value:", 0) == 0) {
+            throw;
+        }
+        throw std::invalid_argument("type:" + key);
     } catch (const std::exception&) {
         throw std::invalid_argument("type:" + key);
     }

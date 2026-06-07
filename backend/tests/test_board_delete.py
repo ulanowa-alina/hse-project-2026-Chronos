@@ -72,6 +72,29 @@ async def test_delete_another_users_board(board_delete, other_auth_user):
     assert response["error"]["code"] in ("RESOURCE_NOT_OWNED", "FORBIDDEN")
 
 
+async def test_delete_same_board_twice(board_delete):
+    response = await board_delete()
+
+    assert response is None
+
+    response = await board_delete(status_code=404)
+
+    assert_error_response(response, "BOARD_NOT_FOUND")
+
+
+async def test_get_deleted_board_returns_not_found(board_delete, board_get, created_board):
+    response = await board_delete()
+
+    assert response is None
+
+    response = await board_get(
+        status_code=404,
+        board_id=created_board["board_id"],
+    )
+
+    assert_error_response(response, "BOARD_NOT_FOUND")
+
+
 async def test_delete_without_auth(board_delete):
     response = await board_delete(
         status_code=401,

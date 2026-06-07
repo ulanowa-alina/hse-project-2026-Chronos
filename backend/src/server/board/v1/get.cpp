@@ -35,7 +35,7 @@ std::optional<int> parse_board_id_query(const http::request<http::string_body>& 
     const auto params = url_view_result->params();
     const auto it = params.find("board_id");
     if (it == params.end()) {
-        return std::nullopt;
+        throw std::invalid_argument("missing:board_id");
     }
 
     try {
@@ -50,8 +50,12 @@ std::optional<int> parse_board_id_query(const http::request<http::string_body>& 
         }
 
         return static_cast<int>(parsed);
-    } catch (const std::invalid_argument&) {
-        throw;
+    } catch (const std::invalid_argument& e) {
+        const std::string message = e.what();
+        if (message.rfind("type:", 0) == 0 || message.rfind("value:", 0) == 0) {
+            throw;
+        }
+        throw std::invalid_argument("type:board_id");
     } catch (const std::exception&) {
         throw std::invalid_argument("type:board_id");
     }
@@ -80,9 +84,7 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
         BoardRepository board_repository(pool);
 
         const std::optional<int> requested_board_id = parse_board_id_query(req);
-        std::optional<Board> board = requested_board_id.has_value()
-                                         ? board_repository.find_by_id(*requested_board_id)
-                                         : board_repository.find_by_user_id(user_id);
+        std::optional<Board> board = board_repository.find_by_id(*requested_board_id);
 
         if (!board.has_value()) {
             return server::utils::build_error_response(req, http::status::not_found,
@@ -100,6 +102,11 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
 
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
+        if (message.rfind("missing:", 0) == 0) {
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
+                json{{"board_id", "Missing required field"}});
+        }
         if (message.rfind("type:", 0) == 0) {
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
