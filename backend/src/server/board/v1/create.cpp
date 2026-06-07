@@ -104,13 +104,8 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
 
     const json details = collect_missing_fields(body);
     if (!details.empty()) {
-        return server::utils::build_error_response(
-            req,
-            http::status::bad_request,
-            "MISSING_FIELD",
-            "Missing required fields",
-            details
-        );
+        return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
+                                                   "Missing required fields", details);
     }
 
     try {
@@ -141,13 +136,9 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
 
         if (message.rfind("missing:", 0) == 0) {
             const std::string field = message.substr(8);
-            return server::utils::build_error_response(
-                req,
-                http::status::bad_request,
-                "MISSING_FIELD",
-                "Missing required fields",
-                json{{field, "Missing required field"}}
-            );
+            return server::utils::build_error_response(req, http::status::bad_request,
+                                                       "MISSING_FIELD", "Missing required fields",
+                                                       json{{field, "Missing required field"}});
         }
 
         if (message.rfind("type:", 0) == 0) {
