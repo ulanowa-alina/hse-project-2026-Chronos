@@ -2,40 +2,6 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
-@pytest.fixture(name='board_create')
-def _board_create(service_client, auth_headers):
-    async def _inner(
-            status_code=200,
-            headers=None,
-            json=None,
-            **kwargs,
-    ):
-        body = {
-            'title' : 'test board',
-            'description' : 'test description',
-            'is_private' : False,
-        }
-
-        if json is not None:
-            body = json
-        else:
-            body.update(kwargs)
-
-        response = await service_client.post(
-            '/board/v1/create',
-            headers = headers if headers is not None else auth_headers,
-            json = body
-        )
-
-        assert response.status_code == status_code
-
-        if response.content:
-            return response.json()
-
-        return None
-
-    return _inner
-
 def assert_board_response(
         response,
         *,

@@ -126,8 +126,8 @@ json model_to_json(const Task& task) {
 
 } // namespace
 
-auto handleCreate(const http::request<http::string_body>& req,
-                  ConnectionPool& pool) -> http::response<http::string_body> {
+auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& pool,
+                  int user_id) -> http::response<http::string_body> {
     if (req.method() != http::verb::post) {
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "METHOD_NOT_ALLOWED",
@@ -172,14 +172,26 @@ auto handleCreate(const http::request<http::string_body>& req,
         }
 
         BoardRepository board_repository(pool);
-        if (!board_repository.find_by_id(board_id).has_value()) {
+        const std::optional<Board> board = board_repository.find_by_id(board_id);
+        if (!board.has_value()) {
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
+        if (board->user_id_ != user_id) {
+            return server::utils::build_error_response(req, http::status::forbidden,
+                                                       "RESOURCE_NOT_OWNED",
+                                                       "Resource belongs to another user");
+        }
+
         StatusRepository status_repository(pool);
         const auto status = status_repository.find_by_id(status_id);
-        if (!status.has_value() || status->board_id_ != board_id) {
+        if (!status.has_value()) {
+            return server::utils::build_error_response(req, http::status::not_found,
+                                                       "STATUS_NOT_FOUND", "Status not found");
+        }
+
+        if (status->board_id_ != board_id) {
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"status_id", "status_id must reference a status from this board"}});

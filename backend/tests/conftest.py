@@ -11,6 +11,15 @@ AUTH_REGISTER_URL = "/auth/v1/register"
 AUTH_LOGIN_URL = "/auth/v1/login"
 
 BOARD_CREATE_URL = "/board/v1/create"
+BOARD_EDIT_URL = "/board/v1/edit"
+BOARD_DELETE_URL = "/board/v1/delete"
+
+STATUS_CREATE_URL = "/status/v1/create"
+STATUS_GET_ALL_URL = "/status/v1/get_all"
+
+TASK_CREATE_URL = "/task/v1/create"
+TASK_EDIT_URL = "/task/v1/edit"
+TASK_DELETE_URL = "/task/v1/delete"
 
 
 @pytest_asyncio.fixture
@@ -21,6 +30,15 @@ async def service_client():
 
 @pytest_asyncio.fixture
 async def auth_user(service_client):
+    return await create_auth_user(service_client)
+
+
+@pytest_asyncio.fixture
+async def other_auth_user(service_client):
+    return await create_auth_user(service_client)
+
+
+async def create_auth_user(service_client):
     email = f"test-{uuid.uuid4()}@example.com"
     password = "password123"
 
@@ -88,6 +106,7 @@ def _board_create(service_client, auth_headers):
             status_code=200,
             headers=None,
             raw_body=None,
+            json=None,
             omit_fields=(),
             **kwargs,
     ):
@@ -103,18 +122,342 @@ def _board_create(service_client, auth_headers):
                 content=raw_body,
             )
         else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "title": "test board",
+                    "description": "test description",
+                    "is_private": False,
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
             response = await service_client.post(
                 BOARD_CREATE_URL,
                 headers=request_headers,
-                json=build_json(
-                    default_body={
-                        "title": "Study board",
-                        "description": "Spring semester",
-                        "is_private": False,
-                    },
-                    omit_fields=omit_fields,
-                    overrides=kwargs,
-                ),
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest_asyncio.fixture
+async def created_board(auth_user, board_create):
+    response = await board_create(headers=auth_user["headers"])
+    board = response["data"]
+
+    return {
+        "owner": auth_user,
+        "board": board,
+        "board_id": board["id"],
+    }
+
+
+@pytest.fixture(name="board_edit")
+def _board_edit(service_client, auth_headers, created_board):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.patch(
+                BOARD_EDIT_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "board_id": created_board["board_id"],
+                    "title": "Updated study board",
+                    "description": "Updated spring semester",
+                    "is_private": True,
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.patch(
+                BOARD_EDIT_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest.fixture(name="board_delete")
+def _board_delete(service_client, auth_headers, created_board):
+    async def _inner(
+            status_code=204,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.request(
+                "DELETE",
+                BOARD_DELETE_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "board_id": created_board["board_id"],
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.request(
+                "DELETE",
+                BOARD_DELETE_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+async def get_board_statuses(service_client, headers, board_id):
+    response = await service_client.get(
+        STATUS_GET_ALL_URL,
+        headers=headers,
+        params={"board_id": board_id},
+    )
+
+    assert response.status_code == 200, response.text
+    statuses = response.json()["data"]
+    assert statuses
+
+    return statuses
+
+
+async def create_board_status(service_client, headers, board_id, name, position):
+    response = await service_client.post(
+        STATUS_CREATE_URL,
+        headers=headers,
+        json={
+            "board_id": board_id,
+            "name": name,
+            "position": position,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    return response.json()["data"]
+
+
+@pytest_asyncio.fixture
+async def created_status(service_client, created_board):
+    statuses = await get_board_statuses(
+        service_client,
+        created_board["owner"]["headers"],
+        created_board["board_id"],
+    )
+
+    return statuses[0]
+
+
+@pytest_asyncio.fixture
+async def another_created_status(service_client, created_board):
+    return await create_board_status(
+        service_client,
+        created_board["owner"]["headers"],
+        created_board["board_id"],
+        "Task review",
+        100,
+    )
+
+
+@pytest_asyncio.fixture
+async def other_created_board(other_auth_user, board_create):
+    response = await board_create(headers=other_auth_user["headers"])
+    board = response["data"]
+
+    return {
+        "owner": other_auth_user,
+        "board": board,
+        "board_id": board["id"],
+    }
+
+
+@pytest_asyncio.fixture
+async def other_created_status(service_client, other_created_board):
+    statuses = await get_board_statuses(
+        service_client,
+        other_created_board["owner"]["headers"],
+        other_created_board["board_id"],
+    )
+
+    return statuses[0]
+
+
+@pytest.fixture(name="task_create")
+def _task_create(service_client, auth_headers, created_board, created_status):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.post(
+                TASK_CREATE_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "board_id": created_board["board_id"],
+                    "title": "Write lecture notes",
+                    "description": "Prepare notes for the next seminar",
+                    "status_id": created_status["id"],
+                    "priority_color": "blue",
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.post(
+                TASK_CREATE_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest_asyncio.fixture
+async def created_task(task_create):
+    response = await task_create()
+    task = response["data"]
+
+    return {
+        "task": task,
+        "task_id": task["id"],
+    }
+
+
+@pytest.fixture(name="task_edit")
+def _task_edit(service_client, auth_headers, created_task, another_created_status):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.patch(
+                TASK_EDIT_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "task_id": created_task["task_id"],
+                    "title": "Updated lecture notes",
+                    "description": "Polish notes before publishing",
+                    "status_id": another_created_status["id"],
+                    "priority_color": "red",
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.patch(
+                TASK_EDIT_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest.fixture(name="task_delete")
+def _task_delete(service_client, auth_headers, created_task):
+    async def _inner(
+            status_code=204,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.request(
+                "DELETE",
+                TASK_DELETE_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "task_id": created_task["task_id"],
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.request(
+                "DELETE",
+                TASK_DELETE_URL,
+                headers=request_headers,
+                json=body,
             )
 
         assert response.status_code == status_code, response.text
