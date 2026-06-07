@@ -14,19 +14,19 @@ namespace status::v1 {
 namespace {
 
 json missing_fields(const json& body) {
-    json missing = json::array();
+    json details = json::object();
 
     if (!body.contains("status_id")) {
-        missing.push_back("status_id");
+        details["status_id"] = "Missing required field";
     }
     if (!body.contains("name")) {
-        missing.push_back("name");
+        details["name"] = "Missing required field";
     }
     if (!body.contains("position")) {
-        missing.push_back("position");
+        details["position"] = "Missing required field";
     }
 
-    return missing;
+    return details;
 }
 
 int positive_field(const json& body, const std::string& key) {
@@ -95,11 +95,10 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                    "Invalid JSON format");
     }
 
-    const json missing = missing_fields(body);
-    if (!missing.empty()) {
+    const json details = missing_fields(body);
+    if (!details.empty()) {
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
-                                                   "Missing required fields",
-                                                   json{{"missing_fields", missing}});
+                                                   "Missing required fields", details);
     }
 
     try {
@@ -152,9 +151,9 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
         if (message.rfind("missing:", 0) == 0) {
             const std::string field = message.substr(8);
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
-                json{{"missing_fields", json::array({field})}});
+            return server::utils::build_error_response(req, http::status::bad_request,
+                                                       "MISSING_FIELD", "Missing required fields",
+                                                       json{{field, "Missing required field"}});
         }
 
         if (message.rfind("type:", 0) == 0) {

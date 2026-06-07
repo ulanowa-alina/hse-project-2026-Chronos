@@ -15,6 +15,8 @@ BOARD_EDIT_URL = "/board/v1/edit"
 BOARD_DELETE_URL = "/board/v1/delete"
 
 STATUS_CREATE_URL = "/status/v1/create"
+STATUS_EDIT_URL = "/status/v1/edit"
+STATUS_DELETE_URL = "/status/v1/delete"
 STATUS_GET_ALL_URL = "/status/v1/get_all"
 
 TASK_CREATE_URL = "/task/v1/create"
@@ -245,57 +247,6 @@ def _board_delete(service_client, auth_headers, created_board):
     return _inner
 
 
-async def get_board_statuses(service_client, headers, board_id):
-    response = await service_client.get(
-        STATUS_GET_ALL_URL,
-        headers=headers,
-        params={"board_id": board_id},
-    )
-
-    assert response.status_code == 200, response.text
-    statuses = response.json()["data"]
-    assert statuses
-
-    return statuses
-
-
-async def create_board_status(service_client, headers, board_id, name, position):
-    response = await service_client.post(
-        STATUS_CREATE_URL,
-        headers=headers,
-        json={
-            "board_id": board_id,
-            "name": name,
-            "position": position,
-        },
-    )
-
-    assert response.status_code == 200, response.text
-    return response.json()["data"]
-
-
-@pytest_asyncio.fixture
-async def created_status(service_client, created_board):
-    statuses = await get_board_statuses(
-        service_client,
-        created_board["owner"]["headers"],
-        created_board["board_id"],
-    )
-
-    return statuses[0]
-
-
-@pytest_asyncio.fixture
-async def another_created_status(service_client, created_board):
-    return await create_board_status(
-        service_client,
-        created_board["owner"]["headers"],
-        created_board["board_id"],
-        "Task review",
-        100,
-    )
-
-
 @pytest_asyncio.fixture
 async def other_created_board(other_auth_user, board_create):
     response = await board_create(headers=other_auth_user["headers"])
@@ -310,13 +261,194 @@ async def other_created_board(other_auth_user, board_create):
 
 @pytest_asyncio.fixture
 async def other_created_status(service_client, other_created_board):
-    statuses = await get_board_statuses(
-        service_client,
-        other_created_board["owner"]["headers"],
-        other_created_board["board_id"],
+    response = await service_client.get(
+        STATUS_GET_ALL_URL,
+        headers=other_created_board["owner"]["headers"],
+        params={"board_id": other_created_board["board_id"]},
     )
 
+    assert response.status_code == 200, response.text
+    statuses = response.json()["data"]
+    assert statuses
+
     return statuses[0]
+
+
+@pytest.fixture(name="status_create")
+def _status_create(service_client, auth_headers, created_board):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.post(
+                STATUS_CREATE_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "board_id": created_board["board_id"],
+                    "name": "Review status",
+                    "position": 10,
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.post(
+                STATUS_CREATE_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest_asyncio.fixture
+async def created_status(status_create):
+    response = await status_create(name="Task status", position=20)
+    return response["data"]
+
+
+@pytest_asyncio.fixture
+async def another_created_status(status_create):
+    response = await status_create(name="Task review", position=100)
+    return response["data"]
+
+
+@pytest.fixture(name="status_edit")
+def _status_edit(service_client, auth_headers, created_status):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.patch(
+                STATUS_EDIT_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "status_id": created_status["id"],
+                    "name": "Updated status",
+                    "position": 30,
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.patch(
+                STATUS_EDIT_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest.fixture(name="status_delete")
+def _status_delete(service_client, auth_headers, created_status):
+    async def _inner(
+            status_code=204,
+            headers=None,
+            raw_body=None,
+            json=None,
+            omit_fields=(),
+            **kwargs,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if raw_body is not None:
+            response = await service_client.request(
+                "DELETE",
+                STATUS_DELETE_URL,
+                headers={
+                    **request_headers,
+                    "Content-Type": "application/json",
+                },
+                content=raw_body,
+            )
+        else:
+            body = json if json is not None else build_json(
+                default_body={
+                    "status_id": created_status["id"],
+                },
+                omit_fields=omit_fields,
+                overrides=kwargs,
+            )
+
+            response = await service_client.request(
+                "DELETE",
+                STATUS_DELETE_URL,
+                headers=request_headers,
+                json=body,
+            )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
+
+
+@pytest.fixture(name="status_get_all")
+def _status_get_all(service_client, auth_headers, created_board):
+    async def _inner(
+            status_code=200,
+            headers=None,
+            params=None,
+            board_id=None,
+            omit_board_id=False,
+    ):
+        request_headers = auth_headers if headers is None else headers
+
+        if params is None:
+            if omit_board_id:
+                request_params = {}
+            else:
+                request_params = {
+                    "board_id": created_board["board_id"] if board_id is None else board_id,
+                }
+        else:
+            request_params = params
+
+        response = await service_client.get(
+            STATUS_GET_ALL_URL,
+            headers=request_headers,
+            params=request_params,
+        )
+
+        assert response.status_code == status_code, response.text
+        return json_or_none(response)
+
+    return _inner
 
 
 @pytest.fixture(name="task_create")

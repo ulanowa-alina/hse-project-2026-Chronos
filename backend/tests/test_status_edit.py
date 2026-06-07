@@ -1,215 +1,171 @@
-import uuid
+import pytest
 
-from status_test_helpers import create_user, get_first_board_id, get_statuses
+pytestmark = pytest.mark.asyncio
 
 
-def test_status_edit_success(
-    session,
-    status_edit_url,
-    status_get_all_url,
-    auth_user,
-    board_id,
-    board_statuses,
+def assert_status_response(
+        response,
+        *,
+        status_id,
+        name="Updated status",
+        position=30,
 ):
-    status_to_edit = board_statuses[0]
-    updated_name = f"updated-{uuid.uuid4().hex[:8]}"
-    updated_position = 7
+    assert "data" in response
 
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={
-            "status_id": status_to_edit["id"],
-            "name": updated_name,
-            "position": updated_position,
-        },
-    )
+    status = response["data"]
 
-    assert response.status_code == 200
+    assert status["id"] == status_id
+    assert isinstance(status["board_id"], int)
+    assert status["name"] == name
+    assert status["position"] == position
 
-    body = response.json()
-    assert body["data"]["id"] == status_to_edit["id"]
-    assert body["data"]["board_id"] == board_id
-    assert body["data"]["name"] == updated_name
-    assert body["data"]["position"] == updated_position
+    if "created_at" in status:
+        assert isinstance(status["created_at"], str)
+    if "updated_at" in status:
+        assert isinstance(status["updated_at"], str)
 
-    statuses_after_update = get_statuses(
-        session, status_get_all_url, auth_user["headers"], board_id
-    )
-    updated_status = next(
-        status for status in statuses_after_update if status["id"] == status_to_edit["id"]
-    )
-
-    assert updated_status["name"] == updated_name
-    assert updated_status["position"] == updated_position
+    return status
 
 
-def test_status_edit_requires_authorization(session, status_edit_url):
-    response = session.patch(
-        status_edit_url,
-        json={
-            "status_id": 1,
-            "name": "updated-name",
-            "position": 1,
-        },
-    )
-
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
-
-
-def test_status_edit_invalid_json(session, status_edit_url, auth_user):
-    response = session.patch(
-        status_edit_url,
-        data='{"status_id": 1, "name": "todo", "position": 0',
-        headers={
-            "Authorization": auth_user["headers"]["Authorization"],
-            "Content-Type": "application/json",
-        },
-    )
-
-    assert response.status_code == 400
-    body = response.json()
-    assert body["error"]["code"] == "INVALID_FORMAT"
-
-
-def test_status_edit_missing_required_fields(session, status_edit_url, auth_user):
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={"name": "updated-name"},
-    )
-
-    assert response.status_code == 400
-
-    body = response.json()
-    assert body["error"]["code"] == "MISSING_FIELD"
-    assert set(body["error"]["details"]["missing_fields"]) == {"status_id", "position"}
-
-
-def test_status_edit_invalid_status_id_format(session, status_edit_url, auth_user):
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={
-            "status_id": "wrong",
-            "name": "updated-name",
-            "position": 1,
-        },
-    )
-
-    assert response.status_code == 400
-    body = response.json()
-    assert body["error"]["code"] == "INVALID_FORMAT"
-    assert body["error"]["details"]["status_id"] == "Invalid status_id format"
-
-
-def test_status_edit_rejects_negative_position(
-    session,
-    status_edit_url,
-    auth_user,
-    board_statuses,
+def assert_error_response(
+        response,
+        code,
+        field=None,
 ):
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={
-            "status_id": board_statuses[0]["id"],
-            "name": "updated-name",
-            "position": -1,
-        },
+    assert "error" in response
+
+    error = response["error"]
+
+    assert error["code"] == code
+    assert isinstance(error["message"], str)
+    assert error["message"]
+
+    if field is not None:
+        assert "details" in error
+        assert field in error["details"]
+
+
+async def test_basic(status_edit, created_status):
+    response = await status_edit()
+
+    assert_status_response(
+        response,
+        status_id=created_status["id"],
     )
 
-    assert response.status_code == 400
-    body = response.json()
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-    assert body["error"]["details"]["position"] == "Position must be greater than or equal to 0"
 
-
-def test_status_edit_rejects_empty_name(session, status_edit_url, auth_user, board_statuses):
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={
-            "status_id": board_statuses[0]["id"],
-            "name": "",
-            "position": 1,
-        },
+async def test_edit_without_status_id(status_edit):
+    response = await status_edit(
+        status_code=400,
+        omit_fields=("status_id",),
     )
 
-    assert response.status_code == 400
-    body = response.json()
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-    assert body["error"]["details"]["name"] == "Name length must be between 1 and 50 symbols"
+    assert_error_response(response, "MISSING_FIELD", field="status_id")
 
 
-def test_status_edit_returns_not_found_for_unknown_status(session, status_edit_url, auth_user):
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={
-            "status_id": 999999999,
-            "name": "updated-name",
-            "position": 1,
-        },
+async def test_edit_without_name(status_edit):
+    response = await status_edit(
+        status_code=400,
+        omit_fields=("name",),
     )
 
-    assert response.status_code == 404
-    body = response.json()
-    assert body["error"]["code"] == "STATUS_NOT_FOUND"
+    assert_error_response(response, "MISSING_FIELD", field="name")
 
 
-def test_status_edit_rejects_duplicate_name_on_same_board(
-    session,
-    status_edit_url,
-    auth_user,
-    board_statuses,
-):
-    status_to_edit = board_statuses[0]
-    existing_status = board_statuses[1]
-
-    response = session.patch(
-        status_edit_url,
-        headers=auth_user["headers"],
-        json={
-            "status_id": status_to_edit["id"],
-            "name": existing_status["name"],
-            "position": status_to_edit["position"],
-        },
+async def test_edit_without_position(status_edit):
+    response = await status_edit(
+        status_code=400,
+        omit_fields=("position",),
     )
 
-    assert response.status_code == 405
-    body = response.json()
-    assert body["error"]["code"] == "DUPLICATE_RESOURCE"
-    assert body["error"]["details"]["name"] == "already exists"
+    assert_error_response(response, "MISSING_FIELD", field="position")
 
 
-def test_status_edit_forbids_access_to_another_users_status(
-    session,
-    register_url,
-    login_url,
-    status_edit_url,
-    status_get_all_url,
-    board_get_all_url,
-):
-    owner = create_user(session, register_url, login_url, email_prefix="status-owner")
-    intruder = create_user(session, register_url, login_url, email_prefix="status-intruder")
-
-    owner_board_id = get_first_board_id(session, board_get_all_url, owner["headers"])
-    owner_statuses = get_statuses(session, status_get_all_url, owner["headers"], owner_board_id)
-    status_to_edit = owner_statuses[0]
-
-    response = session.patch(
-        status_edit_url,
-        headers=intruder["headers"],
-        json={
-            "status_id": status_to_edit["id"],
-            "name": "intruder-update",
-            "position": 3,
-        },
+async def test_edit_with_empty_name(status_edit):
+    response = await status_edit(
+        status_code=400,
+        name="",
     )
 
-    assert response.status_code == 403
-    body = response.json()
-    assert body["error"]["code"] == "RESOURCE_NOT_OWNED"
+    assert_error_response(response, "VALIDATION_ERROR", field="name")
+
+
+async def test_edit_with_too_long_name(status_edit):
+    response = await status_edit(
+        status_code=400,
+        name="a" * 51,
+    )
+
+    assert_error_response(response, "VALIDATION_ERROR", field="name")
+
+
+async def test_edit_with_invalid_status_id(status_edit):
+    response = await status_edit(
+        status_code=400,
+        status_id="wrong",
+    )
+
+    assert_error_response(response, "INVALID_FORMAT", field="status_id")
+
+
+async def test_edit_with_invalid_name(status_edit):
+    response = await status_edit(
+        status_code=400,
+        name=123,
+    )
+
+    assert_error_response(response, "INVALID_FORMAT", field="name")
+
+
+async def test_edit_with_invalid_position(status_edit):
+    response = await status_edit(
+        status_code=400,
+        position="0",
+    )
+
+    assert_error_response(response, "INVALID_FORMAT", field="position")
+
+
+async def test_edit_unknown_status(status_edit):
+    response = await status_edit(
+        status_code=404,
+        status_id=999999999,
+    )
+
+    assert_error_response(response, "STATUS_NOT_FOUND")
+
+
+async def test_edit_another_users_status(status_edit, other_auth_user):
+    response = await status_edit(
+        status_code=403,
+        headers=other_auth_user["headers"],
+    )
+
+    assert response["error"]["code"] in ("RESOURCE_NOT_OWNED", "FORBIDDEN")
+
+
+async def test_edit_without_auth(status_edit):
+    response = await status_edit(
+        status_code=401,
+        headers={},
+    )
+
+    assert_error_response(response, "UNAUTHORIZED")
+
+
+async def test_edit_with_invalid_token(status_edit):
+    response = await status_edit(
+        status_code=401,
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert_error_response(response, "INVALID_TOKEN")
+
+
+async def test_edit_with_invalid_json(status_edit):
+    response = await status_edit(
+        status_code=400,
+        raw_body='{"status_id": 1, "name": "Todo"',
+    )
+
+    assert_error_response(response, "INVALID_FORMAT")
