@@ -1,5 +1,7 @@
 #include "task_card.h"
 
+#include "../local_repositories/local_task_repository.hpp"
+
 #include <QApplication>
 #include <QDataStream>
 #include <QDebug>
@@ -11,25 +13,21 @@
 #include <QPixmap>
 #include <QVBoxLayout>
 
-TaskCard::TaskCard(int task_id, int board_id, int status_id, QWidget* parent)
+TaskCard::TaskCard(int task_id, int board_id, int status_id, QSqlDatabase db, QWidget* parent)
     : QFrame(parent)
     , task_id_(task_id)
     , board_id_(board_id)
-    , status_id_(status_id) {
+    , status_id_(status_id)
+    , db_(db) {
     setupLayout();
-    if (task_id_ == -1) {
+    if (task_id_ < 0) {
         title_->setPlaceholderText("Введите название...");
         title_->setFocus();
     }
 }
 
-void TaskCard::setNetworkManager(NetworkManager* manager) {
-    network_manager_ = manager;
-
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &TaskCard::onNetworkResponse);
-    }
+void TaskCard::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
 }
 
 void TaskCard::setData(const QString& title, const QString& description) {
@@ -37,109 +35,78 @@ void TaskCard::setData(const QString& title, const QString& description) {
     description_edit_->setPlainText(description);
 }
 
-void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->tasks_edit_url_ &&
-        endpoint != network_manager_->tasks_create_url_ &&
-        endpoint != network_manager_->tasks_delete_url_)
-        return;
-
-    if (endpoint == network_manager_->tasks_delete_url_) {
-        if (should_be_delete_ && (code == 200 || code == 204)) {
-            qDebug() << "TaskCard: Задача успешно удалена";
-            deleteLater();
-        } else if (should_be_delete_) {
-            qDebug() << "TaskCard: Ошибка удаления. Код:" << code;
-            should_be_delete_ = false;
-        }
-        return;
-    }
-
-    if (code == 200 || code == 201) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        QJsonObject taskData = doc.object()["data"].toObject();
-
-        if (task_id_ == -1) {
-            task_id_ = taskData["id"].toInt();
-            qDebug() << "TaskCard: Задача создана с ID:" << task_id_;
-        } else {
-            qDebug() << "TaskCard: Данные задачи обновлены";
-        }
-    } else {
-        qDebug() << "TaskCard: Ошибка. Код:" << code;
-    }
-}
-
-void TaskCard::mousePressEvent(QMouseEvent* event) {
-    title_->setFocus();
-    QFrame::mousePressEvent(event);
-
-    if (event->button() == Qt::LeftButton) {
-        drag_start_position_ = event->pos();
-    }
-}
-
-void TaskCard::mouseMoveEvent(QMouseEvent* event) {
-    if (!(event->buttons() & Qt::LeftButton))
-        return;
-
-    if (QLineF(event->pos(), drag_start_position_).length() > QApplication::startDragDistance()) {
-        QMimeData* mime = new QMimeData;
-
-        QByteArray data;
-        QDataStream stream(&data, QIODevice::WriteOnly);
-        stream << task_id_ << board_id_ << status_id_;
-        mime->setData("application/task", data);
-
-        QDrag* drag = new QDrag(this);
-        drag->setMimeData(mime);
-
-        QPixmap task_image = grab();
-        drag->setPixmap(task_image);
-        drag->setHotSpot(event->pos());
-        drag->exec(Qt::MoveAction);
-    }
-}
-
 void TaskCard::updateTaskStatus() {
-    if (task_id_ == -1 || !network_manager_)
+    if (task_id_ < 0 || !sync_coordinator_) {
         return;
+    }
 
-    QJsonObject json;
-    json["task_id"] = task_id_;
-    json["status_id"] = status_id_;
+    LocalTaskRepository repo(db_);
+    const auto existing = repo.findById(task_id_);
+    if (!existing) {
+        return;
+    }
 
-    network_manager_->PATCH(network_manager_->tasks_edit_url_, json);
+    LocalTask task = *existing;
+    task.status_id_ = status_id_;
+    task.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(task);
+    } catch (const std::exception& e) {
+        qDebug() << "TaskCard: failed to update task status:" << e.what();
+        return;
+    }
+    sync_coordinator_->syncTasks();
 }
 
 void TaskCard::onTaskSaveRequest() {
-    QString title = title_->text().trimmed();
+    const QString title = title_->text().trimmed();
 
-    if (task_id_ == -1 && title.isEmpty()) {
-        this->deleteLater();
+    if (task_id_ < 0 && title.isEmpty()) {
+        LocalTaskRepository repo(db_);
+        repo.deleteById(task_id_);
+        deleteLater();
         return;
     }
 
-    if (title.isEmpty())
+    if (title.isEmpty()) {
         return;
+    }
 
-    if (!network_manager_)
+    if (!sync_coordinator_) {
         return;
+    }
 
-    QJsonObject json;
-    if (task_id_ == -1) {
-        json["board_id"] = board_id_;
-        json["title"] = title;
-        json["description"] = description_edit_->toPlainText();
-        json["status_id"] = status_id_;
-        json["priority_color"] = "gray";
-        network_manager_->POST(network_manager_->tasks_create_url_, json);
+    LocalTaskRepository repo(db_);
+    if (task_id_ < 0) {
+        LocalTask task(task_id_, board_id_, title, status_id_, QStringLiteral("gray"),
+                       description_edit_->toPlainText());
+        task.sync_status_ = SyncStatus::PENDING;
+        task.server_version_ = 0;
+        try {
+            repo.save(task);
+        } catch (const std::exception& e) {
+            qDebug() << "TaskCard: failed to save task:" << e.what();
+            return;
+        }
     } else {
-        json["task_id"] = task_id_;
-        json["title"] = title;
-        json["description"] = description_edit_->toPlainText();
-        json["status_id"] = status_id_;
-        network_manager_->PATCH(network_manager_->tasks_edit_url_, json);
+        const auto existing = repo.findById(task_id_);
+        if (!existing) {
+            return;
+        }
+        LocalTask task = *existing;
+        task.title_ = title;
+        task.description_ = description_edit_->toPlainText();
+        task.status_id_ = status_id_;
+        task.sync_status_ = SyncStatus::PENDING;
+        try {
+            repo.save(task);
+        } catch (const std::exception& e) {
+            qDebug() << "TaskCard: failed to save task:" << e.what();
+            return;
+        }
     }
+
+    sync_coordinator_->syncTasks();
 }
 
 void TaskCard::onOpenSettings() {
@@ -178,16 +145,53 @@ void TaskCard::onDescriptionEditRequest() {
 }
 
 void TaskCard::onDeleteTaskRequest() {
-    if (task_id_ == -1 || !network_manager_) {
+    if (!sync_coordinator_) {
         deleteLater();
         return;
     }
 
-    should_be_delete_ = true;
+    if (task_id_ < 0) {
+        LocalTaskRepository repo(db_);
+        repo.deleteById(task_id_);
+        deleteLater();
+        return;
+    }
 
-    QJsonObject json;
-    json["task_id"] = task_id_;
-    network_manager_->DELETE(network_manager_->tasks_delete_url_, json);
+    LocalTaskRepository repo(db_);
+    repo.markDeletedById(task_id_);
+    sync_coordinator_->syncTasks();
+    deleteLater();
+}
+
+void TaskCard::mousePressEvent(QMouseEvent* event) {
+    title_->setFocus();
+    QFrame::mousePressEvent(event);
+
+    if (event->button() == Qt::LeftButton) {
+        drag_start_position_ = event->pos();
+    }
+}
+
+void TaskCard::mouseMoveEvent(QMouseEvent* event) {
+    if (!(event->buttons() & Qt::LeftButton))
+        return;
+
+    if (QLineF(event->pos(), drag_start_position_).length() > QApplication::startDragDistance()) {
+        QMimeData* mime = new QMimeData;
+
+        QByteArray data;
+        QDataStream stream(&data, QIODevice::WriteOnly);
+        stream << task_id_ << board_id_ << status_id_;
+        mime->setData("application/task", data);
+
+        QDrag* drag = new QDrag(this);
+        drag->setMimeData(mime);
+
+        QPixmap task_image = grab();
+        drag->setPixmap(task_image);
+        drag->setHotSpot(event->pos());
+        drag->exec(Qt::MoveAction);
+    }
 }
 
 void TaskCard::setupLayout() {

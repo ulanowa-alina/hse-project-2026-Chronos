@@ -1,7 +1,9 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "board_screen.h"
+#include "local_db.h"
 #include "login_screen.h"
 #include "network_manager.h"
 #include "profile_edit_screen.h"
@@ -9,6 +11,8 @@
 #include "registration_screen.h"
 
 #include <QMainWindow>
+#include <QSettings>
+#include <QSqlDatabase>
 #include <QStackedWidget>
 
 class MainWindow : public QMainWindow {
@@ -22,9 +26,20 @@ class MainWindow : public QMainWindow {
     void switchToRegistration();
     void switchToBoard(int board_id);
     void switchToProfileEdit();
+    void onInitialDataReady(int board_id);
+    void onDataChanged();
+
+  private slots:
+    void onAuthenticated(const QString& token);
 
   private:
+    void restoreSession();
+    void clearSession();
+
     NetworkManager* network_manager_;
+    SyncCoordinator* sync_coordinator_;
+    LocalDatabaseManager* local_db_{nullptr};
+    QSqlDatabase db_;
 
     QStackedWidget* stacked_widget_{nullptr};
     LoginScreen* login_screen_{nullptr};

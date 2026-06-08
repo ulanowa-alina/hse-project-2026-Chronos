@@ -1,9 +1,7 @@
 #include "registration_screen.h"
 
 #include <QDebug>
-#include <QJsonArray>
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+#include <QJsonDocument>
 
 RegistrationScreen::RegistrationScreen(QWidget* parent)
     : QWidget(parent) {
@@ -19,15 +17,20 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void RegistrationScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
 void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
                                            int code) {
     if (!isVisible()) {
         return;
     }
 
-    if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_ &&
-        endpoint != network_manager_->boards_get_all_url_)
+    if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_) {
         return;
+    }
+
     if (endpoint == network_manager_->register_url_) {
         if (code == 200) {
             qDebug() << "RegistrationScreen: Успешная регистрация. Входим в аккаунт...";
@@ -44,32 +47,18 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonObject data_obj = doc.object()["data"].toObject();
 
-            QString token = data_obj["token"].toString();
+            const QString token = data_obj["token"].toString();
             network_manager_->setToken(token);
 
-            qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен, перехожу на доску";
-            network_manager_->GET(network_manager_->boards_get_all_url_);
+            if (sync_coordinator_) {
+                sync_coordinator_->beginUserSession(data_obj["user"].toObject());
+            }
+
+            emit authenticated(token);
+
+            qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен";
         } else {
             qDebug() << "RegistrationScreen: Ошибка входа после регистрации:" << code;
-        }
-    } else if (endpoint == network_manager_->boards_get_all_url_) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            const QJsonArray boards = doc.object()["data"].toArray();
-            if (boards.isEmpty()) {
-                qDebug() << "RegistrationScreen: Для пользователя не найдено ни одной доски";
-                return;
-            }
-
-            const int board_id = boards.first().toObject()["id"].toInt(-1);
-            if (board_id <= 0) {
-                qDebug() << "RegistrationScreen: Некорректный board_id в ответе /board/v1/get_all";
-                return;
-            }
-
-            emit registrationRequested(board_id);
-        } else {
-            qDebug() << "RegistrationScreen: Ошибка получения доски:" << code;
         }
     }
 }
@@ -198,5 +187,3 @@ void RegistrationScreen::setupLayout() {
             &RegistrationScreen::onRegisterRequest);
     connect(login_button_, &QPushButton::clicked, this, &RegistrationScreen::loginRequested);
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
