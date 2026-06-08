@@ -12,6 +12,7 @@ find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
+pkg_check_modules(ARGON2 REQUIRED IMPORTED_TARGET libargon2)
 
 
 
@@ -35,6 +36,7 @@ target_include_directories(chronos_backend PRIVATE
         ${Boost_INCLUDE_DIRS}
         ${PostgreSQL_INCLUDE_DIRS}
         ${PQXX_INCLUDE_DIRS}
+        ${ARGON2_INCLUDE_DIRS}
 )
 
 target_compile_definitions(chronos_backend PRIVATE
@@ -47,7 +49,8 @@ target_link_libraries(chronos_backend PRIVATE
         Boost::url
         Threads::Threads
         PkgConfig::PQXX
+        PkgConfig::ARGON2
         ${PostgreSQL_LIBRARIES}
         OpenSSL::Crypto
 )
-target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
+target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER} ${ARGON2_CFLAGS_OTHER})

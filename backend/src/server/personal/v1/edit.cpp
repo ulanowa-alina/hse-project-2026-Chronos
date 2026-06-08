@@ -2,6 +2,7 @@
 
 #include "models/user.hpp"
 #include "repositories/user_repository.hpp"
+#include "security/password_hashing.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
@@ -167,7 +168,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                json{{"password", "Minimum length is 8 symbols"}});
     }
 
-    const std::string password_hash = has_password ? ("hash:" + password) : "";
+    const std::string password_hash = has_password ? security::hash_password(password) : "";
 
     try {
         UserRepository repo(pool);
