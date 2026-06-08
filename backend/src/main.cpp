@@ -1,5 +1,6 @@
 #include "db/connection_pool.hpp"
 #include "db/db_config.hpp"
+#include "server/auth/jwt.hpp"
 #include "server/server.hpp"
 
 #include <boost/asio.hpp>
@@ -26,6 +27,8 @@ int main(int argc, char* argv[]) {
 
     logger->set_level(spdlog::level::info);
     spdlog::flush_on(spdlog::level::info);
+
+    auth::validate_jwt_config();
 
     auto db = load_db_config_from_env();
     ConnectionPool pool(db.connection_info(), db.pool_size);
