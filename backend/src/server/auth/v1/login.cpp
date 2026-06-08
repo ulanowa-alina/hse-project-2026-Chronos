@@ -1,6 +1,7 @@
 #include "login.hpp"
 
 #include "repositories/user_repository.hpp"
+#include "security/password_hashing.hpp"
 #include "server/auth/jwt.hpp"
 
 #include <ctime>
@@ -124,12 +125,8 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     return true;
 }
 
-auto build_password_hash(const std::string& password) -> std::string {
-    return "hash:" + password;
-}
-
 auto is_password_valid(const User& user, const std::string& password) -> bool {
-    return user.password_hash_ == build_password_hash(password);
+    return security::verify_password(password, user.password_hash_);
 }
 
 auto to_iso8601(std::time_t t) -> std::string {

@@ -4,6 +4,7 @@
 #include "models/user.hpp"
 #include "repositories/board_repository.hpp"
 #include "repositories/user_repository.hpp"
+#include "security/password_hashing.hpp"
 
 #include <ctime>
 #include <iomanip>
@@ -92,7 +93,7 @@ User parse_new_user(const json& body) {
         throw std::length_error("password_too_short");
     }
 
-    const std::string password_hash = "hash:" + password; // временно, до реального хеша
+    const std::string password_hash = security::hash_password(password);
     return User(0, email, name, status, password_hash, std::time(nullptr));
 }
 
