@@ -139,7 +139,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
 
         if (existing_status.has_value()) {
             return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
+                req, http::status::conflict, "DUPLICATE_RESOURCE",
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
 
@@ -183,7 +183,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         if (msg.find("statuses_board_id_name_key") != std::string::npos ||
             msg.find("duplicate key") != std::string::npos) {
             return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
+                req, http::status::conflict, "DUPLICATE_RESOURCE",
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
 

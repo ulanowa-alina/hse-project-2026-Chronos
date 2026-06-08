@@ -11,24 +11,23 @@ Board BoardRepository::insert(const Board& board) {
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
-    pqxx::result r =
-        txn.exec_params("INSERT INTO boards (user_id, title, description, is_private) "
-                        "VALUES ($1, $2, $3, $4) "
-                        "RETURNING id, "
-                        "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
-                        "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec",
-                        board.user_id_, board.title_, board.description_, board.is_private_);
+    pqxx::result r = txn.exec_params("INSERT INTO boards (user_id, title, description) "
+                                     "VALUES ($1, $2, $3) "
+                                     "RETURNING id, "
+                                     "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
+                                     "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec",
+                                     board.user_id_, board.title_, board.description_);
 
     const int board_id = r[0][0].as<int>();
     txn.exec_params("INSERT INTO statuses (board_id, name, position) VALUES "
-                    "($1, 'todo', 0), "
-                    "($1, 'in_progress', 1), "
-                    "($1, 'done', 2)",
+                    "($1, 'To do', 0), "
+                    "($1, 'In progress', 1), "
+                    "($1, 'Done', 2)",
                     board_id);
 
     txn.commit();
 
-    return Board(board_id, board.user_id_, board.title_, board.description_, board.is_private_,
+    return Board(board_id, board.user_id_, board.title_, board.description_,
                  static_cast<std::time_t>(r[0]["created_sec"].as<long>()),
                  static_cast<std::time_t>(r[0]["updated_sec"].as<long>()));
 }
@@ -38,16 +37,15 @@ Board BoardRepository::update(const Board& board) {
     pqxx::work txn(handle.conn());
 
     pqxx::result r = txn.exec_params("UPDATE boards SET user_id = $1, title = $2, description = "
-                                     "$3, is_private = $4, updated_at = NOW() "
-                                     "WHERE id = $5 "
+                                     "$3, updated_at = NOW() "
+                                     "WHERE id = $4 "
                                      "RETURNING EXTRACT(EPOCH FROM updated_at)::bigint",
-                                     board.user_id_, board.title_, board.description_,
-                                     board.is_private_, board.id_);
+                                     board.user_id_, board.title_, board.description_, board.id_);
 
     txn.commit();
 
-    return Board(board.id_, board.user_id_, board.title_, board.description_, board.is_private_,
-                 board.created_at_, static_cast<std::time_t>(r[0][0].as<long>()));
+    return Board(board.id_, board.user_id_, board.title_, board.description_, board.created_at_,
+                 static_cast<std::time_t>(r[0][0].as<long>()));
 }
 
 Board BoardRepository::save(const Board& board) {
@@ -67,7 +65,7 @@ std::optional<Board> BoardRepository::find_by_id(int board_id) {
         auto handle = pool_.acquire();
         pqxx::work txn(handle.conn());
 
-        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, is_private, "
+        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, "
                                          "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
                                          "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
                                          "FROM boards WHERE id = $1",
@@ -81,7 +79,7 @@ std::optional<Board> BoardRepository::find_by_id(int board_id) {
         txn.commit();
         return Board(row["id"].as<int>(), row["user_id"].as<int>(), row["title"].as<std::string>(),
                      row["description"].is_null() ? "" : row["description"].as<std::string>(),
-                     row["is_private"].as<bool>(), row["created_sec"].as<long>(),
+                     row["created_sec"].as<long>(),
                      row["updated_sec"].is_null() ? row["created_sec"].as<long>()
                                                   : row["updated_sec"].as<long>());
 
@@ -95,7 +93,7 @@ std::optional<Board> BoardRepository::find_by_user_id(int user_id) {
         auto handle = pool_.acquire();
         pqxx::work txn(handle.conn());
 
-        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, is_private, "
+        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, "
                                          "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
                                          "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
                                          "FROM boards WHERE user_id = $1 ORDER BY id ASC LIMIT 1",
@@ -109,7 +107,7 @@ std::optional<Board> BoardRepository::find_by_user_id(int user_id) {
         txn.commit();
         return Board(row["id"].as<int>(), row["user_id"].as<int>(), row["title"].as<std::string>(),
                      row["description"].is_null() ? "" : row["description"].as<std::string>(),
-                     row["is_private"].as<bool>(), row["created_sec"].as<long>(),
+                     row["created_sec"].as<long>(),
                      row["updated_sec"].is_null() ? row["created_sec"].as<long>()
                                                   : row["updated_sec"].as<long>());
 
@@ -123,7 +121,7 @@ std::vector<Board> BoardRepository::find_all_by_user_id(int user_id) {
         auto handle = pool_.acquire();
         pqxx::work txn(handle.conn());
 
-        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, is_private, "
+        pqxx::result r = txn.exec_params("SELECT id, user_id, title, description, "
                                          "EXTRACT(EPOCH FROM created_at)::bigint AS created_sec, "
                                          "EXTRACT(EPOCH FROM updated_at)::bigint AS updated_sec "
                                          "FROM boards WHERE user_id = $1 ORDER BY id ASC",
@@ -135,7 +133,7 @@ std::vector<Board> BoardRepository::find_all_by_user_id(int user_id) {
             boards.emplace_back(
                 row["id"].as<int>(), row["user_id"].as<int>(), row["title"].as<std::string>(),
                 row["description"].is_null() ? "" : row["description"].as<std::string>(),
-                row["is_private"].as<bool>(), row["created_sec"].as<long>(),
+                row["created_sec"].as<long>(),
                 row["updated_sec"].is_null() ? row["created_sec"].as<long>()
                                              : row["updated_sec"].as<long>());
         }

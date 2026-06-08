@@ -1,11 +1,11 @@
 #ifndef POMODORO_SCREEN_H
 #define POMODORO_SCREEN_H
 
+#include "circular_progress.h"
 #include "network_manager.h"
 
 #include <QDialog>
 #include <QLabel>
-#include <QProgressBar>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -28,6 +28,7 @@ class PomodoroScreen : public QWidget {
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onStartFocusClicked();
     void onGoalConfirmed();
+    void onSkipGoalClicked();
     void onStopClicked();
     void onTimerTick();
 
@@ -50,8 +51,7 @@ class PomodoroScreen : public QWidget {
 
     QWidget* timer_widget_{nullptr};
     QLabel* state_label_{nullptr};
-    QLabel* timer_label_{nullptr};
-    QProgressBar* progress_bar_{nullptr};
+    CircularProgress* circular_progress_{nullptr};
     QPushButton* stop_button_{nullptr};
 
     QTimer* timer_{nullptr};

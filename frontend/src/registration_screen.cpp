@@ -19,6 +19,21 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void RegistrationScreen::clearInputs() {
+    if (email_input_) {
+        email_input_->clear();
+    }
+    if (password_input_) {
+        password_input_->clear();
+    }
+    if (name_input_) {
+        name_input_->clear();
+    }
+    if (status_input_) {
+        status_input_->clear();
+    }
+}
+
 void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
                                            int code) {
     if (!isVisible()) {

@@ -17,6 +17,7 @@ void BoardCard::setBoardData(const QString& title, const QString& description, i
     if (description.trimmed().isEmpty()) {
         description_label_->setText("Описания нет. Нажмите, чтобы открыть доску.");
         description_label_->setStyleSheet(
+            "background: transparent; "
             "color: #94A3B8; font-style: italic; font-size: 13px; line-height: 18px;");
     } else {
         QFontMetrics metrics(description_label_->font());
@@ -24,7 +25,8 @@ void BoardCard::setBoardData(const QString& title, const QString& description, i
             metrics.elidedText(description, Qt::ElideRight, description_label_->width() * 2);
         description_label_->setText(elided_text);
         description_label_->setStyleSheet(
-            "color: #475569; font-style: normal; font-size: 13px; line-height: 18px;");
+            "background: transparent; "
+            "color: #94A3B8; font-style: italic; font-size: 13px; line-height: 18px;");
     }
 
     int total_tasks = active_tasks + completed_tasks;
@@ -60,12 +62,15 @@ void BoardCard::setupLayout() {
     this->setFixedSize(280, 180);
 
     this->setStyleSheet("#boardCard { "
-                        "   background: white; "
+                        "   background: #F4F7FE; "
                         "   border: 1px solid #E2E8F0; "
                         "   border-radius: 16px; "
                         "}"
                         "#boardCard:hover { "
                         "   border: 1px solid #305CDE; "
+                        "}"
+                        "#boardCard QLabel { "
+                        "   background: transparent; "
                         "}");
 
     auto* main_layout = new QVBoxLayout(this);
@@ -73,7 +78,7 @@ void BoardCard::setupLayout() {
     main_layout->setSpacing(0);
 
     title_label_ = new QLabel(this);
-    title_label_->setStyleSheet("font-weight: bold; font-size: 18px; color: #172B4D;");
+    title_label_->setStyleSheet("font-weight: bold; font-size: 20px; color: #172B4D;");
     main_layout->addWidget(title_label_);
 
     main_layout->addSpacing(10);
@@ -110,14 +115,15 @@ void BoardCard::setupLayout() {
 
     main_layout->addSpacing(12);
 
-    auto* footer_layout = new QHBoxLayout();
+    auto* footer_layout = new QVBoxLayout();
+    footer_layout->setSpacing(4);
 
     active_tasks_label_ = new QLabel(this);
     active_tasks_label_->setStyleSheet("color: #64748B; font-size: 12px; font-weight: 500;");
 
     deadline_label_ = new QLabel(this);
     deadline_label_->setStyleSheet("color: #64748B; font-size: 12px; font-weight: 500;");
-    deadline_label_->setAlignment(Qt::AlignRight);
+    deadline_label_->setAlignment(Qt::AlignLeft);
 
     footer_layout->addWidget(active_tasks_label_);
     footer_layout->addWidget(deadline_label_);

@@ -35,6 +35,7 @@ json model_to_json(const Task& task) {
         {"description", task.description_},
         {"status_id", task.status_id_},
         {"priority_color", task.priority_color_},
+        {"is_completed", task.is_completed_},
         {"created_at", time_to_string_iso8601(task.created_at_)},
         {"updated_at", time_to_string_iso8601(task.updated_at_)},
     };

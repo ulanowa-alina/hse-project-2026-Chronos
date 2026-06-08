@@ -16,8 +16,8 @@ const int SECONDS_IN_MIN = 60;
 const int SECONDS_IN_HOUR = SECONDS_IN_MIN * 60;
 const int SECONDS_IN_DAY = 24 * SECONDS_IN_HOUR;
 
-const int SMALL_TIMER_INTERVAL = 1'000; // это милисекунды
-const int BIG_TIMER_INTERVAL = 60'000;  // это милисекунды
+const int SMALL_TIMER_INTERVAL = 1'000;
+const int BIG_TIMER_INTERVAL = 60'000;
 
 const int COMPLETE_BTN_SIZE = 22;
 const int COMPLETE_BTN_RADIUS = COMPLETE_BTN_SIZE / 2;
@@ -44,8 +44,11 @@ TaskCard::TaskCard(int task_id, int board_id, int status_id, QWidget* parent)
 }
 
 void TaskCard::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &TaskCard::onNetworkResponse);
+    }
     network_manager_ = manager;
-
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &TaskCard::onNetworkResponse);
@@ -87,7 +90,7 @@ void TaskCard::onUpdateTimer() {
     QString date_part = deadline_.toString("dd.MM в hh:mm");
 
     if (current >= deadline_) {
-        deadline_label_->setText(QString("⚠️ %1 (Просрочено!)").arg(date_part));
+        deadline_label_->setText(QString("%1 (Просрочено!)").arg(date_part));
         deadline_label_->setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 12px;");
         timer_->stop();
         return;
@@ -216,6 +219,7 @@ void TaskCard::onOpenSettings() {
 
     if (selected == edit_action) {
         qDebug() << "Вызов глобального окна редактирования для task_id:" << task_id_;
+        emit openTaskEditScreen(task_id_, board_id_, status_id_);
     } else if (selected == rename_action) {
         title_->setFocus();
         title_->selectAll();
@@ -256,7 +260,7 @@ void TaskCard::doneVisualState() {
     if (is_completed_) {
         title_->setReadOnly(true);
         title_->setStyleSheet("font-weight: bold; font-size: 18px; color: #a0a0a0; border: none; "
-                              "background: transparent; text-decoration: line-through;");
+                              "background: transparent;");
         description_label_->setStyleSheet(
             "color: #d0d0d0; font-size: 12px; background: transparent;");
         blue_line_->setStyleSheet("background-color: #d0d0d0; border-radius: 1.5px;");
@@ -309,6 +313,8 @@ void TaskCard::setupLayout() {
     this->setMinimumHeight(100);
     this->setMaximumHeight(130);
 
+    this->setMaximumWidth(260);
+
     this->setStyleSheet(
         "#taskCard { background: white; border: 1px solid #e0e0e0; border-radius: 12px; }"
         "#taskCard:hover { border: 1px solid #3498db; }");
@@ -352,13 +358,27 @@ void TaskCard::setupLayout() {
     blue_line_->setStyleSheet("background-color: #305CDE; border-radius: 1.5px;");
     blue_line_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 
-    description_label_ = new QLabel(description_text_);
+    auto* desc_content_widget = new QWidget(description_text_);
+    auto* desc_content_layout = new QVBoxLayout(desc_content_widget);
+    desc_content_layout->setContentsMargins(0, 0, 0, 0);
+    desc_content_layout->setSpacing(2);
+
+    auto* description_title_label_ = new QLabel("Описание:", desc_content_widget);
+    description_title_label_->setStyleSheet(
+        "color: #7f8c8d; font-size: 12px; font-weight: 500; background: transparent;");
+    description_title_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    description_label_ = new QLabel(desc_content_widget);
     description_label_->setWordWrap(true);
     description_label_->setStyleSheet("color: #7f8c8d; font-size: 12px; background: transparent;");
     description_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
+    desc_content_layout->addWidget(description_title_label_);
+    desc_content_layout->addWidget(description_label_);
+    desc_content_widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
     desc_layout->addWidget(blue_line_);
-    desc_layout->addWidget(description_label_);
+    desc_layout->addWidget(desc_content_widget);
     layout->addWidget(description_text_);
 
     auto* footer_layout = new QHBoxLayout();

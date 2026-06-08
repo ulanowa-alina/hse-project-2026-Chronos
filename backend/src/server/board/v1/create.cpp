@@ -63,9 +63,6 @@ json collect_missing_fields(const json& body) {
     if (!body.contains("title")) {
         missing.push_back("title");
     }
-    if (!body.contains("is_private")) {
-        missing.push_back("is_private");
-    }
 
     return missing;
 }
@@ -75,7 +72,6 @@ json model_to_json(const Board& board) {
                 {"user_id", board.user_id_},
                 {"title", board.title_},
                 {"description", board.description_},
-                {"is_private", board.is_private_},
                 {"created_at", time_to_string_iso8601(board.created_at_)},
                 {"updated_at", time_to_string_iso8601(board.updated_at_)}};
 }
@@ -112,7 +108,6 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
     try {
         const std::string title = require_string_field(body, "title");
         const std::string description = optional_string_field(body, "description");
-        const bool is_private = require_bool_field(body, "is_private");
 
         if (title.empty() || title.size() > 100) {
             return server::utils::build_error_response(
@@ -127,7 +122,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         }
 
         BoardRepository board_repository(pool);
-        const Board new_board(0, user_id, title, description, is_private, 0, 0);
+        const Board new_board(0, user_id, title, description, 0, 0);
         const Board created_board = board_repository.save(new_board);
 
         return server::utils::build_json_response(req, http::status::ok,

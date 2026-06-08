@@ -15,6 +15,7 @@ class Task {
     std::optional<std::time_t> deadline_;
     int status_id_;
     std::string priority_color_;
+    bool is_completed_;
 
     std::time_t created_at_;
     std::time_t updated_at_;
@@ -22,7 +23,7 @@ class Task {
     Task() = default;
     Task(int id, int board_id, std::string title, std::string description,
          std::optional<std::time_t> deadline, int status_id, std::string priority_color,
-         std::time_t created_at, std::time_t updated_at)
+         bool is_completed, std::time_t created_at, std::time_t updated_at)
         : id_(id)
         , board_id_(board_id)
         , title_(std::move(title))
@@ -30,6 +31,7 @@ class Task {
         , deadline_(deadline)
         , status_id_(status_id)
         , priority_color_(std::move(priority_color))
+        , is_completed_(is_completed)
         , created_at_(created_at)
         , updated_at_(updated_at) {
 

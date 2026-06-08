@@ -30,17 +30,22 @@ class NetworkManager : public QObject {
     const QString user_info_url_ = "/personal/v1/info";
     const QString tasks_edit_url_ = "/task/v1/edit";
     const QString tasks_create_url_ = "/task/v1/create";
+    const QString tasks_get_all_url_ = "/task/v1/get_all";
     const QString statuses_edit_url_ = "/status/v1/edit";
     const QString statuses_create_url_ = "/status/v1/create";
+    const QString statuses_get_all_url_ = "/status/v1/get_all";
     const QString login_url_ = "/auth/v1/login";
     const QString board_get_url_ = "/board/v1/get";
     const QString boards_get_all_url_ = "/board/v1/get_all";
+    const QString boards_create_url_ = "/board/v1/create";
+    const QString boards_edit_url_ = "/board/v1/edit";
     const QString board_tasks_url_ = "/board/v1/tasks";
     const QString tasks_delete_url_ = "/task/v1/delete";
     const QString statuses_delete_url_ = "/status/v1/delete";
     const QString statieses_edit_url_ = "/status/v1/edit";
     const QString user_edit_info_url_ = "/personal/v1/edit";
     const QString pomodoro_create_url_ = "/pomodoro/v1/create";
+    const QString pomodoro_get_user_sessions_url_ = "/pomodoro/v1/get_user_sessions";
 
     void GET(const QString& endpoint);
     void POST(const QString& endpoint, const QJsonObject& data);

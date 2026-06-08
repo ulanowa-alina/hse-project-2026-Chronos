@@ -18,6 +18,7 @@ class RegistrationScreen : public QWidget {
     explicit RegistrationScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void clearInputs();
 
   signals:
     void loginRequested();

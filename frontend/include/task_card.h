@@ -35,6 +35,9 @@ class TaskCard : public QFrame {
                  const QDateTime& deadline = QDateTime(), bool is_completed = false);
     void updateTaskStatus();
 
+  signals:
+    void openTaskEditScreen(int task_id, int board_id, int status_id);
+
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onOpenSettings();

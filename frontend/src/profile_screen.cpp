@@ -127,7 +127,7 @@ void ProfileScreen::setupLayout() {
                                 "}");
     main_layout->addWidget(edit_button_);
 
-    connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::boardRequested);
+    connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::openDashboardScreen);
     connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
     connect(edit_button_, &QPushButton::clicked, this, &ProfileScreen::profileEditRequested);
 }

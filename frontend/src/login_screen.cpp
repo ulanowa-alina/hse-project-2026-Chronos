@@ -19,6 +19,15 @@ void LoginScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void LoginScreen::clearInputs() {
+    if (email_input_) {
+        email_input_->clear();
+    }
+    if (password_input_) {
+        password_input_->clear();
+    }
+}
+
 void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
     if (!isVisible()) {
         return;
@@ -130,7 +139,7 @@ void LoginScreen::setupLayout() {
 
     email_input_ = new QLineEdit(email_container);
 
-    email_input_->setPlaceholderText("Enter email");
+    email_input_->setPlaceholderText("Введите email");
     email_input_->setStyleSheet("border: none; font-size: 16px; background: transparent;");
 
     email_lay->addWidget(email_hint);
@@ -146,12 +155,12 @@ void LoginScreen::setupLayout() {
     pass_lay->setContentsMargins(15, 8, 15, 8);
     pass_lay->setSpacing(2);
 
-    auto* pass_hint = new QLabel("Password", pass_container);
+    auto* pass_hint = new QLabel("Пароль", pass_container);
     pass_hint->setStyleSheet("color: #8E8E8E; font-size: 12px; border: none;");
 
     password_input_ = new QLineEdit(pass_container);
     password_input_->setEchoMode(QLineEdit::Password);
-    password_input_->setPlaceholderText("Enter password");
+    password_input_->setPlaceholderText("Введите пароль");
     password_input_->setStyleSheet("border: none; font-size: 16px; background: transparent;");
 
     pass_lay->addWidget(pass_hint);

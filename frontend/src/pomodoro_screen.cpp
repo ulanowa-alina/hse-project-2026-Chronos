@@ -41,7 +41,7 @@ void PomodoroScreen::setupWelcomeScreen() {
                                 "<p style='color: #5e6c84; font-size: 14px;'>"
                                 "Техника Pomodoro помогает сохранять фокус и продуктивность. "
                                 "Работайте 30 минут, затем отдыхайте 5 минут. "
-                                "Повторяйте циклы для достижения максимальной эффективности."
+                                "Повторяйте циклы для достижения максимальной эффективности"
                                 "</p>");
     welcome_label_->setWordWrap(true);
     welcome_label_->setAlignment(Qt::AlignCenter);
@@ -72,7 +72,7 @@ void PomodoroScreen::setupGoalSelectionScreen() {
     goal_label_ = new QLabel(
         "<h2 style='color: #172b4d;'>Установите цель</h2>"
         "<p style='color: #5e6c84; font-size: 14px;'>"
-        "Укажите, сколько минут вы хотите работать, или пропустите этот шаг для свободного режима."
+        "Укажите, сколько минут вы хотите работать, или пропустите этот шаг для свободного режима"
         "</p>");
     goal_label_->setWordWrap(true);
     goal_label_->setAlignment(Qt::AlignCenter);
@@ -109,12 +109,7 @@ void PomodoroScreen::setupGoalSelectionScreen() {
         "QPushButton { background: #ebedf0; color: #172b4d; border: none; padding: 12px 25px; "
         "border-radius: 6px; font-size: 14px; font-weight: bold; }"
         "QPushButton:hover { background: #dadce2; }");
-    connect(skip_goal_button_, &QPushButton::clicked, [this]() {
-        has_goal_ = false;
-        goal_minutes_ = 0;
-        switchState(ScreenState::Timer);
-        startTimer();
-    });
+    connect(skip_goal_button_, &QPushButton::clicked, this, &PomodoroScreen::onSkipGoalClicked);
 
     button_layout->addWidget(confirm_goal_button_);
     button_layout->addWidget(skip_goal_button_);
@@ -132,26 +127,15 @@ void PomodoroScreen::setupGoalSelectionScreen() {
 void PomodoroScreen::setupTimerScreen() {
     timer_widget_ = new QWidget();
     auto* layout = new QVBoxLayout(timer_widget_);
-    layout->setContentsMargins(50, 80, 50, 80);
-    layout->setSpacing(40);
+    layout->setContentsMargins(50, 50, 50, 50);
+    layout->setSpacing(30);
 
     state_label_ = new QLabel("РАБОТА");
     state_label_->setStyleSheet("font-size: 24px; font-weight: bold; color: #305CDE;");
     state_label_->setAlignment(Qt::AlignCenter);
 
-    timer_label_ = new QLabel("30:00");
-    timer_label_->setStyleSheet("font-size: 72px; font-weight: bold; color: #172b4d;");
-    timer_label_->setAlignment(Qt::AlignCenter);
-
-    progress_bar_ = new QProgressBar();
-    progress_bar_->setRange(0, 100);
-    progress_bar_->setValue(100);
-    progress_bar_->setTextVisible(false);
-    progress_bar_->setStyleSheet(
-        "QProgressBar { border: 2px solid #dfe1e6; border-radius: 10px; background: #f4f5f7; "
-        "height: 20px; }"
-        "QProgressBar::chunk { background: #305CDE; border-radius: 8px; }");
-    progress_bar_->setFixedHeight(20);
+    circular_progress_ = new CircularProgress();
+    circular_progress_->setValue(100);
 
     stop_button_ = new QPushButton("Завершить фокусировку");
     stop_button_->setCursor(Qt::PointingHandCursor);
@@ -163,8 +147,7 @@ void PomodoroScreen::setupTimerScreen() {
 
     layout->addStretch();
     layout->addWidget(state_label_, 0, Qt::AlignCenter);
-    layout->addWidget(timer_label_, 0, Qt::AlignCenter);
-    layout->addWidget(progress_bar_);
+    layout->addWidget(circular_progress_, 0, Qt::AlignCenter);
     layout->addWidget(stop_button_, 0, Qt::AlignCenter);
     layout->addStretch();
 
@@ -198,6 +181,13 @@ void PomodoroScreen::onGoalConfirmed() {
     startTimer();
 }
 
+void PomodoroScreen::onSkipGoalClicked() {
+    has_goal_ = false;
+    goal_minutes_ = 0;
+    switchState(ScreenState::Timer);
+    startTimer();
+}
+
 void PomodoroScreen::startTimer() {
     is_work_phase_ = true;
     remaining_seconds_ = total_work_seconds_;
@@ -206,8 +196,9 @@ void PomodoroScreen::startTimer() {
 
     state_label_->setText("РАБОТА");
     state_label_->setStyleSheet("font-size: 24px; font-weight: bold; color: #305CDE;");
-    timer_label_->setText(formatTime(remaining_seconds_));
-    progress_bar_->setValue(100);
+    circular_progress_->setTimerText(formatTime(remaining_seconds_));
+    circular_progress_->setValue(100);
+    circular_progress_->setColor(QColor("#305CDE"));
 
     timer_->start(1000);
 }
@@ -223,18 +214,22 @@ void PomodoroScreen::stopTimer() {
 }
 
 void PomodoroScreen::onTimerTick() {
+    if (remaining_seconds_ <= 0) {
+        return;
+    }
+
     remaining_seconds_--;
 
     if (is_work_phase_) {
         total_work_time_seconds_++;
     }
 
-    timer_label_->setText(formatTime(remaining_seconds_));
+    circular_progress_->setTimerText(formatTime(remaining_seconds_));
 
     int total_seconds = is_work_phase_ ? total_work_seconds_ : total_break_seconds_;
     int progress =
         static_cast<int>((static_cast<double>(remaining_seconds_) / total_seconds) * 100);
-    progress_bar_->setValue(progress);
+    circular_progress_->setValue(progress);
 
     if (remaining_seconds_ <= 0) {
         if (is_work_phase_) {
@@ -244,24 +239,18 @@ void PomodoroScreen::onTimerTick() {
 
             state_label_->setText("ОТДЫХ");
             state_label_->setStyleSheet("font-size: 24px; font-weight: bold; color: #00875a;");
-            progress_bar_->setStyleSheet(
-                "QProgressBar { border: 2px solid #dfe1e6; border-radius: 10px; background: "
-                "#f4f5f7; height: 20px; }"
-                "QProgressBar::chunk { background: #00875a; border-radius: 8px; }");
+            circular_progress_->setColor(QColor("#00875a"));
         } else {
             is_work_phase_ = true;
             remaining_seconds_ = total_work_seconds_;
 
             state_label_->setText("РАБОТА");
             state_label_->setStyleSheet("font-size: 24px; font-weight: bold; color: #305CDE;");
-            progress_bar_->setStyleSheet(
-                "QProgressBar { border: 2px solid #dfe1e6; border-radius: 10px; background: "
-                "#f4f5f7; height: 20px; }"
-                "QProgressBar::chunk { background: #305CDE; border-radius: 8px; }");
+            circular_progress_->setColor(QColor("#305CDE"));
         }
 
-        timer_label_->setText(formatTime(remaining_seconds_));
-        progress_bar_->setValue(100);
+        circular_progress_->setTimerText(formatTime(remaining_seconds_));
+        circular_progress_->setValue(100);
 
         if (has_goal_) {
             int goal_seconds = goal_minutes_ * 60;
@@ -284,7 +273,7 @@ void PomodoroScreen::saveSession() {
 
     QJsonObject json;
     json["goal_minutes"] = has_goal_ ? goal_minutes_ : QJsonValue();
-    json["work_duration_seconds"] = total_work_seconds_;
+    json["work_duration_seconds"] = total_work_time_seconds_;
     json["break_duration_seconds"] = total_break_seconds_;
     json["completed_cycles"] = completed_cycles_;
 

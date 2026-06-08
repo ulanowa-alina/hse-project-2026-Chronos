@@ -111,6 +111,7 @@ json model_to_json(const Task& task) {
         {"description", task.description_},
         {"status_id", task.status_id_},
         {"priority_color", task.priority_color_},
+        {"is_completed", task.is_completed_},
         {"created_at", time_to_string_iso8601(task.created_at_)},
         {"updated_at", time_to_string_iso8601(task.updated_at_)},
     };
@@ -186,8 +187,12 @@ auto handleCreate(const http::request<http::string_body>& req,
         }
 
         TaskRepository task_repository(pool);
-        const Task new_task(0, board_id, title, description, deadline, status_id, priority_color, 0,
-                            0);
+        bool is_completed = false;
+        if (body.contains("is_completed") && body["is_completed"].is_boolean()) {
+            is_completed = body["is_completed"].get<bool>();
+        }
+        const Task new_task(0, board_id, title, description, deadline, status_id, priority_color,
+                            is_completed, 0, 0);
         const Task created = task_repository.save(new_task);
 
         return server::utils::build_json_response(req, http::status::ok,

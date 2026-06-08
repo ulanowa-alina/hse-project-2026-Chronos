@@ -12,7 +12,6 @@ CREATE TABLE boards (
                         user_id INT NOT NULL,
                         title VARCHAR(255) NOT NULL CHECK (char_length(title) BETWEEN 1 AND 100),
                         description TEXT CHECK (description IS NULL OR char_length(description) <= 1000),
-                        is_private BOOLEAN NOT NULL DEFAULT FALSE,
                         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                         updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
                         CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)
@@ -34,6 +33,7 @@ CREATE TABLE tasks (
                        description TEXT CHECK (description IS NULL OR char_length(description) <= 1000),
                        priority_color VARCHAR(50) NOT NULL CHECK (char_length(priority_color) BETWEEN 1 AND 50),
                        deadline TIMESTAMP,
+                       is_completed BOOLEAN NOT NULL DEFAULT FALSE,
                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
                        CONSTRAINT fk_board FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,

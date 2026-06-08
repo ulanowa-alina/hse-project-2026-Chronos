@@ -22,15 +22,6 @@ json collect_missing_fields(const json& body) {
     if (!body.contains("board_id")) {
         missing.push_back("board_id");
     }
-    if (!body.contains("title")) {
-        missing.push_back("title");
-    }
-    if (!body.contains("description")) {
-        missing.push_back("description");
-    }
-    if (!body.contains("is_private")) {
-        missing.push_back("is_private");
-    }
 
     return missing;
 }
@@ -82,7 +73,6 @@ json model_to_json(const Board& board) {
                 {"user_id", board.user_id_},
                 {"title", board.title_},
                 {"description", board.description_},
-                {"is_private", board.is_private_},
                 {"created_at", time_to_string_iso8601(board.created_at_)},
                 {"updated_at", time_to_string_iso8601(board.updated_at_)}};
 }
@@ -118,21 +108,6 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
     try {
         const int board_id = require_positive_int_field(body, "board_id");
-        const std::string title = require_string_field(body, "title");
-        const std::string description = require_string_field(body, "description");
-        const bool is_private = require_bool_field(body, "is_private");
-
-        if (title.empty() || title.size() > 100) {
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"title", "Title must be between 1 and 100 characters"}});
-        }
-
-        if (description.size() > 1000) {
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"description", "Description cannot exceed 1000 characters"}});
-        }
 
         BoardRepository board_repository(pool);
         const std::optional<Board> existing_board = board_repository.find_by_id(board_id);
@@ -147,9 +122,28 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                        "Resource belongs to another user");
         }
 
+        std::string title = existing_board->title_;
+        if (body.contains("title")) {
+            title = body["title"].get<std::string>();
+            if (title.empty() || title.size() > 100) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"title", "Title must be between 1 and 100 characters"}});
+            }
+        }
+
+        std::string description = existing_board->description_;
+        if (body.contains("description")) {
+            description = body["description"].get<std::string>();
+            if (description.size() > 1000) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"description", "Description cannot exceed 1000 characters"}});
+            }
+        }
+
         const Board board_to_save(existing_board->id_, existing_board->user_id_, title, description,
-                                  is_private, existing_board->created_at_,
-                                  existing_board->updated_at_);
+                                  existing_board->created_at_, existing_board->updated_at_);
         const Board updated_board = board_repository.save(board_to_save);
 
         return server::utils::build_json_response(req, http::status::ok,

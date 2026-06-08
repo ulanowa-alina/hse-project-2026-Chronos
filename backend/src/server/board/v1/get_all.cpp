@@ -27,7 +27,6 @@ json model_to_json(const Board& board) {
                 {"user_id", board.user_id_},
                 {"title", board.title_},
                 {"description", board.description_},
-                {"is_private", board.is_private_},
                 {"created_at", time_to_string_iso8601(board.created_at_)},
                 {"updated_at", time_to_string_iso8601(board.updated_at_)}};
 }

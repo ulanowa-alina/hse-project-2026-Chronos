@@ -15,8 +15,11 @@ StatusWindow::StatusWindow(int status_id, int board_id, const QString& name, QWi
 }
 
 void StatusWindow::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &StatusWindow::onNetworkResponse);
+    }
     network_manager_ = manager;
-
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &StatusWindow::onNetworkResponse);
@@ -47,14 +50,7 @@ void StatusWindow::onNetworkResponse(const QString& endpoint, const QByteArray& 
 }
 
 void StatusWindow::onCreateTaskRequest() {
-    if (!network_manager_)
-        return;
-
-    auto* card = new TaskCard(-1, board_id_, status_id_, this);
-    card->setNetworkManager(network_manager_);
-
-    tasks_layout_->insertWidget(0, card);
-    updateGeometry();
+    emit openTaskCreateScreen(board_id_, status_id_);
 }
 
 void StatusWindow::onOpenSettings() {
@@ -99,6 +95,21 @@ void StatusWindow::onStatusDeleteRequest() {
     QJsonObject json;
     json["status_id"] = status_id_;
     network_manager_->DELETE(network_manager_->statuses_delete_url_, json);
+}
+
+void StatusWindow::onStatusNameEdited() {
+    QString new_name = status_name_->text().trimmed();
+    if (new_name.isEmpty() || status_id_ == -1 || network_manager_ == nullptr) {
+        return;
+    }
+    QJsonObject json;
+    json["status_id"] = status_id_;
+    json["name"] = new_name;
+    json["board_id"] = board_id_;
+    network_manager_->PATCH(network_manager_->statuses_edit_url_, json);
+    status_name_->setReadOnly(true);
+    status_name_->setStyleSheet("QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "
+                                "border: none; background: transparent; }");
 }
 
 void StatusWindow::dragEnterEvent(QDragEnterEvent* event) {
@@ -239,6 +250,20 @@ void StatusWindow::removeTaskCard(TaskCard* card) {
     tasks_layout_->removeWidget(card);
 }
 
+void StatusWindow::clearTasks() {
+    while (tasks_layout_->count() > 1) {
+        QLayoutItem* item = tasks_layout_->takeAt(0);
+        if (!item) {
+            continue;
+        }
+
+        if (item->widget()) {
+            delete item->widget();
+        }
+        delete item;
+    }
+}
+
 void StatusWindow::processHighlight() {
     if (should_be_highlighted_) {
         setStyleSheet("#statusWindow { background-color: #D6DFFB; border-radius: 12px; border: 2px "
@@ -317,7 +342,7 @@ void StatusWindow::setupLayout(const QString& name) {
     tasks_scroll_area_->setWidget(tasks_container_);
     main_layout->addWidget(tasks_scroll_area_, 1);
 
-    connect(status_name_, &QLineEdit::editingFinished, this, [this]() {});
+    connect(status_name_, &QLineEdit::editingFinished, this, &StatusWindow::onStatusNameEdited);
     connect(create_task_button_, &QPushButton::clicked, this, &StatusWindow::onCreateTaskRequest);
     connect(settings_button_, &QPushButton::clicked, this, &StatusWindow::onOpenSettings);
 }

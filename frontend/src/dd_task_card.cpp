@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPlainTextEdit>
 
 namespace {
 const int HTTP_OK = 200;
@@ -40,11 +41,13 @@ void DdTaskCard::setupLayout() {
                         "   background: #F4F7FE; "
                         "   border: 1px solid #DCE4F9; "
                         "   border-radius: 16px; "
-                        "   padding: 10px; "
                         "}");
 
+    this->setFixedWidth(350);
+    this->setFixedHeight(180);
+
     main_layout_ = new QVBoxLayout(this);
-    main_layout_->setContentsMargins(12, 12, 12, 12);
+    main_layout_->setContentsMargins(20, 12, 20, 14);
     main_layout_->setSpacing(8);
 
     board_button_ = new QPushButton("Загрузка доски...", this);
@@ -52,18 +55,17 @@ void DdTaskCard::setupLayout() {
 
     board_button_->setStyleSheet("QPushButton { "
                                  "   color: #305CDE; "
-                                 "   font-size: 13px; "
+                                 "   font-size: 17px; "
                                  "   font-weight: bold; "
                                  "   border: none; "
                                  "   background: transparent; "
                                  "   text-align: left; "
-                                 "   padding: 0px; "
+                                 "   padding: 0px 0px 0px 5px; "
                                  "}"
                                  "QPushButton:hover { "
                                  "   text-decoration: underline; "
                                  "   color: #1A3BB0; "
                                  "}");
-
     connect(board_button_, &QPushButton::clicked, this, &DdTaskCard::onBoardButtonClicked);
     main_layout_->addWidget(board_button_);
 
@@ -75,6 +77,7 @@ void DdTaskCard::setupLayout() {
 
 void DdTaskCard::freezeTaskCard() {
     inner_task_card_->setAcceptDrops(false);
+    inner_task_card_->setAttribute(Qt::WA_StyledBackground, true);
 
     auto* settings_btn = inner_task_card_->findChild<QPushButton*>("settings_button_");
     if (!settings_btn) {
@@ -88,22 +91,56 @@ void DdTaskCard::freezeTaskCard() {
             comp_btn->setVisible(false);
         }
     }
-
-    auto* title_edit = inner_task_card_->findChild<QLineEdit*>();
-    if (title_edit) {
-        title_edit->setReadOnly(true);
-        title_edit->setFocusPolicy(Qt::NoFocus);
-        title_edit->setStyleSheet(
-            "font-weight: bold; font-weight: 700; font-size: 18px; border: none; "
-            "background: transparent; color: #172B4D; padding: 0px; selection-background-color: "
-            "transparent;");
-    }
 }
 
 void DdTaskCard::setCardData(const QString& title, const QString& description,
                              const QDateTime& deadline, bool is_completed) {
     if (inner_task_card_ != nullptr) {
         inner_task_card_->setData(title, description, deadline, is_completed);
+        if (auto* title_edit = inner_task_card_->findChild<QLineEdit*>()) {
+            title_edit->setReadOnly(true);
+            title_edit->setFocusPolicy(Qt::NoFocus);
+        }
+
+        auto* desc_edit = inner_task_card_->findChild<QTextEdit*>();
+        auto* desc_plain_edit = inner_task_card_->findChild<QPlainTextEdit*>();
+
+        QTextEdit* target_desc = desc_edit ? (QTextEdit*) desc_edit : (QTextEdit*) desc_plain_edit;
+
+        if (target_desc) {
+            target_desc->setReadOnly(true);
+            target_desc->setFocusPolicy(Qt::NoFocus);
+        }
+
+        inner_task_card_->setFixedWidth(300);
+        inner_task_card_->setStyleSheet("TaskCard { "
+                                        "   background-color: white !important; "
+                                        "   background: white !important; "
+                                        "   border: none !important; "
+                                        "   border-radius: 12px; "
+                                        "   padding: 0px 12px 12px 12px; "
+                                        "}"
+                                        "TaskCard QFrame, TaskCard QWidget { "
+                                        "   background: transparent !important; "
+                                        "   background-color: transparent !important; "
+                                        "   border: none !important; "
+                                        "}"
+                                        "TaskCard QLineEdit { "
+                                        "   font-weight: bold; font-weight: 700; font-size: 18px; "
+                                        "   color: #172B4D !important; "
+                                        "   background: transparent !important; "
+                                        "   border: none !important; "
+                                        "}"
+                                        "TaskCard QTextEdit, TaskCard QPlainTextEdit { "
+                                        "   color: #5E6C84 !important; "
+                                        "   background: transparent !important; "
+                                        "   border: none !important; "
+                                        "   padding: 0px; "
+                                        "}"
+                                        "TaskCard QLabel { "
+                                        "   background: transparent !important; "
+                                        "   border: none !important; "
+                                        "}");
     }
 }
 
@@ -112,7 +149,6 @@ void DdTaskCard::onBoardButtonClicked() {
 }
 
 void DdTaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-
     QString target_endpoint =
         network_manager_->board_get_url_ + QString("?board_id=%1").arg(board_id_);
     if (endpoint != target_endpoint)

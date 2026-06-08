@@ -22,6 +22,7 @@ class ProfileScreen : public QWidget {
     void logoutRequested();
     void boardRequested();
     void profileEditRequested();
+    void openDashboardScreen();
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);

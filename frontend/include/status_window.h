@@ -32,6 +32,10 @@ class StatusWindow : public QFrame {
         return status_id_ = id;
     }
     void addTaskCard(TaskCard* card);
+    void clearTasks();
+
+  signals:
+    void openTaskCreateScreen(int board_id, int status_id);
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -46,6 +50,7 @@ class StatusWindow : public QFrame {
     void onOpenSettings();
     void onStatusEditRequest();
     void onStatusDeleteRequest();
+    void onStatusNameEdited();
 
   private:
     int status_id_;

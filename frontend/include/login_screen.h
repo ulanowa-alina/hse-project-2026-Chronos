@@ -18,6 +18,7 @@ class LoginScreen : public QWidget {
     explicit LoginScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void clearInputs();
 
   signals:
     void loginRequested(int board_id);
