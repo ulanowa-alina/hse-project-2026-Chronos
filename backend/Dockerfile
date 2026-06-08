@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libargon2-dev \
     nlohmann-json3-dev \
     libssl-dev \
+    libspdlog-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend

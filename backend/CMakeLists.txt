@@ -10,6 +10,7 @@ find_package(Boost 1.74 REQUIRED COMPONENTS json url)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(spdlog REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
 pkg_check_modules(ARGON2 REQUIRED IMPORTED_TARGET libargon2)
@@ -52,5 +53,6 @@ target_link_libraries(chronos_backend PRIVATE
         PkgConfig::ARGON2
         ${PostgreSQL_LIBRARIES}
         OpenSSL::Crypto
+        spdlog::spdlog
 )
 target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER} ${ARGON2_CFLAGS_OTHER})

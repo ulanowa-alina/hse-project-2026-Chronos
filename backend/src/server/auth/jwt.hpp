@@ -14,4 +14,6 @@ std::string create_token(int user_id);
 
 bool parse_and_validate_token(const std::string& token, TokenPayload& payload, TokenError& error);
 
+void validate_jwt_config();
+
 } // namespace auth

@@ -4,6 +4,7 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
@@ -28,11 +29,13 @@ class Session : public std::enable_shared_from_this<Session> {
     void doRead();
     void handleRequest();
     void sendResponse(http::response<http::string_body> res);
+    std::string getClientAddress() const;
 
     tcp::socket socket_;
     beast::flat_buffer buffer_;
     http::request<http::string_body> req_;
     Router router_;
+    std::chrono::steady_clock::time_point request_started_at_;
 };
 
 #endif // SERVER_SESSION_HPP

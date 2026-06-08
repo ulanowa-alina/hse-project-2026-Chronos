@@ -1,11 +1,12 @@
 #ifndef PROFILE_EDIT_SCREEN_H
 #define PROFILE_EDIT_SCREEN_H
 
-#include "network_manager.h"
+#include "../sync/sync_coordinator.hpp"
 
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QWidget>
 
 class ProfileEditScreen : public QWidget {
@@ -14,17 +15,20 @@ class ProfileEditScreen : public QWidget {
   public:
     explicit ProfileEditScreen(QWidget* parent = nullptr);
 
-    void setNetworkManager(NetworkManager* manager);
+    void setDatabase(QSqlDatabase db);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
+    void reloadFromLocal();
 
   signals:
     void profileRequested();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onProfileEditRequest();
 
   private:
-    NetworkManager* network_manager_{nullptr};
+    QSqlDatabase db_;
+    SyncCoordinator* sync_coordinator_{nullptr};
+    QString pending_password_;
 
     QLabel* logo_label_{nullptr};
     QLabel* avatar_label_{nullptr};
@@ -39,7 +43,6 @@ class ProfileEditScreen : public QWidget {
     QLineEdit* password_input_{nullptr};
 
     void setupLayout();
-    void showEvent(QShowEvent* event) override;
 };
 
 #endif // PROFILE_EDIT_SCREEN_H
