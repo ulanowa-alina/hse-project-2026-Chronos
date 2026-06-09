@@ -158,6 +158,7 @@ void RegistrationScreen::onRegisterRequest() {
 }
 
 void RegistrationScreen::onAvatarPickRequested() {
+    qDebug() << "RegistrationScreen: onAvatarPickRequested called";
     const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
                                                            "Images (*.png *.jpg *.jpeg *.webp)");
 
