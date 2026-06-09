@@ -281,7 +281,6 @@ void BoardScreen::onStatusCreateRequest() {
         return;
     }
 
-
     auto* new_status = new StatusWindow(temp_id, board_id_, trimmed_name, db_, this);
     new_status->setSyncCoordinator(sync_coordinator_);
     connect(new_status, &StatusWindow::openTaskCreateScreen, this,
