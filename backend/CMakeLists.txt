@@ -17,6 +17,30 @@ find_package(spdlog REQUIRED)
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
 pkg_check_modules(ARGON2 REQUIRED IMPORTED_TARGET libargon2)
 
+include(FetchContent)
+
+FetchContent_Declare(
+    prometheus-cpp-lite
+    GIT_REPOSITORY https://github.com/biaks/prometheus-cpp-lite.git
+    GIT_TAG v2.0
+)
+FetchContent_MakeAvailable(prometheus-cpp-lite)
+
+if(APPLE)
+    target_include_directories(prometheus-cpp-lite INTERFACE
+        "${CMAKE_CURRENT_SOURCE_DIR}/compat"
+    )
+    target_include_directories(prometheus-cpp-lite-full PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/compat"
+    )
+    target_compile_options(prometheus-cpp-lite INTERFACE
+        $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
+    )
+    target_compile_options(prometheus-cpp-lite-full PRIVATE
+        $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
+    )
+endif()
+
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/models/*.cpp"
@@ -57,6 +81,7 @@ target_link_libraries(chronos_backend PRIVATE
     CURL::libcurl
     nlohmann_json::nlohmann_json
     spdlog::spdlog
+    prometheus-cpp-lite-full
 )
 
 target_compile_options(chronos_backend PRIVATE
