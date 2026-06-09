@@ -1,5 +1,7 @@
 #include "task_card.h"
 
+#include "../local_repositories/local_task_repository.hpp"
+
 #include <QApplication>
 #include <QDataStream>
 #include <QDebug>
@@ -11,30 +13,128 @@
 #include <QPixmap>
 #include <QVBoxLayout>
 
-TaskCard::TaskCard(int task_id, int board_id, int status_id, QWidget* parent)
+namespace {
+const int SECONDS_IN_MIN = 60;
+const int SECONDS_IN_HOUR = SECONDS_IN_MIN * 60;
+const int SECONDS_IN_DAY = 24 * SECONDS_IN_HOUR;
+
+const int SMALL_TIMER_INTERVAL = 1'000;
+const int BIG_TIMER_INTERVAL = 60'000;
+
+const int COMPLETE_BTN_SIZE = 22;
+const int COMPLETE_BTN_RADIUS = COMPLETE_BTN_SIZE / 2;
+const int BLUE_LINE_WIDTH = 3;
+
+const int HTTP_OK = 200;
+const int HTTP_CREATED = 201;
+const int HTTP_NO_CONTENT = 204;
+} // namespace
+
+TaskCard::TaskCard(int task_id, int board_id, int status_id, QSqlDatabase db, QWidget* parent)
     : QFrame(parent)
     , task_id_(task_id)
     , board_id_(board_id)
-    , status_id_(status_id) {
+    , status_id_(status_id)
+    , db_(db) {
     setupLayout();
-    if (task_id_ == -1) {
+    if (task_id_ < 0) {
         title_->setPlaceholderText("Введите название...");
         title_->setFocus();
     }
+
+    timer_ = new QTimer(this);
+    connect(timer_, &QTimer::timeout, this, &TaskCard::onUpdateTimer);
 }
 
 void TaskCard::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &TaskCard::onNetworkResponse);
+    }
     network_manager_ = manager;
-
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &TaskCard::onNetworkResponse);
     }
 }
 
-void TaskCard::setData(const QString& title, const QString& description) {
+void TaskCard::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
+void TaskCard::setData(const QString& title, const QString& description, const QDateTime& deadline,
+                       bool is_completed) {
     title_->setText(title);
-    description_edit_->setPlainText(description);
+    is_completed_ = is_completed;
+    deadline_ = deadline;
+
+    if (description.trimmed().isEmpty()) {
+        description_text_->setVisible(false);
+    } else {
+        description_label_->setText(description);
+        description_text_->setVisible(true);
+    }
+
+    doneVisualState();
+
+    if (deadline_.isValid() && !deadline_.isNull() && !is_completed_) {
+        deadline_label_->setVisible(true);
+        onUpdateTimer();
+        timer_->start();
+    } else {
+        deadline_label_->setVisible(false);
+        timer_->stop();
+    }
+}
+
+void TaskCard::onUpdateTimer() {
+    if (!deadline_.isValid() || is_completed_) {
+        timer_->stop();
+        return;
+    }
+
+    QDateTime current = QDateTime::currentDateTime();
+    QDateTime display_deadline = deadline_.addSecs(3 * 3600);
+    QString date_part = display_deadline.toString("dd.MM в hh:mm");
+
+    if (current >= deadline_) {
+        deadline_label_->setText(QString("%1 (Просрочено!)").arg(date_part));
+        deadline_label_->setStyleSheet("color: #e74c3c; font-size: 12px;");
+        timer_->stop();
+        return;
+    }
+
+    qint64 secs_to = current.secsTo(deadline_);
+
+    if (secs_to < SECONDS_IN_HOUR) {
+        int minutes = secs_to / SECONDS_IN_MIN;
+        int seconds = secs_to % SECONDS_IN_MIN;
+
+        deadline_label_->setText(
+            QString("%1 (Осталось: %2м %3с)").arg(date_part).arg(minutes).arg(seconds));
+        deadline_label_->setStyleSheet("color: #e74c3c; font-size: 12px;");
+
+        if (timer_->interval() != SMALL_TIMER_INTERVAL) {
+            timer_->setInterval(SMALL_TIMER_INTERVAL);
+        }
+        return;
+    }
+
+    int days = secs_to / SECONDS_IN_DAY;
+    int hours = (secs_to % SECONDS_IN_DAY) / SECONDS_IN_HOUR;
+
+    if (days > 0) {
+        deadline_label_->setText(
+            QString("%1 (Осталось: %2д %3ч)").arg(date_part).arg(days).arg(hours));
+        deadline_label_->setStyleSheet("color: #7f8c8d; font-size: 12px;");
+    } else {
+        deadline_label_->setText(QString("%1 (Осталось: %2ч)").arg(date_part).arg(hours));
+        deadline_label_->setStyleSheet("color: #e67e22; font-size: 12px;");
+    }
+
+    if (timer_->interval() != BIG_TIMER_INTERVAL) {
+        timer_->setInterval(BIG_TIMER_INTERVAL);
+    }
 }
 
 void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
@@ -44,7 +144,7 @@ void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data
         return;
 
     if (endpoint == network_manager_->tasks_delete_url_) {
-        if (should_be_delete_ && (code == 200 || code == 204)) {
+        if (should_be_delete_ && (code == HTTP_OK || code == HTTP_NO_CONTENT)) {
             qDebug() << "TaskCard: Задача успешно удалена";
             deleteLater();
         } else if (should_be_delete_) {
@@ -54,7 +154,7 @@ void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data
         return;
     }
 
-    if (code == 200 || code == 201) {
+    if (code == HTTP_OK || code == HTTP_CREATED) {
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonObject taskData = doc.object()["data"].toObject();
 
@@ -101,47 +201,77 @@ void TaskCard::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TaskCard::updateTaskStatus() {
-    if (task_id_ == -1 || !network_manager_)
+    if (task_id_ < 0 || !sync_coordinator_) {
         return;
+    }
 
-    QJsonObject json;
-    json["task_id"] = task_id_;
-    json["status_id"] = status_id_;
+    LocalTaskRepository repo(db_);
+    const auto existing = repo.findById(task_id_);
+    if (!existing) {
+        return;
+    }
 
-    network_manager_->PATCH(network_manager_->tasks_edit_url_, json);
+    LocalTask task = *existing;
+    task.status_id_ = status_id_;
+    task.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(task);
+    } catch (const std::exception& e) {
+        qDebug() << "TaskCard: failed to update task status:" << e.what();
+        return;
+    }
+    sync_coordinator_->syncTasks();
 }
 
 void TaskCard::onTaskSaveRequest() {
-    QString title = title_->text().trimmed();
+    const QString title = title_->text().trimmed();
 
-    if (task_id_ == -1 && title.isEmpty()) {
-        this->deleteLater();
+    if (task_id_ < 0 && title.isEmpty()) {
+        LocalTaskRepository repo(db_);
+        repo.deleteById(task_id_);
+        deleteLater();
         return;
     }
 
-    if (title.isEmpty())
+    if (title.isEmpty()) {
         return;
+    }
 
-    if (!network_manager_)
+    if (!sync_coordinator_) {
         return;
+    }
 
-    QJsonObject json;
-    if (task_id_ == -1) {
-        json["board_id"] = board_id_;
-        json["title"] = title;
-        json["description"] = description_edit_->toPlainText();
-        json["status_id"] = status_id_;
-        json["priority_color"] = "gray";
-        network_manager_->POST(network_manager_->tasks_create_url_, json);
+    LocalTaskRepository repo(db_);
+    if (task_id_ < 0) {
+        LocalTask task(task_id_, board_id_, title, status_id_, QStringLiteral("gray"), QString());
+        task.sync_status_ = SyncStatus::PENDING;
+        task.server_version_ = 0;
+        try {
+            repo.save(task);
+        } catch (const std::exception& e) {
+            qDebug() << "TaskCard: failed to save task:" << e.what();
+            return;
+        }
     } else {
-        json["task_id"] = task_id_;
-        json["title"] = title;
-        json["description"] = description_edit_->toPlainText();
-        json["status_id"] = status_id_;
-        network_manager_->PATCH(network_manager_->tasks_edit_url_, json);
+        const auto existing = repo.findById(task_id_);
+        if (!existing) {
+            return;
+        }
+        LocalTask task = *existing;
+        task.title_ = title;
+        task.description_ = QString();
+        task.status_id_ = status_id_;
+        task.sync_status_ = SyncStatus::PENDING;
+        try {
+            repo.save(task);
+        } catch (const std::exception& e) {
+            qDebug() << "TaskCard: failed to save task:" << e.what();
+            return;
+        }
     }
-}
 
+    sync_coordinator_->syncTasks();
+}
 void TaskCard::onOpenSettings() {
     QMenu menu(this);
     menu.setStyleSheet(
@@ -149,45 +279,129 @@ void TaskCard::onOpenSettings() {
         "QMenu::item { padding: 8px 20px; color: #172b4d; }"
         "QMenu::item:selected { background: #f4f5f7; }");
 
-    QAction* rename_action = menu.addAction("✏️ Переименовать");
-    QAction* edit_description_action = menu.addAction("📝 Изменить описание");
+    QAction* edit_action = menu.addAction("📝 Изменить задачу");
+    QAction* rename_action = menu.addAction("🏷️ Переименовать");
     QAction* delete_action = menu.addAction("🗑️ Удалить");
 
     QAction* selected =
         menu.exec(settings_button_->mapToGlobal(QPoint(0, settings_button_->height())));
 
-    if (selected == rename_action) {
-        onTitleEditRequest();
-    } else if (selected == edit_description_action) {
-        onDescriptionEditRequest();
+    if (selected == edit_action) {
+        qDebug() << "Вызов глобального окна редактирования для task_id:" << task_id_;
+        emit openTaskEditScreen(task_id_, board_id_, status_id_);
+    } else if (selected == rename_action) {
+        title_->setFocus();
+        title_->selectAll();
     } else if (selected == delete_action) {
         onDeleteTaskRequest();
     }
 }
 
 void TaskCard::onTitleEditRequest() {
-    title_->setFocus();
-    title_->selectAll();
+    QString title = title_->text().trimmed();
+    if (title.isEmpty() || task_id_ < 0 || !sync_coordinator_) {
+        return;
+    }
+
+    LocalTaskRepository repo(db_);
+    const auto existing = repo.findById(task_id_);
+    if (!existing) {
+        return;
+    }
+
+    LocalTask task = *existing;
+    task.title_ = title;
+    task.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(task);
+    } catch (const std::exception& e) {
+        qDebug() << "TaskCard: failed to save task:" << e.what();
+        return;
+    }
+    sync_coordinator_->syncTasks();
 }
 
-void TaskCard::onDescriptionEditRequest() {
-    description_edit_->setFocus();
-    QTextCursor cursor = description_edit_->textCursor();
-    cursor.select(QTextCursor::Document);
-    description_edit_->setTextCursor(cursor);
+void TaskCard::onMarkDoneRequest() {
+    is_completed_ = !is_completed_;
+    doneVisualState();
+
+    if (task_id_ < 0 || !sync_coordinator_) {
+        return;
+    }
+
+    LocalTaskRepository repo(db_);
+    const auto existing = repo.findById(task_id_);
+    if (!existing) {
+        return;
+    }
+
+    LocalTask task = *existing;
+    task.is_completed_ = is_completed_;
+    task.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(task);
+    } catch (const std::exception& e) {
+        qDebug() << "TaskCard: failed to save task:" << e.what();
+        return;
+    }
+    sync_coordinator_->syncTasks();
+}
+
+void TaskCard::doneVisualState() {
+    if (is_completed_) {
+        title_->setReadOnly(true);
+        title_->setStyleSheet("font-weight: bold; font-size: 18px; color: #a0a0a0; border: none; "
+                              "background: transparent;");
+        description_label_->setStyleSheet(
+            "color: #d0d0d0; font-size: 12px; background: transparent;");
+        blue_line_->setStyleSheet("background-color: #d0d0d0; border-radius: 1.5px;");
+        deadline_label_->setStyleSheet("color: #d0d0d0; font-size: 12px; background: transparent;");
+
+        complete_button_->setText("✓");
+        complete_button_->setStyleSheet(
+            QString("QPushButton { border: 2px solid #2ecc71; border-radius: %1px; background: "
+                    "#2ecc71; color: white; font-weight: bold; font-size: 12px; }")
+                .arg(COMPLETE_BTN_RADIUS));
+
+        timer_->stop();
+    } else {
+        title_->setReadOnly(false);
+        title_->setStyleSheet("font-weight: bold; font-size: 18px; border: none; background: "
+                              "transparent; color: #305CDE; padding: 0px;");
+        description_label_->setStyleSheet(
+            "color: #7f8c8d; font-size: 12px; background: transparent;");
+        blue_line_->setStyleSheet("background-color: #305CDE; border-radius: 1.5px;");
+
+        complete_button_->setText("");
+        complete_button_->setStyleSheet(QString("QPushButton { border: 2px solid #b2b2b2; "
+                                                "border-radius: %1px; background: transparent; }"
+                                                "QPushButton:hover { border-color: #2ecc71; }")
+                                            .arg(COMPLETE_BTN_RADIUS));
+
+        if (deadline_.isValid() && !deadline_.isNull()) {
+            onUpdateTimer();
+            timer_->start();
+        }
+    }
 }
 
 void TaskCard::onDeleteTaskRequest() {
-    if (task_id_ == -1 || !network_manager_) {
+    if (!sync_coordinator_) {
         deleteLater();
         return;
     }
 
-    should_be_delete_ = true;
+    if (task_id_ < 0) {
+        LocalTaskRepository repo(db_);
+        repo.deleteById(task_id_);
+        deleteLater();
+        return;
+    }
 
-    QJsonObject json;
-    json["task_id"] = task_id_;
-    network_manager_->DELETE(network_manager_->tasks_delete_url_, json);
+    LocalTaskRepository repo(db_);
+    repo.markDeletedById(task_id_);
+    sync_coordinator_->syncTasks();
+    deleteLater();
 }
 
 void TaskCard::setupLayout() {
@@ -195,6 +409,8 @@ void TaskCard::setupLayout() {
     this->setAttribute(Qt::WA_StyledBackground, true);
     this->setMinimumHeight(100);
     this->setMaximumHeight(130);
+
+    this->setMaximumWidth(260);
 
     this->setStyleSheet(
         "#taskCard { background: white; border: 1px solid #e0e0e0; border-radius: 12px; }"
@@ -215,7 +431,7 @@ void TaskCard::setupLayout() {
     title_->setStyleSheet("font-weight: bold; font-size: 18px; border: none; "
                           "background: transparent; color: #305CDE; padding: 0px;");
     title_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    connect(title_, &QLineEdit::editingFinished, this, &TaskCard::onTaskSaveRequest);
+    connect(title_, &QLineEdit::editingFinished, this, &TaskCard::onTitleEditRequest);
 
     settings_button_ = new QPushButton("⋮", this);
     settings_button_->setFixedSize(26, 26);
@@ -225,21 +441,58 @@ void TaskCard::setupLayout() {
     header_layout->addWidget(settings_button_);
     layout->addLayout(header_layout);
 
-    description_edit_ = new QTextEdit(this);
-    description_edit_->setPlaceholderText("Добавьте описание...");
-    description_edit_->setMaximumHeight(100);
-    description_edit_->setStyleSheet("QTextEdit { "
-                                     "   border: none; "
-                                     "   border-left: 2px solid #305CDE; "
-                                     "   margin-top: 8px; "
-                                     "   padding-left: 10px; "
-                                     "   background: transparent; "
-                                     "   color: #7f8c8d; "
-                                     "   font-size: 12px; "
-                                     "}");
+    deadline_label_ = new QLabel(this);
+    deadline_label_->setStyleSheet(
+        "color: #7f8c8d; font-size: 12px; font-weight: 500; background: transparent;");
+    layout->addWidget(deadline_label_);
+    description_text_ = new QWidget(this);
+    auto* desc_layout = new QHBoxLayout(description_text_);
+    desc_layout->setContentsMargins(4, 8, 0, 4);
+    desc_layout->setSpacing(10);
 
-    layout->addWidget(description_edit_);
+    blue_line_ = new QWidget(description_text_);
+    blue_line_->setFixedWidth(BLUE_LINE_WIDTH);
+    blue_line_->setStyleSheet("background-color: #305CDE; border-radius: 1.5px;");
+    blue_line_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+
+    auto* desc_content_widget = new QWidget(description_text_);
+    auto* desc_content_layout = new QVBoxLayout(desc_content_widget);
+    desc_content_layout->setContentsMargins(0, 0, 0, 0);
+    desc_content_layout->setSpacing(2);
+
+    auto* description_title_label_ = new QLabel("Описание:", desc_content_widget);
+    description_title_label_->setStyleSheet(
+        "color: #7f8c8d; font-size: 12px; font-weight: 500; background: transparent;");
+    description_title_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    description_label_ = new QLabel(desc_content_widget);
+    description_label_->setWordWrap(true);
+    description_label_->setStyleSheet("color: #7f8c8d; font-size: 12px; background: transparent;");
+    description_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    desc_content_layout->addWidget(description_title_label_);
+    desc_content_layout->addWidget(description_label_);
+    desc_content_widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    desc_layout->addWidget(blue_line_);
+    desc_layout->addWidget(desc_content_widget);
+    layout->addWidget(description_text_);
+
+    auto* footer_layout = new QHBoxLayout();
+    complete_button_ = new QPushButton(this);
+    complete_button_->setFixedSize(COMPLETE_BTN_SIZE, COMPLETE_BTN_SIZE);
+    complete_button_->setStyleSheet(
+        QString("QPushButton { border: 2px solid #b2b2b2; border-radius: %1px; background: "
+                "transparent; font-size: 12px; }"
+                "QPushButton:hover { border-color: #2ecc71; }")
+            .arg(COMPLETE_BTN_RADIUS));
+
+    footer_layout->addStretch();
+    footer_layout->addWidget(complete_button_);
+    layout->addLayout(footer_layout);
+
     layout->addStretch();
 
     connect(settings_button_, &QPushButton::clicked, this, &TaskCard::onOpenSettings);
+    connect(complete_button_, &QPushButton::clicked, this, &TaskCard::onMarkDoneRequest);
 }

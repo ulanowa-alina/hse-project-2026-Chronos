@@ -2,12 +2,14 @@
 
 #include "models/user.hpp"
 #include "repositories/user_repository.hpp"
+#include "security/password_hashing.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
 #include <pqxx/pqxx>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
 
@@ -16,9 +18,10 @@ namespace http = boost::beast::http;
 namespace personal::v1 {
 
 namespace {
+const size_t MAX_NAME_SIZE = 50;
+const size_t MIN_PASS_SIZE = 8;
 
 using nlohmann::json;
-
 auto is_valid_email(const std::string& email) -> bool {
     if (email.empty() || email.size() > 255) {
         return false;
@@ -42,7 +45,7 @@ auto is_valid_email(const std::string& email) -> bool {
 }
 
 auto is_valid_name(const std::string& name) -> bool {
-    return !name.empty() && name.size() <= 50;
+    return !name.empty() && name.size() <= MAX_NAME_SIZE;
 }
 
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
@@ -80,6 +83,7 @@ auto build_update_response(const http::request<http::string_body>& req,
              {"email", user.email_},
              {"name", user.name_},
              {"status", user.status_},
+             {"avatar_s3_key", user.avatar_s3_key_},
              {"created_at", to_iso8601(user.created_at_)}};
 
     return build_json_response(req, http::status::ok, json{{"data", out}});
@@ -89,10 +93,17 @@ auto build_update_response(const http::request<http::string_body>& req,
 
 auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& pool,
                 int user_id) -> http::response<http::string_body> {
+    spdlog::info("User edit request received");
     json body;
+    if (req.method() != http::verb::put) {
+        spdlog::error("User edit rejected: method not allowed");
+        return build_api_error(req, http::status::method_not_allowed, "DUPLICATE_RESOURCE",
+                               "Method not allowed");
+    }
     try {
         body = json::parse(req.body());
-    } catch (...) {
+    } catch (const json::exception&) {
+        spdlog::error("User edit rejected: invalid JSON format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid JSON format");
     }
@@ -101,23 +112,33 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     const bool has_name = body.contains("name");
     const bool has_status = body.contains("status");
     const bool has_password = body.contains("password");
+    const bool has_avatar_s3_key = body.contains("avatar_s3_key");
 
     if (has_email && !body["email"].is_string()) {
+        spdlog::error("User edit rejected: invalid email format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid email format", json{{"email", "Invalid email format"}});
     }
     if (has_name && !body["name"].is_string()) {
+        spdlog::error("User edit rejected: invalid name format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid name format", json{{"name", "Invalid name format"}});
     }
     if (has_status && !body["status"].is_string()) {
+        spdlog::error("User edit rejected: invalid status format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid status format", json{{"status", "Invalid status format"}});
     }
     if (has_password && !body["password"].is_string()) {
+        spdlog::error("User edit rejected: invalid password format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid password format",
                                json{{"password", "Invalid password format"}});
+    }
+    if (has_avatar_s3_key && !body["avatar_s3_key"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid avatar_s3_key format",
+                               json{{"avatar_s3_key", "Invalid avatar_s3_key format"}});
     }
 
     json missing_fields = json::array();
@@ -131,11 +152,9 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     if (!has_status) {
         missing_fields.push_back("status");
     }
-    if (!has_password) {
-        missing_fields.push_back("password");
-    }
 
     if (!missing_fields.empty()) {
+        spdlog::error("User edit rejected: missing required fields");
         return build_api_error(req, http::status::bad_request, "MISSING_FIELD",
                                "Missing required fields", json{{"missing_fields", missing_fields}});
     }
@@ -144,30 +163,36 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     const std::string name = has_name ? body["name"].get<std::string>() : "";
     const std::string status = has_status ? body["status"].get<std::string>() : "";
     const std::string password = has_password ? body["password"].get<std::string>() : "";
+    const std::string avatar_s3_key =
+        has_avatar_s3_key ? body["avatar_s3_key"].get<std::string>() : "";
 
     if (has_email && !is_valid_email(email)) {
+        spdlog::error("User edit rejected: invalid email format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid email format", json{{"email", "Invalid email format"}});
     }
 
     if (has_name && !is_valid_name(name)) {
+        spdlog::error("User edit rejected: name is too long");
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed",
                                json{{"name", "Name length must be between 1 and 50 symbols"}});
     }
 
     if (status.empty()) {
+        spdlog::error("User edit rejected: status field is empty");
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed", json{{"status", "Status cannot be empty"}});
     }
 
-    if (has_password && password.size() < 8) {
+    if (has_password && password.size() < MIN_PASS_SIZE) {
+        spdlog::error("User edit rejected: invalid password format");
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed",
                                json{{"password", "Minimum length is 8 symbols"}});
     }
 
-    const std::string password_hash = has_password ? ("hash:" + password) : "";
+    const std::string password_hash = has_password ? security::hash_password(password) : "";
 
     try {
         UserRepository repo(pool);
@@ -175,6 +200,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         const auto existing = repo.find_by_id(user_id);
 
         if (!existing.has_value()) {
+            spdlog::error("User edit rejected: user with id={} not found", user_id);
             return build_api_error(req, static_cast<http::status>(404), "USER_NOT_FOUND",
                                    "User not found");
         }
@@ -193,17 +219,23 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         if (has_password) {
             updated.password_hash_ = password_hash;
         }
+        if (has_avatar_s3_key) {
+            updated.avatar_s3_key_ = avatar_s3_key;
+        }
 
         const User saved = repo.save(updated);
+        spdlog::info("User edit succeeded for user_id={}", user_id);
         return build_update_response(req, saved);
 
     } catch (const std::invalid_argument& e) {
         const std::string reason = e.what();
 
         if (reason == "Invalid email format") {
+            spdlog::error("User edit rejected: invalid email format");
             return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                    "Invalid email format", json{{"email", "Invalid email format"}});
         }
+        spdlog::error("User edit rejected: validation error: {}", reason);
 
         return build_api_error(req, http::status::bad_request, "VALIDATION_ERROR",
                                "Validation failed", json{{"validation", reason}});
@@ -211,16 +243,18 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         const std::string msg = e.what();
         if (msg.find("users_email_key") != std::string::npos ||
             msg.find("duplicate key") != std::string::npos) {
+            spdlog::error("User edit rejected: user with this email already exists");
             return build_api_error(req, static_cast<http::status>(405), "EMAIL_ALREADY_EXISTS",
                                    "User with this email already exists",
                                    json{{"email", "already exists"}});
         }
-
+        spdlog::error("User edit failed with database error: {}", e.what());
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");
-    } catch (const std::exception&) {
-        return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
-                               "Database error");
+    } catch (const std::exception& e) {
+        spdlog::error("User edit failed with unexpected error: {}", e.what());
+        return build_api_error(req, http::status::internal_server_error, "INTERNAL_ERROR",
+                               "Internal error");
     }
 }
 

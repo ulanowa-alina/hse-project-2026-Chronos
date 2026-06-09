@@ -5,7 +5,7 @@
 
 #include <boost/url.hpp>
 #include <chrono>
-#include <iostream>
+#include <spdlog/spdlog.h>
 #include <string>
 
 namespace {
@@ -106,13 +106,20 @@ void Session::doRead() {
     http::async_read(socket_, buffer_, req_ = {},
                      [self = shared_from_this()](beast::error_code err, std::size_t) {
                          if (err == http::error::end_of_stream) {
+                             spdlog::info("Connection closed by client {}",
+                                          self->getClientAddress());
                              beast::error_code shutdownErr;
                              self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr);
                              return;
                          }
-                         if (!err) {
-                             self->handleRequest();
+                         if (err) {
+                             spdlog::error("Failed to read request from {}: {}",
+                                           self->getClientAddress(), err.message());
+                             return;
                          }
+
+                         self->request_started_at_ = std::chrono::steady_clock::now();
+                         self->handleRequest();
                      });
 }
 
@@ -125,6 +132,9 @@ void Session::handleRequest() {
         url_view_result ? std::string(url_view_result->encoded_path()) : std::string(req_.target());
     const std::string method = method_to_string(req_.method());
 
+    spdlog::info("HTTP request: {} {} from {}", req_.method_string(), req_.target(),
+                 getClientAddress());
+
     auto it = router_.find(route);
     if (it != router_.end()) {
         Response response = it->second(req_);
@@ -133,6 +143,7 @@ void Session::handleRequest() {
         record_response_metrics(response, route, method, duration.count());
         sendResponse(std::move(response));
     } else {
+        spdlog::error("Route not found: {} {}", req_.method_string(), req_.target());
         http::response<http::string_body> res{http::status::not_found, req_.version()};
         res.set(http::field::content_type, "application/json");
         res.keep_alive(req_.keep_alive());
@@ -146,17 +157,54 @@ void Session::handleRequest() {
 }
 
 void Session::sendResponse(http::response<http::string_body> res) {
+
+    const std::string method = std::string(req_.method_string());
+    const std::string target = std::string(req_.target());
+    const std::string client = getClientAddress();
+    const unsigned response_status = res.result_int();
+    const std::size_t response_size = res.body().size();
+
     auto response = std::make_shared<http::response<http::string_body>>(std::move(res));
-    http::async_write(socket_, *response,
-                      [self = shared_from_this(), response](beast::error_code err, std::size_t) {
-                          if (!err && response->keep_alive()) {
-                              self->doRead();
-                          } else {
-                              beast::error_code shutdownErr;
-                              self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr);
-                              if (shutdownErr) {
-                                  std::cerr << "Shutdown error: " << shutdownErr.message() << "\n";
-                              }
-                          }
-                      });
+    http::async_write(
+        socket_, *response,
+        [self = shared_from_this(), response, method, target, client, response_status,
+         response_size](beast::error_code err, std::size_t) {
+            const auto elapsed_time =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - self->request_started_at_)
+                    .count();
+
+            if (!err) {
+                spdlog::info("HTTP response: {} {} -> {} in {} ms ({} bytes) for {}", method,
+                             target, response_status, elapsed_time, response_size, client);
+            }
+
+            if (!err && response->keep_alive()) {
+
+                self->doRead();
+            } else {
+
+                if (err) {
+                    spdlog::error("Failed to write response to {}: {}", client, err.message());
+                }
+
+                beast::error_code shutdownErr;
+                self->socket_.shutdown(tcp::socket::shutdown_send, shutdownErr);
+                if (shutdownErr) {
+                    spdlog::error("Socket shutdown error for {}: {}", client,
+                                  shutdownErr.message());
+                }
+            }
+        });
+}
+
+std::string Session::getClientAddress() const {
+    beast::error_code err;
+    const auto endpoint = socket_.remote_endpoint(err);
+
+    if (err) {
+        return "Not found";
+    }
+
+    return endpoint.address().to_string();
 }

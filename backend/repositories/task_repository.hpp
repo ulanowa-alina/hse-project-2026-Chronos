@@ -15,6 +15,8 @@ class TaskRepository {
     Task save(const Task& task);
     std::optional<Task> find_by_id(int task_id);
     std::vector<Task> find_by_board_id(int board_id);
+    std::vector<Task> find_by_user_id(int user_id);
+    std::vector<Task> find_by_board_and_status_id(int board_id, int status_id);
     bool delete_by_id(int task_id);
 
   private:

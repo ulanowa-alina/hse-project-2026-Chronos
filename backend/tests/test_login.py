@@ -1,0 +1,234 @@
+import uuid
+
+import pytest
+
+pytestmark = pytest.mark.asyncio
+
+AUTH_REGISTER_URL = "/auth/v1/register"
+AUTH_LOGIN_URL = "/auth/v1/login"
+
+
+def unique_email():
+    return f"login-{uuid.uuid4()}@example.com"
+
+
+async def register_user(service_client, *, email=None, password="password123"):
+    user = {
+        "name": "Login User",
+        "email": email or unique_email(),
+        "status": "student",
+        "password": password,
+    }
+
+    response = await service_client.post(AUTH_REGISTER_URL, json=user)
+    assert response.status_code in (200, 201), response.text
+    return user
+
+
+def assert_error_response(response_body, code, field=None):
+    assert "error" in response_body
+
+    error = response_body["error"]
+    assert error["code"] == code
+    assert isinstance(error["message"], str)
+    assert error["message"]
+
+    if field is not None:
+        assert "details" in error
+        assert field in error["details"]
+
+
+async def test_login_success(service_client):
+    user = await register_user(service_client)
+
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        json={
+            "email": user["email"],
+            "password": user["password"],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    assert "data" in body
+    assert isinstance(body["data"]["token"], str)
+    assert body["data"]["token"]
+
+    user_body = body["data"]["user"]
+    assert isinstance(user_body["id"], int)
+    assert user_body["email"] == user["email"]
+    assert isinstance(user_body["name"], str)
+    assert isinstance(user_body["status"], str)
+    assert isinstance(user_body["avatar_s3_key"], str)
+    assert isinstance(user_body["created_at"], str)
+
+
+async def test_login_wrong_password(service_client):
+    user = await register_user(service_client)
+
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        json={
+            "email": user["email"],
+            "password": "wrong_password",
+        },
+    )
+
+    assert response.status_code == 401, response.text
+    assert_error_response(response.json(), "UNAUTHORIZED")
+
+
+@pytest.mark.parametrize(
+    ("body", "missing_fields"),
+    [
+        ({"password": "password123"}, ["email"]),
+        ({"email": "user@example.com"}, ["password"]),
+        ({}, ["email", "password"]),
+    ],
+)
+async def test_login_missing_fields(service_client, body, missing_fields):
+    response = await service_client.post(AUTH_LOGIN_URL, json=body)
+
+    assert response.status_code == 400, response.text
+
+    response_body = response.json()
+    assert_error_response(response_body, "MISSING_FIELD")
+
+    details = response_body["error"]["details"]
+    assert "missing_fields" in details
+    for field in missing_fields:
+        assert field in details["missing_fields"]
+
+
+@pytest.mark.parametrize(
+    ("body", "invalid_field"),
+    [
+        ({"email": 123, "password": "password123"}, "email"),
+        ({"email": 12.5, "password": "password123"}, "email"),
+        ({"email": True, "password": "password123"}, "email"),
+        ({"email": None, "password": "password123"}, "email"),
+        ({"email": [], "password": "password123"}, "email"),
+        ({"email": ["user@example.com"], "password": "password123"}, "email"),
+        ({"email": {}, "password": "password123"}, "email"),
+        ({"email": {"value": "user@example.com"}, "password": "password123"}, "email"),
+        ({"email": "user@example.com", "password": 12345678}, "password"),
+        ({"email": "user@example.com", "password": 12.5}, "password"),
+        ({"email": "user@example.com", "password": True}, "password"),
+        ({"email": "user@example.com", "password": None}, "password"),
+        ({"email": "user@example.com", "password": []}, "password"),
+        ({"email": "user@example.com", "password": ["password123"]}, "password"),
+        ({"email": "user@example.com", "password": {}}, "password"),
+        ({"email": "user@example.com", "password": {"value": "password123"}}, "password"),
+    ],
+)
+async def test_login_invalid_data(service_client, body, invalid_field):
+    response = await service_client.post(AUTH_LOGIN_URL, json=body)
+
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "INVALID_FORMAT", invalid_field)
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "user",
+        "@example.com",
+        "user@",
+        "user@com",
+        "user@.com",
+        "user@example.",
+        "user name@example.com",
+        "user@example com",
+        "user@exam@ple.com",
+        "user#name@example.com",
+        "user@example..com",
+        ".user@example.com",
+        "user.@example.com",
+        "ваня@example.com",
+        "user@почта.рф",
+        " ",
+        "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqaewsredtzsexdrcftvgbhnjkmlmkjnhbgvfcdxszxdcfvgbhnjkmcfyvgubhdcfvgbhnjmjnhbgvcxddcfvgbhnjmkjnhbgvfcdinjmkjhgfdxcfgvhqwertyuioasdfghjkzxcvbnmqwertyuioasdfghjkzxcvbnbjnkmjhgfdtcfvghbjknrstuqwertyuiopasdfghjklzxcvbnmvwxyzabcdefghxml@example.com",
+    ],
+)
+async def test_login_invalid_email_format(service_client, email):
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        json={
+            "email": email,
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "VALIDATION_ERROR", "email")
+
+
+async def test_login_empty_password(service_client):
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        json={
+            "email": "user@example.com",
+            "password": "",
+        },
+    )
+
+    assert response.status_code == 400, response.text
+
+    body = response.json()
+    assert_error_response(body, "VALIDATION_ERROR", "password")
+    assert body["error"]["details"]["password"] == "Password cannot be empty"
+
+
+@pytest.mark.parametrize("password", ["1234567"[:i] for i in range(1, 8)])
+async def test_login_short_password(service_client, password):
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        json={
+            "email": "user@example.com",
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 400, response.text
+
+    body = response.json()
+    assert_error_response(body, "VALIDATION_ERROR", "password")
+    assert body["error"]["details"]["password"] == "Password length cannot be less than 8 symbols"
+
+
+@pytest.mark.parametrize(
+    "raw_body",
+    [
+        '{"email": "user@example.com", "password": "password123"',
+        '{"email": "user@example.com" "password": "password123"}',
+        '{"email": "user@example.com", "password": }',
+        "{'email': 'user@example.com', 'password': 'password123'}",
+        "just string",
+        '""',
+        "[]",
+    ],
+)
+async def test_login_invalid_json(service_client, raw_body):
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        content=raw_body,
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "INVALID_FORMAT")
+
+
+async def test_login_nonexistent_user(service_client):
+    response = await service_client.post(
+        AUTH_LOGIN_URL,
+        json={
+            "email": unique_email(),
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 401, response.text
+    assert_error_response(response.json(), "UNAUTHORIZED")

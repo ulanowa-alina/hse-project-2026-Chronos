@@ -9,6 +9,7 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
 
@@ -35,7 +36,7 @@ std::optional<int> parse_board_id_query(const http::request<http::string_body>& 
     const auto params = url_view_result->params();
     const auto it = params.find("board_id");
     if (it == params.end()) {
-        return std::nullopt;
+        throw std::invalid_argument("missing:board_id");
     }
 
     try {
@@ -50,8 +51,12 @@ std::optional<int> parse_board_id_query(const http::request<http::string_body>& 
         }
 
         return static_cast<int>(parsed);
-    } catch (const std::invalid_argument&) {
-        throw;
+    } catch (const std::invalid_argument& e) {
+        const std::string message = e.what();
+        if (message.rfind("type:", 0) == 0 || message.rfind("value:", 0) == 0) {
+            throw;
+        }
+        throw std::invalid_argument("type:board_id");
     } catch (const std::exception&) {
         throw std::invalid_argument("type:board_id");
     }
@@ -62,7 +67,6 @@ json model_to_json(const Board& board) {
                 {"user_id", board.user_id_},
                 {"title", board.title_},
                 {"description", board.description_},
-                {"is_private", board.is_private_},
                 {"created_at", time_to_string_iso8601(board.created_at_)},
                 {"updated_at", time_to_string_iso8601(board.updated_at_)}};
 }
@@ -71,7 +75,9 @@ json model_to_json(const Board& board) {
 
 auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool,
                int user_id) -> http::response<http::string_body> {
+    spdlog::info("Board get request received");
     if (req.method() != http::verb::get) {
+        spdlog::error("Board get rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -80,42 +86,54 @@ auto handleGet(const http::request<http::string_body>& req, ConnectionPool& pool
         BoardRepository board_repository(pool);
 
         const std::optional<int> requested_board_id = parse_board_id_query(req);
-        std::optional<Board> board = requested_board_id.has_value()
-                                         ? board_repository.find_by_id(*requested_board_id)
-                                         : board_repository.find_by_user_id(user_id);
+        std::optional<Board> board = board_repository.find_by_id(*requested_board_id);
 
         if (!board.has_value()) {
+            spdlog::error("Board get rejected: board with id={} not found",
+                          requested_board_id.value());
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (board->user_id_ != user_id) {
+            spdlog::error("Board get rejected: board with id={} belongs to another user",
+                          board->id_);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
         }
 
+        spdlog::info("Successfully get board with id={}", board->id_);
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(*board)}});
 
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
+        if (message.rfind("missing:", 0) == 0) {
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
+                json{{"board_id", "Missing required field"}});
+        }
         if (message.rfind("type:", 0) == 0) {
+            spdlog::error("Board get rejected: invalid field format");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
                 json{{"board_id", "Invalid board_id format"}});
         }
         if (message.rfind("value:", 0) == 0) {
+            spdlog::error("Board get rejected: invalid field value");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"board_id", "Board id must be positive"}});
         }
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", "Validation failed");
-    } catch (const std::runtime_error&) {
+    } catch (const std::runtime_error& e) {
+        spdlog::error("Board get failed with database error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", "Database error");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::error("Board get failed with unexpected error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "INTERNAL_ERROR", "Internal server error");
     }

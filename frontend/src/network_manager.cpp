@@ -39,6 +39,30 @@ void NetworkManager::PUT(const QString& endpoint, const QJsonObject& data) {
     sendRequest({endpoint, "PUT", data, 0});
 }
 
+void NetworkManager::syncPOST(const QString& endpoint, const QJsonObject& data,
+                              const QString& entity, int local_id, const QString& operation) {
+    RequestData req{endpoint, "POST", data, 0, entity, local_id, operation, true};
+    sendRequest(req);
+}
+
+void NetworkManager::syncPATCH(const QString& endpoint, const QJsonObject& data,
+                               const QString& entity, int local_id, const QString& operation) {
+    RequestData req{endpoint, "PATCH", data, 0, entity, local_id, operation, true};
+    sendRequest(req);
+}
+
+void NetworkManager::syncDELETE(const QString& endpoint, const QJsonObject& data,
+                                const QString& entity, int local_id, const QString& operation) {
+    RequestData req{endpoint, "DELETE", data, 0, entity, local_id, operation, true};
+    sendRequest(req);
+}
+
+void NetworkManager::syncPUT(const QString& endpoint, const QJsonObject& data,
+                             const QString& entity, int local_id, const QString& operation) {
+    RequestData req{endpoint, "PUT", data, 0, entity, local_id, operation, true};
+    sendRequest(req);
+}
+
 void NetworkManager::sendRequest(const RequestData& req_data) {
     QUrl url(base_url_ + req_data.endpoint_);
     QNetworkRequest request(url);
@@ -117,6 +141,11 @@ void NetworkManager::onResult(QNetworkReply* reply) {
     qDebug() << "Status:" << status_code;
     qDebug() << "Data:" << data;
 
-    emit responseReceived(endpoint, data, status_code);
+    if (req.is_sync_request_) {
+        emit syncResponseReceived(endpoint, data, status_code, req.sync_entity_, req.sync_local_id_,
+                                  req.sync_operation_);
+    } else {
+        emit responseReceived(endpoint, data, status_code);
+    }
     reply->deleteLater();
 }

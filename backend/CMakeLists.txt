@@ -10,37 +10,41 @@ find_package(Boost 1.74 REQUIRED COMPONENTS json url)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(spdlog REQUIRED)
 
 pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
+pkg_check_modules(ARGON2 REQUIRED IMPORTED_TARGET libargon2)
 
 include(FetchContent)
 
 FetchContent_Declare(
-        prometheus-cpp-lite
-        GIT_REPOSITORY https://github.com/biaks/prometheus-cpp-lite.git
-        GIT_TAG v2.0
+    prometheus-cpp-lite
+    GIT_REPOSITORY https://github.com/biaks/prometheus-cpp-lite.git
+    GIT_TAG v2.0
 )
 FetchContent_MakeAvailable(prometheus-cpp-lite)
 
 if(APPLE)
     target_include_directories(prometheus-cpp-lite INTERFACE
-            "${CMAKE_CURRENT_SOURCE_DIR}/compat"
+        "${CMAKE_CURRENT_SOURCE_DIR}/compat"
     )
     target_include_directories(prometheus-cpp-lite-full PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/compat"
+        "${CMAKE_CURRENT_SOURCE_DIR}/compat"
     )
     target_compile_options(prometheus-cpp-lite INTERFACE
-            $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
+        $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
     )
     target_compile_options(prometheus-cpp-lite-full PRIVATE
-            $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
+        $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-c++11-narrowing>
     )
 endif()
 
 file(GLOB_RECURSE BACKEND_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/models/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/repositories/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/models/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/repositories/*.cpp"
 )
 
 if(NOT BACKEND_SOURCES)
@@ -48,29 +52,39 @@ if(NOT BACKEND_SOURCES)
 endif()
 
 add_executable(chronos_backend ${BACKEND_SOURCES})
+
 target_include_directories(chronos_backend PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/models"
-        "${CMAKE_CURRENT_SOURCE_DIR}/repositories"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/server"
-        ${Boost_INCLUDE_DIRS}
-        ${PostgreSQL_INCLUDE_DIRS}
-        ${PQXX_INCLUDE_DIRS}
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/models"
+    "${CMAKE_CURRENT_SOURCE_DIR}/repositories"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/server"
+    ${Boost_INCLUDE_DIRS}
+    ${PostgreSQL_INCLUDE_DIRS}
+    ${PQXX_INCLUDE_DIRS}
+    ${ARGON2_INCLUDE_DIRS}
 )
 
 target_compile_definitions(chronos_backend PRIVATE
-        BOOST_ERROR_CODE_HEADER_ONLY
+    BOOST_ERROR_CODE_HEADER_ONLY
 )
 
 target_link_libraries(chronos_backend PRIVATE
-        Boost::boost
-        Boost::json
-        Boost::url
-        Threads::Threads
-        PkgConfig::PQXX
-        ${PostgreSQL_LIBRARIES}
-        OpenSSL::Crypto
-        prometheus-cpp-lite-full
+    Boost::boost
+    Boost::json
+    Boost::url
+    Threads::Threads
+    PkgConfig::PQXX
+    PkgConfig::ARGON2
+    ${PostgreSQL_LIBRARIES}
+    OpenSSL::Crypto
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog
+    prometheus-cpp-lite-full
 )
-target_compile_options(chronos_backend PRIVATE ${PQXX_CFLAGS_OTHER})
+
+target_compile_options(chronos_backend PRIVATE
+    ${PQXX_CFLAGS_OTHER}
+    ${ARGON2_CFLAGS_OTHER}
+)

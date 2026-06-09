@@ -1,22 +1,44 @@
 #include "db/connection_pool.hpp"
 #include "db/db_config.hpp"
+#include "server/auth/jwt.hpp"
 #include "server/metrics.hpp"
 #include "server/server.hpp"
 
 #include <boost/asio.hpp>
-#include <iostream>
+#include <memory>
 #include <prometheus/prometheus.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 #include <string>
 #include <thread>
 #include <vector>
 
 int main(int argc, char* argv[]) {
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto file_sink =
+        std::make_shared<spdlog::sinks::basic_file_sink_mt>("/app/backend/logs/server.log", true);
+
+    file_sink->set_pattern("[%Y-%m-%d %H:%M:%S] [%l] [thread: %t] %v");
+    console_sink->set_pattern("[%Y-%m-%d %H:%M:%S] [%^%l%$] [thread: %t] %v");
+
+    std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
+
+    auto logger = std::make_shared<spdlog::logger>("chronos_logger", sinks.begin(), sinks.end());
+
+    spdlog::set_default_logger(logger);
+
+    logger->set_level(spdlog::level::info);
+    spdlog::flush_on(spdlog::level::info);
+
+    auth::validate_jwt_config();
+
     auto db = load_db_config_from_env();
     ConnectionPool pool(db.connection_info(), db.pool_size);
 
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <host> <port>\n";
-        std::cerr << "Example: " << argv[0] << " 0.0.0.0 8080\n";
+        spdlog::critical("Usage: {} <host> <port>", argv[0]);
+        spdlog::critical("Example: {} 0.0.0.0 8080", argv[0]);
         return 1;
     }
 
@@ -31,7 +53,7 @@ int main(int argc, char* argv[]) {
         asio::io_context ioc{threadCount};
         Server server(ioc, host, port, pool);
 
-        std::cout << "Server started on http://" << host << ":" << port << "\n";
+        spdlog::info("Server started on http://{}:{}", host, port);
 
         std::vector<std::thread> threads;
         threads.reserve(static_cast<std::size_t>(threadCount - 1));
@@ -44,7 +66,7 @@ int main(int argc, char* argv[]) {
             thread.join();
         }
     } catch (const std::exception& exc) {
-        std::cerr << "Fatal error: " << exc.what() << "\n";
+        spdlog::critical("Fatal error: {}", exc.what());
         return 1;
     }
     return 0;
