@@ -10,13 +10,10 @@ PomodoroSession PomodoroSessionRepository::insert(const PomodoroSession& session
     auto handle = pool_.acquire();
     pqxx::work txn(handle.conn());
 
-    std::string goal_minutes_param =
-        session.goal_minutes_.has_value() ? txn.quote(session.goal_minutes_.value()) : "NULL";
-
     pqxx::result r = txn.exec_params(
         "INSERT INTO pomodoro_sessions (user_id, goal_minutes, work_duration_seconds, "
         "break_duration_seconds, completed_cycles, started_at) "
-        "VALUES ($1, $2, $3, $4, $5, TO_TIMESTAMP($6)) "
+        "VALUES ($1, NULLIF($2, 0), $3, $4, $5, TO_TIMESTAMP($6)) "
         "RETURNING id, EXTRACT(EPOCH FROM started_at)::bigint AS started_sec",
         session.user_id_, session.goal_minutes_.has_value() ? session.goal_minutes_.value() : 0,
         session.work_duration_seconds_, session.break_duration_seconds_, session.completed_cycles_,
@@ -39,7 +36,7 @@ void PomodoroSessionRepository::update(const PomodoroSession& session) {
                   ")"
             : "NULL";
 
-    txn.exec_params("UPDATE pomodoro_sessions SET user_id = $1, goal_minutes = $2, "
+    txn.exec_params("UPDATE pomodoro_sessions SET user_id = $1, goal_minutes = NULLIF($2, 0), "
                     "work_duration_seconds = $3, break_duration_seconds = $4, "
                     "completed_cycles = $5, completed_at = " +
                         completed_at_param +

@@ -1,4 +1,4 @@
-**Актуальная версия: 1.7**
+**Актуальная версия: 1.8**
 ### Содержание:
 1. [[#История изменений]]
 2. [[#Входные параметры]]<br>
@@ -25,8 +25,9 @@
 | 1.3    | 07.04.2026 | Документ приведён к единому стилю:<br>1. Названия полей переведены в `snake_case`<br>2. Форматы успешных ответов унифицированы через `data`<br>3. Примеры запросов и ответов синхронизированы с текущими endpoint'ами `.../v1/...`<br>4. Удалены упоминания `Tag/tags`|
 | 1.4    | 10.04.2026 | Обновлены endpoint'ы board/task и personal API: унифицированы пути для досок, добавлены `/board/v1/edit` и task endpoint'ы `/task/v1/create`, `/task/v1/edit`, `/task/v1/delete`; обновлены примеры запросов и таблица успешных ответов.                              |
 | 1.5    | 05.05.2026 | Добавлен endpoint `/task/v1/get_all` для получения задач пользователя с фильтрацией по `board_id` и `status_id`; добавлены описание параметров и пример запроса/ответа; еnpoint для получения всех статусов с фильтрацией по доске `board_id`                         |
-| 1.6    | 31.05.2026 | Добавлены endpoint'ы `/personal/v1/avatar/upload` и `/personal/v1/avatar` для загрузки и удаления аватара; обновлена модель `User` полем `avatar_s3_key`; уточнён контракт `PUT /personal/v1/edit`; добавлены новые коды ошибок `S3_UPLOAD_ERROR` и `S3_DELETE_ERROR` |
+| 1.6    | 31.05.2026 | Добавлены endpoint'ы `/personal/v1/avatar/upload` и `/personal/v1/avatar` для загрузки и удаления аватара; обновлена модель `User` полем `avatar_s3_key`; уточнён контракт `PUT /personal/v1/edit`; добавлен код ошибки `S3_UPLOAD_ERROR` |
 | 1.7    | 05.06.2026 | Upload аватара переведён на public PUT в Yandex Object Storage; удаление фото работает как очистка `avatar_s3_key` в БД без физического удаления объекта из bucket; ключи доступа для текущего upload flow не требуются |
+| 1.8    | 09.06.2026 | Добавлены endpoint'ы Pomodoro `/pomodoro/v1/create` и `/pomodoro/v1/get_user_sessions`; добавлена модель `PomodoroSession`; документация синхронизирована с JWT-auth, локальной SQLite-схемой, `avatar_s3_key` и актуальными DBML-схемами |
 
 
 ### Входные параметры
@@ -54,6 +55,8 @@
 | PATCH  | /status/v1/edit   | Обновить статус доски               | {"status_id": "id",<br>"name": "...",<br>"position": 0}                                                          | `data: Status`      |
 | DELETE | /status/v1/delete | Удалить статус доски                | {"status_id": "id"}                                                                                              | 204 No Content      |
 | GET    | /status/v1/get_all| Получить статусы пользователя       | `query: board_id=<id> (optional)`                                                                                |  `data: Status[]`   |
+| POST   | /pomodoro/v1/create | Сохранить Pomodoro-сессию         | {"goal_minutes": 60 \| null,<br>"work_duration_seconds": 1800,<br>"break_duration_seconds": 300,<br>"completed_cycles": 1} | `data: PomodoroSession` |
+| GET    | /pomodoro/v1/get_user_sessions | Получить Pomodoro-сессии пользователя | —                                                                                                      | `data: PomodoroSession[]` |
 
 
 ##### Модели
@@ -107,7 +110,21 @@
 | 3   | name     | string     | да             | Название статуса       | В работе |
 | 4   | position | integer    | да             | Позиция на доске       | 1        |
 
-5. Post (Авторизация)
+5. PomodoroSession (Сессия фокусировки)
+   PomodoroSession object
+
+| №   | Параметр              | Тип данных        | Обязательность | Описание                                      | Пример               |
+| --- | --------------------- | ----------------- | -------------- | --------------------------------------------- | -------------------- |
+| 1   | id                    | integer           | да             | Идентификатор сессии                          | 1                    |
+| 2   | user_id               | integer           | да             | id пользователя                               | 1                    |
+| 3   | goal_minutes          | integer \| null   | нет            | Цель пользователя в рабочих минутах           | 60                   |
+| 4   | work_duration_seconds | integer           | да             | Фактически сохранённое рабочее время в секундах; клиент округляет до минут | 1800 |
+| 5   | break_duration_seconds| integer           | да             | Длительность перерыва в секундах              | 300                  |
+| 6   | completed_cycles      | integer           | да             | Количество завершённых рабочих циклов         | 1                    |
+| 7   | started_at            | string (ISO 8601) | да             | Время начала сессии                           | 2026-06-09T12:00:00Z |
+| 8   | completed_at          | string (ISO 8601) \| null | нет    | Время завершения сессии, если задано          | null                 |
+
+6. Post (Авторизация)
 
 LoginRequest
 
@@ -169,6 +186,18 @@ LoginResponse
 | name     | 1–50 символов             |
 | position | Целое число, не меньше 0  |
 
+5. PomodoroSession
+
+| Параметр              | Ограничения                                      |
+| --------------------- | ------------------------------------------------ |
+| goal_minutes          | `null` или положительное целое число             |
+| work_duration_seconds | Положительное целое число; клиент сохраняет поминутно |
+| break_duration_seconds| Положительное целое число                        |
+| completed_cycles      | Целое число, не меньше 0                         |
+
+Примечание:
+Pomodoro в клиенте работает циклами 30 минут работы и 5 минут отдыха. Если цель меньше 30 минут, рабочая фаза равна цели. Если цель больше 30 минут, клиент набирает её несколькими рабочими фазами; время отдыха не входит в статистику фокусировки.
+
 
 ### Выходные параметры
 
@@ -199,7 +228,7 @@ LoginResponse
 }
 ```
 
->`<Object>` — одна из моделей: User, Board, Task, Status
+>`<Object>` — одна из моделей: User, Board, Task, Status, PomodoroSession
 
 2. Формат успешного ответа со списком объектов
 
@@ -254,7 +283,6 @@ HTTP 204 No Content
 | PATCH /board/v1/edit     | `data: Board`            |
 | GET /board/v1/get        | `data: Board`            |
 | DELETE /board/v1/delete  | `204 No Content`         |
-| DELETE /personal/v1/avatar | `data.avatar_s3_key`   |
 | GET /board/v1/tasks      | `data: Task[]`           |
 | POST /task/v1/create     | `data: Task`             |
 | PATCH /task/v1/edit      | `data: Task`             |
@@ -263,6 +291,8 @@ HTTP 204 No Content
 | PATCH /status/v1/edit    | `data: Status`           |
 | DELETE /status/v1/delete | `204 No Content`         |
 | GET /status/v1/get_all   | `data: Status[]`         |
+| POST /pomodoro/v1/create | `data: PomodoroSession`  |
+| GET /pomodoro/v1/get_user_sessions | `data: PomodoroSession[]` |
 
 
 ##### Ответ с ошибками
@@ -291,7 +321,8 @@ HTTP 204 No Content
 | 401 | Ошибки авторизации             | UNAUTHORIZED<br> INVALID_TOKEN                                          |
 | 403 | Ошибки доступа                 | FORBIDDEN<br> RESOURCE_NOT_OWNED                                        |
 | 404 | Запрашиваемый ресурс не найден | USER_NOT_FOUND<br> BOARD_NOT_FOUND<br> TASK_NOT_FOUND<br> STATUS_NOT_FOUND |
-| 405 | Конфликты данных               | DUPLICATE_RESOURCE<br> EMAIL_ALREADY_EXISTS                             |
+| 405 | Неверный HTTP-метод            | METHOD_NOT_ALLOWED<br> DUPLICATE_RESOURCE                               |
+| 409 | Конфликты данных               | DUPLICATE_RESOURCE<br> EMAIL_ALREADY_EXISTS                             |
 | 500 | Внутренняя ошибка сервера      | INTERNAL_ERROR<br> DATABASE_ERROR<br> S3_UPLOAD_ERROR |
 
 Значения ошибок и их коды:
@@ -327,7 +358,14 @@ HTTP 204 No Content
 | TASK_NOT_FOUND   | Задача не найдена       |
 | STATUS_NOT_FOUND | Статус не найден        |
 
-405 — Конфликты данных
+405 — Неверный HTTP-метод
+
+| Код ошибки            | Описание                                      |
+| --------------------- | --------------------------------------------- |
+| METHOD_NOT_ALLOWED    | Endpoint не поддерживает переданный HTTP-метод |
+| DUPLICATE_RESOURCE    | Исторически используется частью ручек для method not allowed |
+
+409 — Конфликты данных
 
 | Код ошибки            | Описание                                      |
 | --------------------- | --------------------------------------------- |
@@ -589,9 +627,11 @@ Content-Type: application/json
     "id": 101,
     "board_id": 10,
     "title": "Оформить README",
+    "description": "",
     "status_id": 1,
     "priority_color": "red",
     "is_completed": false,
+    "deadline": null,
     "created_at": "2026-02-07T10:30:00Z",
     "updated_at": "2026-02-07T10:30:00Z"
   }
@@ -729,4 +769,62 @@ Authorization: Bearer <JWT>
   ]
 }
 
+```
+
+14. Сохранение Pomodoro-сессии
+
+Запрос:
+```bash
+POST /pomodoro/v1/create
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "goal_minutes": 60,
+  "work_duration_seconds": 1800,
+  "break_duration_seconds": 300,
+  "completed_cycles": 1
+}
+```
+
+Ответ:
+```json
+{
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "goal_minutes": 60,
+    "work_duration_seconds": 1800,
+    "break_duration_seconds": 300,
+    "completed_cycles": 1,
+    "started_at": "2026-06-09T12:00:00Z",
+    "completed_at": null
+  }
+}
+```
+
+15. Получение Pomodoro-сессий пользователя
+
+Запрос:
+```bash
+GET /pomodoro/v1/get_user_sessions
+Authorization: Bearer <JWT>
+```
+
+Ответ:
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "goal_minutes": 60,
+      "work_duration_seconds": 1800,
+      "break_duration_seconds": 300,
+      "completed_cycles": 1,
+      "started_at": "2026-06-09T12:00:00Z",
+      "completed_at": null
+    }
+  ]
+}
 ```

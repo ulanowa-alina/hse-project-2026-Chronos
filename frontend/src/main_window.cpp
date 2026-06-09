@@ -286,8 +286,11 @@ void MainWindow::switchToPomodoro() {
     if (!pomodoro_screen_) {
         pomodoro_screen_ = new PomodoroScreen();
         pomodoro_screen_->setNetworkManager(network_manager_);
+        pomodoro_screen_->setDatabase(db_);
         connect(pomodoro_screen_, &PomodoroScreen::openProfileScreen, this,
                 &MainWindow::switchToProfile);
+        connect(pomodoro_screen_, &PomodoroScreen::sessionSaved, dashboard_screen_,
+                &DashboardScreen::reloadDashboardData);
     }
     pomodoro_screen_->show();
     pomodoro_screen_->raise();

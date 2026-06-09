@@ -1,9 +1,17 @@
 #include "pomodoro_screen.h"
 
+#include "../local_repositories/local_pomodoro_session_repository.hpp"
+#include "../local_repositories/local_user_repository.hpp"
+
+#include <QDateTime>
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSizePolicy>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 PomodoroScreen::PomodoroScreen(QWidget* parent)
     : QWidget(parent) {
@@ -31,11 +39,15 @@ void PomodoroScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void PomodoroScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
+}
+
 void PomodoroScreen::setupWelcomeScreen() {
     welcome_widget_ = new QWidget();
     auto* layout = new QVBoxLayout(welcome_widget_);
-    layout->setContentsMargins(50, 100, 50, 100);
-    layout->setSpacing(30);
+    layout->setContentsMargins(36, 48, 36, 48);
+    layout->setSpacing(24);
 
     welcome_label_ = new QLabel("<h2 style='color: #172b4d;'>Режим Pomodoro</h2>"
                                 "<p style='color: #5e6c84; font-size: 14px;'>"
@@ -45,6 +57,8 @@ void PomodoroScreen::setupWelcomeScreen() {
                                 "</p>");
     welcome_label_->setWordWrap(true);
     welcome_label_->setAlignment(Qt::AlignCenter);
+    welcome_label_->setMaximumWidth(320);
+    welcome_label_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::MinimumExpanding);
 
     start_focus_button_ = new QPushButton("Начать фокусировку");
     start_focus_button_->setCursor(Qt::PointingHandCursor);
@@ -190,9 +204,12 @@ void PomodoroScreen::onSkipGoalClicked() {
 
 void PomodoroScreen::startTimer() {
     is_work_phase_ = true;
+    total_work_seconds_ = nextWorkPhaseSeconds();
     remaining_seconds_ = total_work_seconds_;
     completed_cycles_ = 0;
     total_work_time_seconds_ = 0;
+    last_saved_work_minutes_ = 0;
+    local_session_id_ = 0;
 
     state_label_->setText("РАБОТА");
     state_label_->setStyleSheet("font-size: 24px; font-weight: bold; color: #305CDE;");
@@ -222,6 +239,10 @@ void PomodoroScreen::onTimerTick() {
 
     if (is_work_phase_) {
         total_work_time_seconds_++;
+        const int worked_minutes = total_work_time_seconds_ / 60;
+        if (worked_minutes > last_saved_work_minutes_) {
+            saveLocalSession();
+        }
     }
 
     circular_progress_->setTimerText(formatTime(remaining_seconds_));
@@ -242,6 +263,7 @@ void PomodoroScreen::onTimerTick() {
             circular_progress_->setColor(QColor("#00875a"));
         } else {
             is_work_phase_ = true;
+            total_work_seconds_ = nextWorkPhaseSeconds();
             remaining_seconds_ = total_work_seconds_;
 
             state_label_->setText("РАБОТА");
@@ -262,22 +284,82 @@ void PomodoroScreen::onTimerTick() {
     }
 }
 
+int PomodoroScreen::nextWorkPhaseSeconds() const {
+    if (!has_goal_) {
+        return default_work_seconds_;
+    }
+
+    const int goal_seconds = goal_minutes_ * 60;
+    const int remaining_goal_seconds = goal_seconds - total_work_time_seconds_;
+    return std::min(default_work_seconds_, remaining_goal_seconds);
+}
+
 void PomodoroScreen::onStopClicked() {
     stopTimer();
 }
 
 void PomodoroScreen::saveSession() {
+    if (total_work_time_seconds_ <= 0) {
+        return;
+    }
+
+    const int saved_work_minutes = (total_work_time_seconds_ + 59) / 60;
+
+    saveLocalSession();
+
     if (!network_manager_) {
         return;
     }
 
     QJsonObject json;
     json["goal_minutes"] = has_goal_ ? goal_minutes_ : QJsonValue();
-    json["work_duration_seconds"] = total_work_time_seconds_;
+    json["work_duration_seconds"] = saved_work_minutes * 60;
     json["break_duration_seconds"] = total_break_seconds_;
     json["completed_cycles"] = completed_cycles_;
 
     network_manager_->POST(network_manager_->pomodoro_create_url_, json);
+}
+
+void PomodoroScreen::saveLocalSession() {
+    if (!db_.isOpen() || total_work_time_seconds_ <= 0) {
+        return;
+    }
+
+    try {
+        LocalUserRepository user_repo(db_);
+        const auto user = user_repo.getCurrentUser();
+        if (!user) {
+            return;
+        }
+
+        const int saved_work_minutes = (total_work_time_seconds_ + 59) / 60;
+        if (saved_work_minutes <= 0) {
+            return;
+        }
+
+        LocalPomodoroSessionRepository session_repo(db_);
+        const QString now = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+
+        if (local_session_id_ <= 0) {
+            local_session_id_ = session_repo.getNextId();
+        }
+
+        LocalPomodoroSession session(local_session_id_, user->id_, saved_work_minutes * 60,
+                                     total_break_seconds_, has_goal_ ? goal_minutes_ : 0,
+                                     completed_cycles_, now, QString(), now, now, QString(),
+                                     SyncStatus::PENDING, 0);
+
+        if (session_repo.findById(local_session_id_)) {
+            session_repo.update(session);
+        } else {
+            session_repo.insert(session);
+        }
+
+        last_saved_work_minutes_ = saved_work_minutes;
+        emit sessionSaved();
+    } catch (const std::exception& e) {
+        qDebug() << "PomodoroScreen: Error saving local session:" << e.what();
+    }
 }
 
 QString PomodoroScreen::formatTime(int seconds) {

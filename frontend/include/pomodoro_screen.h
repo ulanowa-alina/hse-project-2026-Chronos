@@ -7,6 +7,7 @@
 #include <QDialog>
 #include <QLabel>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QTimer>
@@ -20,9 +21,11 @@ class PomodoroScreen : public QWidget {
     explicit PomodoroScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setDatabase(QSqlDatabase db);
 
   signals:
     void openProfileScreen();
+    void sessionSaved();
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
@@ -36,6 +39,7 @@ class PomodoroScreen : public QWidget {
     enum class ScreenState { Welcome, GoalSelection, Timer };
 
     NetworkManager* network_manager_{nullptr};
+    QSqlDatabase db_;
 
     QStackedWidget* stacked_widget_{nullptr};
 
@@ -59,11 +63,14 @@ class PomodoroScreen : public QWidget {
     bool is_work_phase_{true};
     int remaining_seconds_{0};
     int total_work_seconds_{30 * 60};
+    int default_work_seconds_{30 * 60};
     int total_break_seconds_{5 * 60};
     int completed_cycles_{0};
     int goal_minutes_{0};
     bool has_goal_{false};
     int total_work_time_seconds_{0};
+    int last_saved_work_minutes_{0};
+    int local_session_id_{0};
 
     void setupWelcomeScreen();
     void setupGoalSelectionScreen();
@@ -72,6 +79,8 @@ class PomodoroScreen : public QWidget {
     void startTimer();
     void stopTimer();
     void saveSession();
+    void saveLocalSession();
+    int nextWorkPhaseSeconds() const;
     QString formatTime(int seconds);
 };
 
