@@ -130,6 +130,8 @@ void TaskSyncManager::sync() {
             json["is_completed"] = task.is_completed_;
             if (!task.deadline_.isEmpty()) {
                 json["deadline"] = task.deadline_;
+            } else {
+                json["deadline"] = QJsonValue::Null;
             }
             network_manager_->syncPATCH(network_manager_->tasks_edit_url_, json, modelName(),
                                         task.id_, "update");

@@ -6,7 +6,10 @@
 #include "../../utils/response_utils.hpp"
 
 #include <array>
+#include <chrono>
 #include <ctime>
+#include <iomanip>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <spdlog/spdlog.h>
@@ -63,6 +66,27 @@ std::string time_to_string_iso8601(std::time_t t) {
         return {buffer.data()};
     }
     throw std::runtime_error("Failed to format timestamp");
+}
+
+std::time_t parse_iso8601_utc(const std::string& value) {
+    if (value.empty() || value.back() != 'Z') {
+        throw std::invalid_argument("value:deadline");
+    }
+
+    std::tm tm = {};
+    std::istringstream stream(value.substr(0, value.size() - 1));
+    stream >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+    if (stream.fail() || !stream.eof()) {
+        throw std::invalid_argument("value:deadline");
+    }
+
+    const std::time_t parsed = timegm(&tm);
+    if (parsed < 0) {
+        throw std::invalid_argument("value:deadline");
+    }
+
+    const auto tp = std::chrono::system_clock::from_time_t(parsed);
+    return std::chrono::system_clock::to_time_t(tp);
 }
 
 json model_to_json(const Task& task) {
@@ -207,8 +231,19 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
             is_completed = body["is_completed"].get<bool>();
         }
 
+        std::optional<std::time_t> deadline = existing_task->deadline_;
+        if (body.contains("deadline")) {
+            if (body["deadline"].is_null()) {
+                deadline = std::nullopt;
+            } else if (body["deadline"].is_string()) {
+                deadline = parse_iso8601_utc(body["deadline"].get<std::string>());
+            } else {
+                throw std::invalid_argument("type:deadline");
+            }
+        }
+
         const Task task_to_save(existing_task->id_, existing_task->board_id_, title, description,
-                                existing_task->deadline_, status_id, priority_color, is_completed,
+                                deadline, status_id, priority_color, is_completed,
                                 existing_task->created_at_, existing_task->updated_at_);
 
         const Task updated_task = task_repository.save(task_to_save);
