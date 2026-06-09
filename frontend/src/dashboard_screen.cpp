@@ -413,6 +413,10 @@ void DashboardScreen::loadDeadlines() {
               });
 
     for (auto* card : deadline_cards_) {
+        if (auto* layout = qobject_cast<QHBoxLayout*>(deadlines_container_->layout())) {
+            layout->removeWidget(card);
+        }
+        card->setParent(nullptr);
         card->deleteLater();
     }
     deadline_cards_.clear();
@@ -499,6 +503,10 @@ void DashboardScreen::loadBoards() {
 
 void DashboardScreen::clearBoards() {
     for (auto* card : board_cards_) {
+        if (auto* layout = qobject_cast<QHBoxLayout*>(boards_container_->layout())) {
+            layout->removeWidget(card);
+        }
+        card->setParent(nullptr);
         card->deleteLater();
     }
     board_cards_.clear();

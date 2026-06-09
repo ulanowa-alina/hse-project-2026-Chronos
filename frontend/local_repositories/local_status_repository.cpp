@@ -214,16 +214,33 @@ void LocalStatusRepository::deleteById(int status_id) {
 void LocalStatusRepository::markDeletedById(int status_id) {
     QSqlQuery query(db_);
 
+    if (!db_.transaction()) {
+        throw std::runtime_error("LocalStatusRepository: failed to start delete transaction");
+    }
+
+    query.prepare("DELETE FROM tasks WHERE status_id = :id");
+    query.bindValue(":id", status_id);
+    if (!query.exec()) {
+        db_.rollback();
+        throw std::runtime_error(
+            ("LocalStatusRepository: Error deleting status tasks " + query.lastError().text())
+                .toStdString());
+    }
+
     query.prepare("UPDATE statuses "
                   "SET deleted_at = CURRENT_TIMESTAMP, sync_status = 'pending' "
                   "WHERE id = :id");
-
     query.bindValue(":id", status_id);
 
     if (!query.exec()) {
+        db_.rollback();
         throw std::runtime_error(
             ("LocalStatusRepository: Error delete by id " + query.lastError().text())
                 .toStdString());
+    }
+
+    if (!db_.commit()) {
+        throw std::runtime_error("LocalStatusRepository: failed to commit delete transaction");
     }
 }
 

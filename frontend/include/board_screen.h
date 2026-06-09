@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QMap>
+#include <QPointer>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPushButton>
@@ -43,6 +44,7 @@ class BoardScreen : public QWidget {
 
   private slots:
     void onStatusCreateRequest();
+    void onStatusDeleteRequested(int status_id);
     void onProfileRequest();
     void onAvatarImageDownloaded(QNetworkReply* reply);
     void onPomodoroRequest();
@@ -71,9 +73,10 @@ class BoardScreen : public QWidget {
 
     QScrollArea* scroll_area_{nullptr};
     QHBoxLayout* board_layout_{nullptr};
-    QMap<int, StatusWindow*> status_windows_;
+    QMap<int, QPointer<StatusWindow>> status_windows_;
     QMap<int, QString> status_names_;
 
+    void removeStatusWindow(int status_id);
     void loadAvatar(const QString& avatar_s3_key);
     void setDefaultAvatar();
     StatusWindow* showStatusWindow(int status_id, const QString& name);

@@ -78,10 +78,13 @@ void BoardScreen::loadFromLocalDatabase() {
     LocalTaskRepository task_repo(db_);
     const std::vector<LocalTask> tasks = task_repo.findByBoardId(board_id_);
     for (const LocalTask& task : tasks) {
-        const QString status_name = status_names_.contains(task.status_id_)
-                                        ? status_names_.value(task.status_id_)
-                                        : "Status " + QString::number(task.status_id_);
+        if (!status_names_.contains(task.status_id_)) {
+            qDebug() << "BoardScreen: skip task with missing status" << task.id_
+                     << "status_id=" << task.status_id_;
+            continue;
+        }
 
+        const QString status_name = status_names_.value(task.status_id_);
         StatusWindow* status = showStatusWindow(task.status_id_, status_name);
 
         auto* card = new TaskCard(task.id_, task.board_id_, task.status_id_, db_, status);
@@ -116,9 +119,33 @@ void BoardScreen::clearBoardData() {
     }
 }
 
+void BoardScreen::removeStatusWindow(int status_id) {
+    auto it = status_windows_.find(status_id);
+    if (it == status_windows_.end()) {
+        return;
+    }
+
+    StatusWindow* status = it.value();
+    status_windows_.erase(it);
+    status_names_.remove(status_id);
+
+    if (!status) {
+        return;
+    }
+
+    if (board_layout_) {
+        board_layout_->removeWidget(status);
+    }
+    status->setParent(nullptr);
+    status->deleteLater();
+}
+
 StatusWindow* BoardScreen::showStatusWindow(int status_id, const QString& name) {
     if (status_windows_.contains(status_id)) {
-        return status_windows_.value(status_id);
+        if (StatusWindow* existing = status_windows_.value(status_id)) {
+            return existing;
+        }
+        status_windows_.remove(status_id);
     }
 
     auto* status = new StatusWindow(status_id, board_id_, name, db_, this);
@@ -126,6 +153,7 @@ StatusWindow* BoardScreen::showStatusWindow(int status_id, const QString& name) 
         status->setSyncCoordinator(sync_coordinator_);
     }
     connect(status, &StatusWindow::openTaskCreateScreen, this, &BoardScreen::openTaskCreateScreen);
+    connect(status, &StatusWindow::deleteRequested, this, &BoardScreen::onStatusDeleteRequested);
     board_layout_->insertWidget(board_layout_->count() - 1, status);
     status_windows_.insert(status_id, status);
     return status;
@@ -253,10 +281,22 @@ void BoardScreen::onStatusCreateRequest() {
         return;
     }
 
+
+    auto* new_status = new StatusWindow(temp_id, board_id_, trimmed_name, db_, this);
+    new_status->setSyncCoordinator(sync_coordinator_);
+    connect(new_status, &StatusWindow::openTaskCreateScreen, this,
+            &BoardScreen::openTaskCreateScreen);
+    connect(new_status, &StatusWindow::deleteRequested, this,
+            &BoardScreen::onStatusDeleteRequested);
+    board_layout_->insertWidget(board_layout_->count() - 1, new_status);
+    status_windows_.insert(temp_id, new_status);
     status_names_.insert(temp_id, trimmed_name);
     showStatusWindow(temp_id, trimmed_name);
-
     sync_coordinator_->syncStatuses();
+}
+
+void BoardScreen::onStatusDeleteRequested(int status_id) {
+    removeStatusWindow(status_id);
 }
 
 void BoardScreen::onProfileRequest() {
