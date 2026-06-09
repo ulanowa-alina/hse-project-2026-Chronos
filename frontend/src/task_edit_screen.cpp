@@ -6,6 +6,12 @@
 #include <QDebug>
 
 namespace {
+const QString kInlineErrorStyle =
+    QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
+const QString kTitleRequiredMessage = QStringLiteral("Название задачи не может быть пустым");
+const QString kLocalSaveErrorMessage =
+    QStringLiteral("Не удалось сохранить задачу. Попробуйте еще раз.");
+
 QString priorityLabelForValue(const QString& priority_value) {
     if (priority_value == "green") {
         return QStringLiteral("🟢Низкий");
@@ -53,6 +59,8 @@ void TaskEditScreen::setStatusId(int status_id) {
 }
 
 void TaskEditScreen::loadTaskData() {
+    clearErrorMessage();
+
     if (task_id_ <= 0) {
         return;
     }
@@ -89,6 +97,8 @@ void TaskEditScreen::onUpdateTaskRequest() {
         return;
     }
 
+    clearErrorMessage();
+
     QString title = title_input_->text().trimmed();
     QString description = description_input_->toPlainText().trimmed();
     QString priority_color = priority_combo_->currentText();
@@ -96,6 +106,7 @@ void TaskEditScreen::onUpdateTaskRequest() {
 
     if (title.isEmpty()) {
         qDebug() << "TaskEditScreen: Название задачи не может быть пустым";
+        showErrorMessage(kTitleRequiredMessage);
         return;
     }
 
@@ -127,19 +138,46 @@ void TaskEditScreen::onUpdateTaskRequest() {
     task.sync_status_ = SyncStatus::PENDING;
     try {
         repo.save(task);
+        clearErrorMessage();
         emit taskUpdated();
         sync_coordinator_->syncTasks();
     } catch (const std::exception& e) {
         qDebug() << "TaskEditScreen: Ошибка сохранения в локальную БД:" << e.what();
+        showErrorMessage(kLocalSaveErrorMessage);
     }
 }
 
 void TaskEditScreen::onCloseRequest() {
+    clearErrorMessage();
     emit closeRequested();
 }
 
 void TaskEditScreen::onDeadlineCheckChanged(Qt::CheckState state) {
     deadline_input_->setEnabled(state == Qt::Checked);
+}
+
+void TaskEditScreen::showErrorMessage(const QString& message) {
+    if (!error_label_) {
+        return;
+    }
+
+    const QString trimmed_message = message.trimmed();
+    if (trimmed_message.isEmpty()) {
+        clearErrorMessage();
+        return;
+    }
+
+    error_label_->setText(trimmed_message);
+    error_label_->show();
+}
+
+void TaskEditScreen::clearErrorMessage() {
+    if (!error_label_) {
+        return;
+    }
+
+    error_label_->clear();
+    error_label_->hide();
 }
 
 void TaskEditScreen::setupLayout() {
@@ -256,6 +294,13 @@ void TaskEditScreen::setupLayout() {
 
     main_layout->addSpacing(20);
 
+    error_label_ = new QLabel(this);
+    error_label_->setWordWrap(true);
+    error_label_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    error_label_->setStyleSheet(kInlineErrorStyle);
+    error_label_->hide();
+    main_layout->addWidget(error_label_);
+
     auto* button_layout = new QHBoxLayout();
     button_layout->setSpacing(10);
 
@@ -284,4 +329,12 @@ void TaskEditScreen::setupLayout() {
     connect(close_button_, &QPushButton::clicked, this, &TaskEditScreen::onCloseRequest);
     connect(deadline_checkbox_, &QCheckBox::checkStateChanged, this,
             &TaskEditScreen::onDeadlineCheckChanged);
+    connect(title_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(description_input_, &QTextEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(priority_combo_, &QComboBox::currentTextChanged, this,
+            [this](const QString&) { clearErrorMessage(); });
+    connect(deadline_checkbox_, &QCheckBox::checkStateChanged, this,
+            [this](Qt::CheckState) { clearErrorMessage(); });
+    connect(deadline_input_, &QDateTimeEdit::dateTimeChanged, this,
+            [this](const QDateTime&) { clearErrorMessage(); });
 }

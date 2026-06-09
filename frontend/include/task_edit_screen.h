@@ -53,6 +53,7 @@ class TaskEditScreen : public QWidget {
 
     QLabel* logo_label_{nullptr};
     QLabel* title_label_{nullptr};
+    QLabel* error_label_{nullptr};
 
     QLineEdit* title_input_{nullptr};
     QTextEdit* description_input_{nullptr};
@@ -61,6 +62,8 @@ class TaskEditScreen : public QWidget {
     QCheckBox* deadline_checkbox_{nullptr};
 
     void setupLayout();
+    void showErrorMessage(const QString& message);
+    void clearErrorMessage();
 };
 
 #endif // TASK_EDIT_SCREEN_H

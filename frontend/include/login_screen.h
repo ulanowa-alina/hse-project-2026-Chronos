@@ -41,10 +41,13 @@ class LoginScreen : public QWidget {
     QLabel* logo_label_{nullptr};
     QLabel* no_account_label_{nullptr};
     QLabel* login_title_label_{nullptr};
+    QLabel* error_label_{nullptr};
 
     QLineEdit* email_input_{nullptr};
     QLineEdit* password_input_{nullptr};
 
     void setupLayout();
+    void showErrorMessage(const QString& message);
+    void clearErrorMessage();
 };
 #endif // LOGIN_SCREEN_H

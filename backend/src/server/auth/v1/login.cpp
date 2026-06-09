@@ -3,6 +3,7 @@
 #include "repositories/user_repository.hpp"
 #include "security/password_hashing.hpp"
 #include "server/auth/jwt.hpp"
+#include "server/utils/email_validation.hpp"
 
 #include <ctime>
 #include <iomanip>
@@ -17,65 +18,6 @@ namespace auth::v1 {
 namespace {
 
 using nlohmann::json;
-
-auto is_valid_email(const std::string& email) -> bool {
-    if (email.empty()) {
-        return false;
-    }
-
-    if (email.size() > 254) {
-        return false;
-    }
-
-    if (email.find(' ') != std::string::npos) {
-        return false;
-    }
-
-    const auto at_pos = email.find('@');
-    if (at_pos == std::string::npos) {
-        return false;
-    }
-
-    if (at_pos == 0 || at_pos != email.rfind('@')) {
-        return false;
-    }
-
-    const std::string local = email.substr(0, at_pos);
-    const std::string domain = email.substr(at_pos + 1);
-
-    if (local.empty() || domain.empty()) {
-        return false;
-    }
-
-    if (local.front() == '.' || local.back() == '.') {
-        return false;
-    }
-
-    if (domain.front() == '.' || domain.back() == '.') {
-        return false;
-    }
-
-    if (email.find("..") != std::string::npos) {
-        return false;
-    }
-
-    if (domain.find('.') == std::string::npos) {
-        return false;
-    }
-
-    for (char ch : email) {
-        const bool is_ascii_letter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
-        const bool is_digit = ch >= '0' && ch <= '9';
-        const bool is_allowed_symbol =
-            ch == '@' || ch == '.' || ch == '_' || ch == '-' || ch == '+';
-
-        if (!is_ascii_letter && !is_digit && !is_allowed_symbol) {
-            return false;
-        }
-    }
-
-    return true;
-}
 
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
                          const json& body) -> http::response<http::string_body> {
@@ -165,7 +107,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     out.email = body["email"].get<std::string>();
     out.password = body["password"].get<std::string>();
 
-    if (!is_valid_email(out.email)) {
+    if (!server::utils::is_valid_email(out.email)) {
         spdlog::error("Request rejected: Invalid email format");
         error_response =
             build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",

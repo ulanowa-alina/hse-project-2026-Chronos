@@ -1,5 +1,6 @@
 #include "board_screen.h"
 
+#include "api_error_utils.h"
 #include "../local_repositories/local_board_repository.hpp"
 #include "../local_repositories/local_status_repository.hpp"
 #include "../local_repositories/local_task_repository.hpp"
@@ -7,6 +8,7 @@
 #include <QDebug>
 #include <QInputDialog>
 #include <QJsonDocument>
+#include <QMessageBox>
 #include <QNetworkRequest>
 #include <QPainter>
 #include <QPainterPath>
@@ -28,6 +30,8 @@ void BoardScreen::setNetworkManager(NetworkManager* manager) {
     if (network_manager_) {
         disconnect(network_manager_, &NetworkManager::responseReceived, this,
                    &BoardScreen::onNetworkResponse);
+        disconnect(network_manager_, &NetworkManager::syncResponseReceived, this,
+                   &BoardScreen::onSyncResponse);
     }
 
     network_manager_ = manager;
@@ -35,6 +39,8 @@ void BoardScreen::setNetworkManager(NetworkManager* manager) {
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &BoardScreen::onNetworkResponse);
+        connect(network_manager_, &NetworkManager::syncResponseReceived, this,
+                &BoardScreen::onSyncResponse);
     }
 }
 
@@ -260,8 +266,8 @@ void BoardScreen::onStatusCreateRequest() {
     }
 
     bool flag;
-    const QString name =
-        QInputDialog::getText(this, "New Status", "Column Name:", QLineEdit::Normal, "", &flag);
+    const QString name = QInputDialog::getText(this, "Новый статус",
+                                               "Название статуса:", QLineEdit::Normal, "", &flag);
 
     const QString trimmed_name = name.trimmed();
     if (!flag || trimmed_name.isEmpty()) {
@@ -269,6 +275,15 @@ void BoardScreen::onStatusCreateRequest() {
     }
 
     LocalStatusRepository repo(db_);
+    const std::vector<LocalStatus> existing_statuses = repo.findByBoardId(board_id_);
+    for (const LocalStatus& existing_status : existing_statuses) {
+        if (existing_status.name_.trimmed() == trimmed_name) {
+            QMessageBox::warning(this, "Ошибка создания статуса",
+                                 "Статус с таким названием уже существует.");
+            return;
+        }
+    }
+
     const int temp_id = repo.createLocalId();
     LocalStatus status(temp_id, board_id_, trimmed_name, 0);
     status.sync_status_ = SyncStatus::PENDING;
@@ -377,6 +392,29 @@ void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
         setDefaultAvatar();
     }
 }
+
+void BoardScreen::onSyncResponse(const QString& endpoint, const QByteArray& data, int code,
+                                 const QString& entity, int local_id, const QString& operation) {
+    if (!network_manager_ || entity != "status" || operation != "create" ||
+        endpoint != network_manager_->statuses_create_url_ || (code >= 200 && code < 300)) {
+        return;
+    }
+
+    LocalStatusRepository repo(db_);
+    const auto status = repo.findById(local_id);
+    if (!status || status->board_id_ != board_id_) {
+        return;
+    }
+
+    if (ApiErrorUtils::isDuplicateFieldError(data, "name") || code == 400 || code == 409) {
+        rollbackFailedStatusCreation(local_id);
+    }
+
+    QMessageBox::warning(
+        this, "Ошибка создания статуса",
+        ApiErrorUtils::parseApiErrorMessage(data, QStringLiteral("Не удалось создать статус.")));
+}
+
 void BoardScreen::onPomodoroRequest() {
     emit openPomodoroScreen();
 }
@@ -391,4 +429,15 @@ bool BoardScreen::eventFilter(QObject* watched, QEvent* event) {
         return true;
     }
     return QWidget::eventFilter(watched, event);
+}
+
+void BoardScreen::rollbackFailedStatusCreation(int local_id) {
+    try {
+        LocalStatusRepository repo(db_);
+        repo.deleteById(local_id);
+    } catch (const std::exception& e) {
+        qDebug() << "BoardScreen: failed to rollback status creation:" << e.what();
+    }
+
+    removeStatusWindow(local_id);
 }

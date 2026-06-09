@@ -46,6 +46,7 @@ class RegistrationScreen : public QWidget {
     QLabel* logo_label_{nullptr};
     QLabel* no_account_label_{nullptr};
     QLabel* login_title_label_{nullptr};
+    QLabel* error_label_{nullptr};
 
     QLineEdit* email_input_{nullptr};
     QLineEdit* password_input_{nullptr};
@@ -54,5 +55,7 @@ class RegistrationScreen : public QWidget {
 
     void setupLayout();
     void updateAvatarButton(const QString& file_path);
+    void showErrorMessage(const QString& message);
+    void clearErrorMessage();
 };
 #endif // REGISTRATION_SCREEN_H

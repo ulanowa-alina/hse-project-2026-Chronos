@@ -51,6 +51,7 @@ class ProfileEditScreen : public QWidget {
     QLabel* logo_label_{nullptr};
     QLabel* avatar_label_{nullptr};
     QLabel* name_label_{nullptr};
+    QLabel* error_label_{nullptr};
 
     QPushButton* save_button_{nullptr};
     QPushButton* cancel_button_{nullptr};
@@ -69,10 +70,11 @@ class ProfileEditScreen : public QWidget {
     void sendProfileUpdate();
     void sendAvatarUpload();
     void sendAvatarDelete();
-    auto parseErrorMessage(const QByteArray& data) const -> QString;
     void resetAvatarSelection();
     void updateAvatarDeleteButtonState();
     void loadRemoteAvatar(const QString& avatar_s3_key);
+    void showErrorMessage(const QString& message);
+    void clearErrorMessage();
 };
 
 #endif // PROFILE_EDIT_SCREEN_H

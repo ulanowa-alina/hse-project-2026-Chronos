@@ -50,6 +50,8 @@ class BoardScreen : public QWidget {
     void onPomodoroRequest();
     void onBoardSettingsRequested();
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onSyncResponse(const QString& endpoint, const QByteArray& data, int code,
+                        const QString& entity, int localId, const QString& operation);
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -82,6 +84,7 @@ class BoardScreen : public QWidget {
     StatusWindow* showStatusWindow(int status_id, const QString& name);
     void loadFromLocalDatabase();
     void setupLayout();
+    void rollbackFailedStatusCreation(int local_id);
 };
 
 #endif // BOARD_SCREEN_H
