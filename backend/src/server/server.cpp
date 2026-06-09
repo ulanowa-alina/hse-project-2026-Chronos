@@ -9,8 +9,11 @@
 #include "board/v1/get.hpp"
 #include "board/v1/get_all.hpp"
 #include "board/v1/tasks.hpp"
+#include "personal/v1/avatar_upload.hpp"
 #include "personal/v1/edit.hpp"
 #include "personal/v1/info.hpp"
+#include "pomodoro/v1/create.hpp"
+#include "pomodoro/v1/get_user_sessions.hpp"
 #include "status/v1/create.hpp"
 #include "status/v1/delete.hpp"
 #include "status/v1/edit.hpp"
@@ -46,6 +49,38 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
             if (req.method() == http::verb::put) {
                 return personal::v1::handleEdit(req, pool_, user_id);
+            }
+
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
+
+    router_["/personal/v1/avatar/upload"] =
+        auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
+            if (req.method() == http::verb::post) {
+                return personal::v1::handleAvatarUpload(req, pool_, user_id);
+            }
+
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
+
+    router_["/personal/v1/avatar"] =
+        auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
+            if (req.method() == http::verb::delete_) {
+                return personal::v1::handleAvatarDelete(req, pool_, user_id);
             }
 
             http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
@@ -297,6 +332,38 @@ Server::Server(asio::io_context& ioc, const std::string& host, unsigned short po
         auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
             if (req.method() == http::verb::delete_) {
                 return status::v1::handleDelete(req, pool_, user_id);
+            }
+
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
+
+    router_["/pomodoro/v1/create"] =
+        auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
+            if (req.method() == http::verb::post) {
+                return pomodoro::v1::handleCreate(req, pool_, user_id);
+            }
+
+            http::response<http::string_body> res{http::status::method_not_allowed, req.version()};
+            res.set(http::field::content_type, "application/json");
+            res.set(http::field::access_control_allow_origin, "*");
+            res.keep_alive(req.keep_alive());
+            res.body() =
+                R"({"error":{"code":"DUPLICATE_RESOURCE","message":"Method not allowed"}})";
+            res.prepare_payload();
+            return res;
+        });
+
+    router_["/pomodoro/v1/get_user_sessions"] =
+        auth::with_auth([this](const http::request<http::string_body>& req, int user_id) {
+            if (req.method() == http::verb::get) {
+                return pomodoro::v1::handleGetUserSessions(req, pool_, user_id);
             }
 
             http::response<http::string_body> res{http::status::method_not_allowed, req.version()};

@@ -9,7 +9,6 @@ def assert_board_response(
         board_id,
         title="Updated study board",
         description="Updated spring semester",
-        is_private=True,
 ):
     assert "data" in response
 
@@ -20,7 +19,6 @@ def assert_board_response(
 
     assert board["title"] == title
     assert board["description"] == description
-    assert board["is_private"] is is_private
 
     assert isinstance(board["created_at"], str)
     assert isinstance(board["updated_at"], str)
@@ -126,15 +124,6 @@ async def test_edit_with_max_description_length(board_edit, created_board):
     )
 
 
-async def test_edit_without_is_private(board_edit):
-    response = await board_edit(
-        status_code=400,
-        omit_fields=("is_private",),
-    )
-
-    assert_error_response(response, "MISSING_FIELD", field="is_private")
-
-
 async def test_edit_with_invalid_board_id(board_edit):
     response = await board_edit(
         status_code=400,
@@ -151,15 +140,6 @@ async def test_edit_with_null_description(board_edit):
     )
 
     assert_error_response(response, "INVALID_FORMAT", field="description")
-
-
-async def test_edit_with_invalid_is_private(board_edit):
-    response = await board_edit(
-        status_code=400,
-        is_private="true",
-    )
-
-    assert_error_response(response, "INVALID_FORMAT", field="is_private")
 
 
 async def test_edit_with_invalid_json(board_edit):

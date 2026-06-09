@@ -8,7 +8,6 @@ def assert_board_response(board):
     assert isinstance(board["user_id"], int)
     assert isinstance(board["title"], str)
     assert isinstance(board["description"], str)
-    assert isinstance(board["is_private"], bool)
     assert isinstance(board["created_at"], str)
     assert isinstance(board["updated_at"], str)
 

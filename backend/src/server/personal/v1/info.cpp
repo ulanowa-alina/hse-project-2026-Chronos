@@ -1,11 +1,13 @@
 #include "info.hpp"
 
 #include "repositories/user_repository.hpp"
+#include "utils/response_utils.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
 
@@ -37,6 +39,7 @@ auto build_ok_response(const http::request<http::string_body>& req,
                        {"email", user.email_},
                        {"name", user.name_},
                        {"status", user.status_},
+                       {"avatar_s3_key", user.avatar_s3_key_},
                        {"created_at", to_iso8601(user.created_at_)}};
 
     http::response<http::string_body> res{http::status::ok, req.version()};
@@ -62,6 +65,13 @@ auto build_not_found_response(const http::request<http::string_body>& req)
 
 auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& pool,
                 int user_id) -> http::response<http::string_body> {
+    spdlog::info("User get request received");
+    if (req.method() != http::verb::get) {
+        spdlog::error("Board get rejected: method not allowed");
+        return server::utils::build_error_response(req, http::status::method_not_allowed,
+                                                   "DUPLICATE_RESOURCE", "Method not allowed");
+    }
+
     try {
         UserRepository repo(pool);
         const auto user = repo.find_by_id(user_id);
@@ -70,9 +80,16 @@ auto handleInfo(const http::request<http::string_body>& req, ConnectionPool& poo
             return build_not_found_response(req);
         }
 
+        spdlog::info("Successfully get user info for user_id={}", user_id);
         return build_ok_response(req, *user);
+    } catch (const std::runtime_error& e) {
+        spdlog::error("User get failed with database error: {}", e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "DATABASE_ERROR", "Database error");
     } catch (const std::exception& e) {
-        return build_error_response(req, e);
+        spdlog::error("User get failed with unexpected error: {}", e.what());
+        return server::utils::build_error_response(req, http::status::internal_server_error,
+                                                   "INTERNAL_ERROR", "Internal server error");
     }
 }
 

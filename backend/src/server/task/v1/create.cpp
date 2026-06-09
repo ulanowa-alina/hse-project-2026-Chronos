@@ -12,6 +12,7 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
 
@@ -20,6 +21,10 @@ using json = nlohmann::json;
 namespace task::v1 {
 
 namespace {
+
+const size_t MAX_TITLE_SIZE = 100;
+const size_t MAX_DESCRIPTION_SIZE = 1000;
+const size_t MAX_PRIORITY_COLOR_SIZE = 500;
 
 std::string time_to_string_iso8601(std::time_t t) {
     std::array<char, 25> buffer{};
@@ -111,6 +116,7 @@ json model_to_json(const Task& task) {
         {"description", task.description_},
         {"status_id", task.status_id_},
         {"priority_color", task.priority_color_},
+        {"is_completed", task.is_completed_},
         {"created_at", time_to_string_iso8601(task.created_at_)},
         {"updated_at", time_to_string_iso8601(task.updated_at_)},
     };
@@ -128,7 +134,9 @@ json model_to_json(const Task& task) {
 
 auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& pool,
                   int user_id) -> http::response<http::string_body> {
+    spdlog::info("Task create request received");
     if (req.method() != http::verb::post) {
+        spdlog::error("Task create rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "METHOD_NOT_ALLOWED",
                                                    "Only POST is supported for this endpoint");
@@ -138,11 +146,13 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
+        spdlog::error("Task create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body contains invalid JSON");
     }
 
     if (!body.is_object()) {
+        spdlog::error("Task create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Request body must be a JSON object");
     }
@@ -155,17 +165,20 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::string priority_color = require_string_field(body, "priority_color");
         const std::optional<std::time_t> deadline = optional_deadline_field(body);
 
-        if (title.empty() || title.size() > 100) {
+        if (title.empty() || title.size() > MAX_TITLE_SIZE) {
+            spdlog::error("Task create rejected: invalid title length");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"title", "Title must be between 1 and 100 characters"}});
         }
-        if (description.size() > 1000) {
+        if (description.size() > MAX_DESCRIPTION_SIZE) {
+            spdlog::error("Task create rejected: description is too long");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"description", "Description cannot exceed 1000 characters"}});
         }
-        if (priority_color.empty() || priority_color.size() > 50) {
+        if (priority_color.empty() || priority_color.size() > MAX_PRIORITY_COLOR_SIZE) {
+            spdlog::error("Task create rejected: invalid priority color format");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"priority_color", "Priority color must be between 1 and 50 characters"}});
@@ -174,11 +187,14 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         BoardRepository board_repository(pool);
         const std::optional<Board> board = board_repository.find_by_id(board_id);
         if (!board.has_value()) {
+            spdlog::error("Task create rejected: board with id={} not found", board_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (board->user_id_ != user_id) {
+            spdlog::error("Task create rejected: board with id={} belongs to another user",
+                          board_id);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
@@ -187,39 +203,49 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         StatusRepository status_repository(pool);
         const auto status = status_repository.find_by_id(status_id);
         if (!status.has_value()) {
+            spdlog::error("Task create rejected: status with id={} not found", status_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "STATUS_NOT_FOUND", "Status not found");
         }
 
         if (status->board_id_ != board_id) {
+            spdlog::error("Task create rejected: invalid status_id");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
                 json{{"status_id", "status_id must reference a status from this board"}});
         }
 
         TaskRepository task_repository(pool);
-        const Task new_task(0, board_id, title, description, deadline, status_id, priority_color, 0,
-                            0);
+        bool is_completed = false;
+        if (body.contains("is_completed") && body["is_completed"].is_boolean()) {
+            is_completed = body["is_completed"].get<bool>();
+        }
+        const Task new_task(0, board_id, title, description, deadline, status_id, priority_color,
+                            is_completed, 0, 0);
         const Task created = task_repository.save(new_task);
 
+        spdlog::info("Task with id={} successfully created", created.id_);
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(created)}});
     } catch (const std::invalid_argument& e) {
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
+            spdlog::error("Task create rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required field",
                 json{{field, "Field " + field + " is required"}});
         }
         if (message.rfind("type:", 0) == 0) {
+            spdlog::error("Task create rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
                 json{{field, "Field " + field + " has invalid type"}});
         }
         if (message.rfind("value:", 0) == 0) {
+            spdlog::error("Task create rejected: invalid field value");
             const std::string field = message.substr(6);
             const std::string detail = field == "deadline"
                                            ? "Field deadline must be a valid ISO 8601 UTC datetime"
@@ -231,9 +257,11 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", e.what());
     } catch (const std::runtime_error& e) {
+        spdlog::error("Task create failed with database error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", e.what());
     } catch (const std::exception& e) {
+        spdlog::error("Task create failed with unexpected error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "INTERNAL_ERROR", e.what());
     }

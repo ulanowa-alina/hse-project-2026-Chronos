@@ -12,16 +12,18 @@ class User {
     std::string name_;
     std::string status_;
     std::string password_hash_;
+    std::string avatar_s3_key_;
     std::time_t created_at_;
 
     User() = default;
     User(int id, std::string email, std::string name, std::string status, std::string password_hash,
-         std::time_t created_at)
+         std::string avatar_s3_key, std::time_t created_at)
         : id_(id)
         , email_(std::move(email))
         , name_(std::move(name))
         , status_(std::move(status))
         , password_hash_(std::move(password_hash))
+        , avatar_s3_key_(std::move(avatar_s3_key))
         , created_at_(created_at) {
         if (id_ < 0) {
             throw std::invalid_argument("User ID cannot be negative");

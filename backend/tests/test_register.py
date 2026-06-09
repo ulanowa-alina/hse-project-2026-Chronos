@@ -1,538 +1,269 @@
-import pytest
-import requests
 import re
+import uuid
+
+import pytest
+
+pytestmark = pytest.mark.asyncio
+
+AUTH_REGISTER_URL = "/auth/v1/register"
+AUTH_LOGIN_URL = "/auth/v1/login"
 
 ISO_8601_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
-def test_register_success(register_url, session, reg_user_data, login_url):
-    response = session.post(
-        register_url,
-        json=reg_user_data
-    )
 
-    assert response.status_code == 200
+def unique_email():
+    return f"register-{uuid.uuid4()}@example.com"
+
+
+def user_data(**overrides):
+    data = {
+        "name": "Register User",
+        "email": unique_email(),
+        "status": "student",
+        "password": "password123",
+    }
+    data.update(overrides)
+    return data
+
+
+def assert_error_response(response_body, code, field=None):
+    assert "error" in response_body
+
+    error = response_body["error"]
+    assert error["code"] == code
+    assert isinstance(error["message"], str)
+    assert error["message"]
+
+    if field is not None:
+        assert "details" in error
+        assert field in error["details"]
+
+
+async def test_register_success(service_client):
+    data = user_data()
+
+    response = await service_client.post(AUTH_REGISTER_URL, json=data)
+    assert response.status_code == 200, response.text
 
     body = response.json()
-
     assert "data" in body
-    assert "id" in body["data"]
-    assert isinstance(body["data"]["id"], int)
-    assert body["data"]["id"] > 0
 
-    assert "email" in body["data"]
-    assert body["data"]["email"] == reg_user_data["email"]
+    user = body["data"]
+    assert isinstance(user["id"], int)
+    assert user["id"] > 0
+    assert user["email"] == data["email"]
+    assert user["name"] == data["name"]
+    assert user["status"] == data["status"]
+    assert isinstance(user["avatar_s3_key"], str)
+    assert isinstance(user["created_at"], str)
+    assert ISO_8601_UTC.match(user["created_at"])
+    assert "password" not in user
 
-    assert "name" in body["data"]
-    assert body["data"]["name"] == reg_user_data["name"]
-
-    assert "status" in body["data"]
-    assert body["data"]["status"] == reg_user_data["status"]
-
-    assert "created_at" in body["data"]
-    assert isinstance(body["data"]["created_at"], str)
-    assert ISO_8601_UTC.match(body["data"]["created_at"])
-
-    assert "password" not in body["data"]
-
-    response_login = session.post(
-        login_url,
+    login_response = await service_client.post(
+        AUTH_LOGIN_URL,
         json={
-            "email": reg_user_data["email"],
-            "password": reg_user_data["password"]
-        }
+            "email": data["email"],
+            "password": data["password"],
+        },
     )
-
-    assert response_login.status_code == 200
-
+    assert login_response.status_code == 200, login_response.text
 
 
+@pytest.mark.parametrize("name", ["", "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm"])
+async def test_register_invalid_name(service_client, name):
+    response = await service_client.post(AUTH_REGISTER_URL, json=user_data(name=name))
 
-@pytest.mark.parametrize("name", [
-    "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm",
-    ""
-])
-def test_register_invalid_name(name, register_url, session, reg_user_data, login_url):
-    response = session.post(
-        register_url,
-        json={
-            "name": name,
-            "email": reg_user_data["email"],
-            "status": reg_user_data["status"],
-            "password": reg_user_data["password"]
-        }
-    )
-
-    assert response.status_code == 400
-
-    body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-
-    assert "details" in body["error"]
-    assert "name" in body["error"]["details"]
-
-    response_login = session.post(
-        login_url,
-        json={
-            "email": reg_user_data["email"],
-            "password": reg_user_data["password"]
-        }
-    )
-
-    assert response_login.status_code == 401
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "VALIDATION_ERROR", "name")
 
 
+@pytest.mark.parametrize(
+    "email",
+    [
+        "user",
+        "@example.com",
+        "user@",
+        "user@com",
+        "user@.com",
+        "user@example.",
+        "user name@example.com",
+        "user@example com",
+        "user@exam@ple.com",
+        "user#name@example.com",
+        "user@example..com",
+        ".user@example.com",
+        "user.@example.com",
+        "ваня@example.com",
+        "user@почта.рф",
+        " ",
+        "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqaewsredtzsexdrcftvgbhnjkmlmkjnhbgvfcdxszxdcfvgbhnjkmcfyvgubhdcfvgbhnjmjnhbgvcxddcfvgbhnjmkjnhbgvfcdinjmkjhgfdxcfgvhqwertyuioasdfghjkzxcvbnmqwertyuioasdfghjkzxcvbnbjnkmjhgfdtcfvghbjknrstuqwertyuiopasdfghjklzxcvbnmvwxyzabcdefghxml@example.com",
+    ],
+)
+async def test_register_invalid_email(service_client, email):
+    response = await service_client.post(AUTH_REGISTER_URL, json=user_data(email=email))
 
-@pytest.mark.parametrize("email", [
-    "user",
-    "@example.com",
-    "user@",
-    "user@com",
-    "user@.com",
-    "user@example.",
-    "user name@example.com",
-    "user@example com",
-    "user@exam@ple.com",
-    "user#name@example.com",
-    "user@example..com",
-    ".user@example.com",
-    "user.@example.com",
-    "ваня@example.com",
-    "user@почта.рф",
-    " ",
-    "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqaewsredtzsexdrcftvgbhnjkmlmkjnhbgvfcdxszxdcfvgbhnjkmcfyvgubhdcfvgbhnjmjnhbgvcxddcfvgbhnjmkjnhbgvfcdinjmkjhgfdxcfgvhqwertyuioasdfghjkzxcvbnmqwertyuioasdfghjkzxcvbnbjnkmjhgfdtcfvghbjknrstuqwertyuiopasdfghjklzxcvbnmvwxyzabcdefghxml@example.com"
-])
-def test_register_invalid_email(email, register_url, session, reg_user_data, login_url):
-    response = session.post(
-        register_url,
-        json={
-            "name": reg_user_data["name"],
-            "email": email,
-            "status": reg_user_data["status"],
-            "password": reg_user_data["password"]
-        }
-    )
-    assert response.status_code == 400
-
-    body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-
-    assert "details" in body["error"]
-    assert "email" in body["error"]["details"]
-
-    response_login = session.post(
-        login_url,
-        json={
-            "email": email,
-            "password": reg_user_data["password"]
-        }
-    )
-
-    assert response_login.status_code != 200
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "VALIDATION_ERROR", "email")
 
 
 @pytest.mark.parametrize("password", ["1234567"[:i] for i in range(1, 8)])
-def test_register_invalid_password(password, register_url, session, reg_user_data, login_url):
-    response = session.post(
-        register_url,
-        json={
-            "name": reg_user_data["name"],
-            "email": reg_user_data["email"],
-            "status": reg_user_data["status"],
-            "password": password
-        }
-    )
+async def test_register_short_password(service_client, password):
+    response = await service_client.post(AUTH_REGISTER_URL, json=user_data(password=password))
 
-    assert response.status_code == 400
+    assert response.status_code == 400, response.text
 
     body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-
-    assert "details" in body["error"]
-    assert "password" in body["error"]["details"]
+    assert_error_response(body, "VALIDATION_ERROR", "password")
     assert body["error"]["details"]["password"] == "Password length cannot be less than 8 symbols"
 
-    response_login = session.post(
-        login_url,
-        json={
-            "email": reg_user_data["email"],
-            "password": password
-        }
-    )
 
-    assert response_login.status_code != 200
+async def test_register_empty_password(service_client):
+    response = await service_client.post(AUTH_REGISTER_URL, json=user_data(password=""))
 
-
-def test_register_empty_password(register_url, session, reg_user_data, login_url):
-    response = session.post(
-        register_url,
-        json = {
-            "name": reg_user_data["name"],
-            "email": reg_user_data["email"],
-            "status": reg_user_data["status"],
-            "password": ""
-        }
-    )
-
-    assert response.status_code == 400
+    assert response.status_code == 400, response.text
 
     body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-
-    assert "details" in body["error"]
-    assert  'password' in body["error"]["details"]
-    assert  body["error"]["details"]["password"] == "Password cannot be empty"
+    assert_error_response(body, "VALIDATION_ERROR", "password")
+    assert body["error"]["details"]["password"] == "Password cannot be empty"
 
 
+@pytest.mark.parametrize("status", ["", "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm"])
+async def test_register_invalid_status(service_client, status):
+    response = await service_client.post(AUTH_REGISTER_URL, json=user_data(status=status))
 
-@pytest.mark.parametrize("status", [
-    "",
-    "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm"
-])
-def test_register_invalid_status(status, register_url, session, reg_user_data):
-    response = session.post(
-        register_url,
-        json={
-            "name": reg_user_data["name"],
-            "email": reg_user_data["email"],
-            "status": status,
-            "password": reg_user_data["password"]
-        }
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "VALIDATION_ERROR", "status")
+
+
+@pytest.mark.parametrize(
+    ("body", "invalid_field"),
+    [
+        ({"name": 123, "email": "user@example.com", "status": "student", "password": "password123"}, "name"),
+        ({"name": 12.5, "email": "user@example.com", "status": "student", "password": "password123"}, "name"),
+        ({"name": True, "email": "user@example.com", "status": "student", "password": "password123"}, "name"),
+        ({"name": None, "email": "user@example.com", "status": "student", "password": "password123"}, "name"),
+        ({"name": [], "email": "user@example.com", "status": "student", "password": "password123"}, "name"),
+        ({"name": {}, "email": "user@example.com", "status": "student", "password": "password123"}, "name"),
+        ({"name": "user", "email": 123, "status": "student", "password": "password123"}, "email"),
+        ({"name": "user", "email": 12.5, "status": "student", "password": "password123"}, "email"),
+        ({"name": "user", "email": True, "status": "student", "password": "password123"}, "email"),
+        ({"name": "user", "email": None, "status": "student", "password": "password123"}, "email"),
+        ({"name": "user", "email": [], "status": "student", "password": "password123"}, "email"),
+        ({"name": "user", "email": {}, "status": "student", "password": "password123"}, "email"),
+        ({"name": "user", "email": "user@example.com", "status": 123, "password": "password123"}, "status"),
+        ({"name": "user", "email": "user@example.com", "status": 12.5, "password": "password123"}, "status"),
+        ({"name": "user", "email": "user@example.com", "status": True, "password": "password123"}, "status"),
+        ({"name": "user", "email": "user@example.com", "status": None, "password": "password123"}, "status"),
+        ({"name": "user", "email": "user@example.com", "status": [], "password": "password123"}, "status"),
+        ({"name": "user", "email": "user@example.com", "status": {}, "password": "password123"}, "status"),
+        ({"name": "user", "email": "user@example.com", "status": "student", "password": 123}, "password"),
+        ({"name": "user", "email": "user@example.com", "status": "student", "password": 12.5}, "password"),
+        ({"name": "user", "email": "user@example.com", "status": "student", "password": True}, "password"),
+        ({"name": "user", "email": "user@example.com", "status": "student", "password": None}, "password"),
+        ({"name": "user", "email": "user@example.com", "status": "student", "password": []}, "password"),
+        ({"name": "user", "email": "user@example.com", "status": "student", "password": {}}, "password"),
+    ],
+)
+async def test_register_invalid_data(service_client, body, invalid_field):
+    body = dict(body)
+    if isinstance(body.get("email"), str):
+        body["email"] = unique_email()
+
+    response = await service_client.post(AUTH_REGISTER_URL, json=body)
+
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "INVALID_FORMAT", invalid_field)
+
+
+@pytest.mark.parametrize(
+    "raw_body",
+    [
+        '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"',
+        '{"name": "user", "email": "user@example.com" "status": "student", "password": "password123"}',
+        '{"name": "user", "email": "user@example.com", "status": "student", "password": }',
+        "{'name': 'user', 'email': 'user@example.com', 'status': 'student', 'password': 'password123'}",
+        '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123",}',
+        '{"name": "user",, "email": "user@example.com", "status": "student", "password": "password123"}',
+        '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"}}',
+        '[{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"}',
+        '{"name": "user", "email": user@example.com, "status": "student", "password": "password123"}',
+        '{"name": "user, "email": "user@example.com", "status": "student", "password": "password123"}',
+        '{"name": "user", "email": "user@example.com", "status": "student", "password": "pass\nword"}',
+        '{"name": "user", \x00 "email": "user@example.com", "status": "student"}',
+        '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123" "extra": true}',
+        "just string",
+        '""',
+        "[]",
+        "123",
+        "true",
+        "null",
+        "     ",
+        "",
+        '{"name": "user", "email": "user@example.com", "status": 0123, "password": "password123"}',
+        '{"name": "user", "email": "user@example.com", "status": 12., "password": "password123"}',
+        "{",
+        '{"name":',
+        '{"name": "user"',
+    ],
+)
+async def test_register_invalid_json(service_client, raw_body):
+    response = await service_client.post(
+        AUTH_REGISTER_URL,
+        content=raw_body,
+        headers={"Content-Type": "application/json"},
     )
 
-    assert response.status_code == 400
-
-    body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "VALIDATION_ERROR"
-
-    assert "details" in body["error"]
-    assert "status" in body["error"]["details"]
+    assert response.status_code == 400, response.text
+    assert_error_response(response.json(), "INVALID_FORMAT")
 
 
-@pytest.mark.parametrize("my_json, invalid_field", [
-    ({
-         "name": 123,
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": "password123"
-     }, "name"),
-    ({
-         "name": 12.5,
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": "password123"
-     }, "name"),
-    ({
-         "name": True,
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": "password123"
-     }, "name"),
-    ({
-         "name": None,
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": "password123"
-     }, "name"),
-    ({
-         "name": [],
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": "password123"
-     }, "name"),
-    ({
-         "name": {},
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": "password123"
-     }, "name"),
-    ({
-         "name": "user",
-         "email": 123,
-         "status": "student",
-         "password": "password123"
-     }, "email"),
-    ({
-         "name": "user",
-         "email": 12.5,
-         "status": "student",
-         "password": "password123"
-     }, "email"),
-    ({
-         "name": "user",
-         "email": True,
-         "status": "student",
-         "password": "password123"
-     }, "email"),
-    ({
-         "name": "user",
-         "email": None,
-         "status": "student",
-         "password": "password123"
-     }, "email"),
-    ({
-         "name": "user",
-         "email": [],
-         "status": "student",
-         "password": "password123"
-     }, "email"),
-    ({
-         "name": "user",
-         "email": {},
-         "status": "student",
-         "password": "password123"
-     }, "email"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": 123,
-         "password": "password123"
-     }, "status"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": 12.5,
-         "password": "password123"
-     }, "status"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": True,
-         "password": "password123"
-     }, "status"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": None,
-         "password": "password123"
-     }, "status"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": [],
-         "password": "password123"
-     }, "status"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": {},
-         "password": "password123"
-     }, "status"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": 123
-     }, "password"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": 12.5
-     }, "password"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": True
-     }, "password"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": None
-     }, "password"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": []
-     }, "password"),
-    ({
-         "name": "user",
-         "email": "non_existance@example.com",
-         "status": "student",
-         "password": {}
-     }, "password"),
-])
-def test_register_invalid_data(my_json, invalid_field, register_url, session):
-    response = session.post(
-        register_url,
-        json=my_json
-    )
+@pytest.mark.parametrize(
+    "missing_fields",
+    [
+        ("name",),
+        ("email",),
+        ("status",),
+        ("password",),
+        ("name", "email"),
+        ("name", "status"),
+        ("name", "password"),
+        ("email", "status"),
+        ("email", "password"),
+        ("status", "password"),
+        ("name", "email", "status"),
+        ("name", "email", "password"),
+        ("name", "status", "password"),
+        ("email", "status", "password"),
+        ("name", "email", "status", "password"),
+    ],
+)
+async def test_register_missing_field(service_client, missing_fields):
+    body = user_data()
+    for field in missing_fields:
+        body.pop(field)
 
-    assert response.status_code == 400
+    response = await service_client.post(AUTH_REGISTER_URL, json=body)
 
-    body = response.json()
+    assert response.status_code == 400, response.text
 
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "INVALID_FORMAT"
+    response_body = response.json()
+    assert_error_response(response_body, "MISSING_FIELD")
 
-    assert "details" in body["error"]
-    assert invalid_field in body["error"]["details"]
+    details = response_body["error"]["details"]
+    assert "missing_fields" in details
+    for field in missing_fields:
+        assert field in details["missing_fields"]
 
 
-@pytest.mark.parametrize("json_test", [
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"',
-    '{"name": "user", "email": "user@example.com" "status": "student", "password": "password123"}',
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": }',
-    "{'name': 'user', 'email': 'user@example.com', 'status': 'student', 'password': 'password123'}",
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123",}',
-    '{"name": "user",, "email": "user@example.com", "status": "student", "password": "password123"}',
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"}}',
-    '[{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"}',
-    '{"name": "user", "email": user@example.com, "status": "student", "password": "password123"}',
-    '{"name": "user, "email": "user@example.com", "status": "student", "password": "password123"}',
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123"',
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": "pass' + chr(10) + 'word"}',
-    '{"name": "user", \x00 "email": "user@example.com", "status": "student"}',
-    '{"name": "user", "email": "user@example.com", "status": "student", "password": "password123" "extra": true}',
-    'just string',
-    '""',
-    '[]',
-    '123',
-    'true',
-    'null',
-    '     ',
-    '',
-    '{"name": "user", "email": "user@example.com", "status": 0123, "password": "password123"}',
-    '{"name": "user", "email": "user@example.com", "status": 12., "password": "password123"}',
-    '{',
-    '{"name":',
-    '{"name": "user"'
-])
-def test_register_invalid_json(json_test, register_url, session):
-    response = session.post(
-        register_url,
-        data=json_test,
-        headers={"Content-Type": "application/json"}
-    )
+async def test_register_existent_email(service_client):
+    data = user_data()
 
-    assert response.status_code == 400
+    first_response = await service_client.post(AUTH_REGISTER_URL, json=data)
+    assert first_response.status_code == 200, first_response.text
 
-    body = response.json()
+    second_response = await service_client.post(AUTH_REGISTER_URL, json=data)
+    assert second_response.status_code == 405, second_response.text
 
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "INVALID_FORMAT"
-
-
-
-@pytest.mark.parametrize("my_json", [
-    {
-        "email": "missing_check@example.com",
-        "status": "student",
-        "password": "password123"
-    },
-    {
-        "name": "user",
-        "status": "student",
-        "password": "password123"
-    },
-    {
-        "name": "user",
-        "email": "missing_check@example.com",
-        "password": "password123"
-    },
-    {
-        "name": "user",
-        "email": "missing_check@example.com",
-        "status": "student"
-    },
-    {
-        "status": "student",
-        "password": "password123"
-    },
-    {
-        "email": "missing_check@example.com",
-        "password": "password123"
-    },
-    {
-        "email": "missing_check@example.com",
-        "status": "student"
-    },
-    {
-        "name": "user",
-        "password": "password123"
-    },
-    {
-        "name": "user",
-        "status": "student"
-    },
-    {
-        "name": "user",
-        "email": "missing_check@example.com"
-    },
-    {
-        "password": "password123"
-    },
-    {
-        "status": "student"
-    },
-    {
-        "email": "missing_check@example.com"
-    },
-    {
-        "name": "user"
-    },
-    {}
-])
-def test_register_missing_field(my_json, register_url, session):
-    required = ["name", "email", "status", "password"]
-    missed = [s for s in required if s not in my_json]
-
-    response = session.post(
-        register_url,
-        json=my_json
-    )
-
-    assert response.status_code == 400
-
-    body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "MISSING_FIELD"
-
-    assert "details" in body["error"]
-    assert "missing_fields" in body["error"]["details"]
-
-    for field in missed:
-        assert field in body["error"]["details"]["missing_fields"]
-
-
-def test_register_existent_email(register_url, session):
-    response = session.post(
-        register_url,
-        json={
-            "name": "user",
-            "email": "user@example.com",
-            "status": "student",
-            "password": "password123"
-        }
-    )
-
-    assert response.status_code == 405
-
-    body = response.json()
-
-    assert "error" in body
-    assert "message" in body["error"]
-    assert body["error"]["code"] == "EMAIL_ALREADY_EXISTS"
-    assert "details" in body["error"]
+    body = second_response.json()
+    assert_error_response(body, "EMAIL_ALREADY_EXISTS", "email")
     assert body["error"]["details"]["email"] == "already exists"

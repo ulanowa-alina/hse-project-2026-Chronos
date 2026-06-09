@@ -131,7 +131,6 @@ def _board_create(service_client, auth_headers):
                 default_body={
                     "title": "test board",
                     "description": "test description",
-                    "is_private": False,
                 },
                 omit_fields=omit_fields,
                 overrides=kwargs,
@@ -188,7 +187,6 @@ def _board_edit(service_client, auth_headers, created_board):
                     "board_id": created_board["board_id"],
                     "title": "Updated study board",
                     "description": "Updated spring semester",
-                    "is_private": True,
                 },
                 omit_fields=omit_fields,
                 overrides=kwargs,

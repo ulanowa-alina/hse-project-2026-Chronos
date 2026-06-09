@@ -1,6 +1,7 @@
 #ifndef REGISTRATION_SCREEN_H
 #define REGISTRATION_SCREEN_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QHBoxLayout>
@@ -8,6 +9,7 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QPushButton>
+#include <QString>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -18,17 +20,24 @@ class RegistrationScreen : public QWidget {
     explicit RegistrationScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
+
+    void clearInputs();
 
   signals:
     void loginRequested();
     void registrationRequested(int board_id);
+    void authenticated(const QString& token);
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onRegisterRequest();
+    void onAvatarPickRequested();
 
   private:
     NetworkManager* network_manager_{nullptr};
+    QString avatar_file_path_;
+    SyncCoordinator* sync_coordinator_{nullptr};
 
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};
@@ -44,5 +53,6 @@ class RegistrationScreen : public QWidget {
     QLineEdit* status_input_{nullptr};
 
     void setupLayout();
+    void updateAvatarButton(const QString& file_path);
 };
 #endif // REGISTRATION_SCREEN_H

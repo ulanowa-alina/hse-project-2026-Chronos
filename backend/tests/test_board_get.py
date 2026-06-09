@@ -9,7 +9,6 @@ def assert_board_response(
         board_id,
         title="test board",
         description="test description",
-        is_private=False,
 ):
     assert "data" in response
 
@@ -19,7 +18,6 @@ def assert_board_response(
     assert isinstance(board["user_id"], int)
     assert board["title"] == title
     assert board["description"] == description
-    assert board["is_private"] is is_private
     assert isinstance(board["created_at"], str)
     assert isinstance(board["updated_at"], str)
 

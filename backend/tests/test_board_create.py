@@ -7,7 +7,6 @@ def assert_board_response(
         *,
         title = 'test board',
         description = 'test description',
-        is_private = False,
 ):
     assert 'data' in response
 
@@ -18,7 +17,6 @@ def assert_board_response(
 
     assert board['title'] == title
     assert board['description'] == description
-    assert board['is_private'] is is_private
 
     assert isinstance(board['created_at'], str)
     assert isinstance(board['updated_at'], str)
@@ -61,7 +59,6 @@ async def test_create_without_title(board_create):
         status_code=400,
         json={
             'description': 'Test description',
-            'is_private': False,
         },
     )
 
@@ -122,35 +119,6 @@ async def test_create_with_null_description(board_create):
         response,
         description='',
     )
-
-async def test_create_private_board(board_create):
-    response = await board_create(
-        is_private=True,
-    )
-
-    assert_board_response(
-        response,
-        is_private=True,
-    )
-
-async def test_create_without_is_private(board_create):
-    response = await board_create(
-        status_code=400,
-        json={
-            'title': 'Test board',
-            'description': 'Test description',
-        },
-    )
-
-    assert_error_response(response, 'MISSING_FIELD', field='is_private')
-
-async def test_create_with_invalid_is_private(board_create):
-    response = await board_create(
-        status_code=400,
-        is_private='false',
-    )
-
-    assert_error_response(response, 'INVALID_FORMAT', field='is_private')
 
 async def test_create_without_auth(board_create):
     response = await board_create(
