@@ -48,7 +48,10 @@ void BoardScreen::reloadBoardData() {
     }
 
     loadFromLocalDatabase();
+}
 
+void BoardScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
     if (network_manager_) {
         network_manager_->GET(network_manager_->user_info_url_);
     }
@@ -249,10 +252,8 @@ void BoardScreen::onStatusCreateRequest() {
         return;
     }
 
-    auto* new_status = new StatusWindow(temp_id, board_id_, trimmed_name, db_, this);
-    new_status->setSyncCoordinator(sync_coordinator_);
-    board_layout_->insertWidget(board_layout_->count() - 1, new_status);
-    status_windows_.insert(temp_id, new_status);
+    status_names_.insert(temp_id, trimmed_name);
+    showStatusWindow(temp_id, trimmed_name);
 
     sync_coordinator_->syncStatuses();
 }
