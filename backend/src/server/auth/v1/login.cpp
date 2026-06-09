@@ -1,9 +1,9 @@
 #include "login.hpp"
 
+#include "models/user.hpp"
 #include "repositories/user_repository.hpp"
 #include "security/password_hashing.hpp"
 #include "server/auth/jwt.hpp"
-#include "server/utils/email_validation.hpp"
 
 #include <ctime>
 #include <iomanip>
@@ -107,7 +107,7 @@ bool parse_login_request(const http::request<http::string_body>& req, LoginReque
     out.email = body["email"].get<std::string>();
     out.password = body["password"].get<std::string>();
 
-    if (!server::utils::is_valid_email(out.email)) {
+    if (!user_validation::is_valid_email(out.email)) {
         spdlog::error("Request rejected: Invalid email format");
         error_response =
             build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",

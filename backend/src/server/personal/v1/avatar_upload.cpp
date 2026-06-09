@@ -1,7 +1,7 @@
 #include "avatar_upload.hpp"
 
+#include "models/user.hpp"
 #include "repositories/user_repository.hpp"
-#include "server/utils/email_validation.hpp"
 #include "server/utils/base64.hpp"
 #include "storage/s3_config.hpp"
 #include "storage/s3_uploader.hpp"
@@ -127,7 +127,7 @@ auto validate_profile_payload(const http::request<http::string_body>& req, const
     payload.has_password = has_password;
     payload.password = has_password ? body["password"].get<std::string>() : "";
 
-    if (!server::utils::is_valid_email(payload.email)) {
+    if (!user_validation::is_valid_email(payload.email)) {
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid email format", json{{"email", "Invalid email format"}});
     }

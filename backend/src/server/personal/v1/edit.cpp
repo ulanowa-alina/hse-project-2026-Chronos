@@ -3,7 +3,6 @@
 #include "models/user.hpp"
 #include "repositories/user_repository.hpp"
 #include "security/password_hashing.hpp"
-#include "server/utils/email_validation.hpp"
 
 #include <boost/beast/http.hpp>
 #include <ctime>
@@ -145,7 +144,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     const std::string avatar_s3_key =
         has_avatar_s3_key ? body["avatar_s3_key"].get<std::string>() : "";
 
-    if (has_email && !server::utils::is_valid_email(email)) {
+    if (has_email && !user_validation::is_valid_email(email)) {
         spdlog::error("User edit rejected: invalid email format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid email format", json{{"email", "Invalid email format"}});

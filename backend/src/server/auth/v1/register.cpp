@@ -5,7 +5,6 @@
 #include "repositories/board_repository.hpp"
 #include "repositories/user_repository.hpp"
 #include "security/password_hashing.hpp"
-#include "server/utils/email_validation.hpp"
 
 #include <ctime>
 #include <iomanip>
@@ -102,7 +101,7 @@ User parse_new_user(const json& body) {
     const std::string status = require_string_field(body, "status");
     const std::string password = require_string_field(body, "password");
 
-    if (!server::utils::is_valid_email(email)) {
+    if (!user_validation::is_valid_email(email)) {
         throw std::invalid_argument("invalid_email");
     }
 
