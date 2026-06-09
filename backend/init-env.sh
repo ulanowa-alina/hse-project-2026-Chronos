@@ -21,11 +21,16 @@ if ! command -v openssl >/dev/null 2>&1; then
 fi
 
 JWT_SECRET="$(openssl rand -hex 32)"
+DB_PASSWORD="$(openssl rand -hex 16)"
 TMP_FILE="$(mktemp)"
 
-awk -v jwt_secret="$JWT_SECRET" '
+awk -v jwt_secret="$JWT_SECRET" -v db_password="$DB_PASSWORD" '
     /^JWT_SECRET=/ {
         print "JWT_SECRET=" jwt_secret
+        next
+    }
+    /^DB_PASSWORD=/ {
+        print "DB_PASSWORD=" db_password
         next
     }
     { print }
