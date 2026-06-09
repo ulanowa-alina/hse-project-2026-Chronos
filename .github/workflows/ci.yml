@@ -31,5 +31,6 @@ jobs:
 
       - name: Run Clang-Format Check
         run: |
+          clang-format-18 --version
           find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
           | xargs -0 -r clang-format-18 --style=file --dry-run -Werror
