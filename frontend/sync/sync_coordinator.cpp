@@ -182,7 +182,7 @@ void SyncCoordinator::handleResponse(const QString& endpoint, const QByteArray& 
         finishInitialLoadCycle();
     }
 
-    if (!remote_loading_) {
+    if (!remote_loading_ && endpoint != network_manager_->user_info_url_) {
         emit dataChanged();
     }
 }

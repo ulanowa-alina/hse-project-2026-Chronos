@@ -14,6 +14,7 @@
 #include <QNetworkReply>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QShowEvent>
 #include <QSqlDatabase>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -50,6 +51,7 @@ class BoardScreen : public QWidget {
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
   private:
     int board_id_;
