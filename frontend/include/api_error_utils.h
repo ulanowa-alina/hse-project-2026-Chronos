@@ -66,8 +66,8 @@ inline auto fieldDisplayName(const QString& field) -> QString {
     return field;
 }
 
-inline auto translateRawMessage(const QString& raw_message, const QString& field = QString())
-    -> QString {
+inline auto translateRawMessage(const QString& raw_message,
+                                const QString& field = QString()) -> QString {
     const QString message = raw_message.trimmed();
     if (message.isEmpty()) {
         return {};
@@ -148,7 +148,8 @@ inline auto translateRawMessage(const QString& raw_message, const QString& field
         return QStringLiteral("Пользователь с таким email уже существует.");
     }
     if (message == QStringLiteral("Missing required field")) {
-        return QStringLiteral("Обязательное поле \"%1\" не заполнено.").arg(fieldDisplayName(field));
+        return QStringLiteral("Обязательное поле \"%1\" не заполнено.")
+            .arg(fieldDisplayName(field));
     }
     if (message == QStringLiteral("Missing required fields")) {
         return QStringLiteral("Не заполнены обязательные поля.");
@@ -202,8 +203,7 @@ inline auto translateRawMessage(const QString& raw_message, const QString& field
         QString raw_field = message;
         raw_field.remove(0, QStringLiteral("Invalid ").size());
         raw_field.chop(QStringLiteral(" format").size());
-        return QStringLiteral("Некорректный формат поля \"%1\".")
-            .arg(fieldDisplayName(raw_field));
+        return QStringLiteral("Некорректный формат поля \"%1\".").arg(fieldDisplayName(raw_field));
     }
 
     return message;

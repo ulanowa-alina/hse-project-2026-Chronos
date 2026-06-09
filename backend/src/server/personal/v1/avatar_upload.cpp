@@ -5,6 +5,7 @@
 #include "server/utils/base64.hpp"
 #include "storage/s3_config.hpp"
 #include "storage/s3_uploader.hpp"
+#include "security/password_hashing.hpp"
 
 #include <array>
 #include <boost/beast/http.hpp>
@@ -154,7 +155,7 @@ void apply_profile_payload(User& user, const ProfilePayload& payload) {
     user.name_ = payload.name;
     user.status_ = payload.status;
     if (payload.has_password) {
-        user.password_hash_ = "hash:" + payload.password;
+        user.password_hash_ = security::hash_password(payload.password);
     }
 }
 
