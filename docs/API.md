@@ -48,7 +48,7 @@
 | GET    | /board/v1/tasks   | Получить задачи доски               | `query: board_id=<id>`                                                                                           | `data: Task[]`      |
 | GET    | /task/v1/get_all  | Получить задачи пользователя        | `query: board_id=<id> (optional), status_id=<id> (optional)`                                                     | `data: Task[]`      |
 | POST   | /task/v1/create   | Создать задачу в доске              | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."} | `data: Task`        |
-| PATCH  | /task/v1/edit     | Обновить задачу                     | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."}  | `data: Task`        |
+| PATCH  | /task/v1/edit     | Обновить задачу                     | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "...",<br>"deadline": "2026-01-10T12:00:00Z" \| null}  | `data: Task`        |
 | DELETE | /task/v1/delete   | Удалить задачу                      | {"task_id": "id"}                                                                                                | 204 No Content      |
 | POST   | /status/v1/create | Создать статус доски                | {"board_id": "id",<br>"name": "...",<br>"position": 0}                                                           | `data: Status`      |
 | PATCH  | /status/v1/edit   | Обновить статус доски               | {"status_id": "id",<br>"name": "...",<br>"position": 0}                                                          | `data: Status`      |
@@ -95,7 +95,7 @@
 | 7   | is_completed   | bool              | да             | Выполнена ли задача           | false                |
 | 8   | created_at     | string (ISO 8601) | да             | Дата создания карточки        | 2026-01-10T12:00:00Z |
 | 9   | updated_at     | string (ISO 8601) | да             | Дата обновления карточки      | 2026-01-10T12:00:00Z |
-| 10  | deadline       | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
+| 10  | deadline       | string (ISO 8601) \| null | нет     | Дедлайн; в `PATCH /task/v1/edit` `null` снимает дедлайн | 2026-01-10T12:00:00Z |
 
 4. Status (Статус доски)
    Status object
