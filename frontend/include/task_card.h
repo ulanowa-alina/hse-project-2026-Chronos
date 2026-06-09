@@ -63,6 +63,7 @@ class TaskCard : public QFrame {
     int board_id_;
     int status_id_;
     bool is_completed_{false};
+    bool should_be_delete_{false};
 
     QPoint drag_start_position_;
 

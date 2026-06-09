@@ -36,17 +36,7 @@ void StatusWindow::setSyncCoordinator(SyncCoordinator* coordinator) {
 }
 
 void StatusWindow::onCreateTaskRequest() {
-    if (!sync_coordinator_) {
-        return;
-    }
-
-    LocalTaskRepository repo(db_);
-    const int temp_id = repo.createLocalId();
-
-    auto* card = new TaskCard(temp_id, board_id_, status_id_, db_, this);
-    card->setSyncCoordinator(sync_coordinator_);
-    tasks_layout_->insertWidget(0, card);
-    updateGeometry();
+    emit openTaskCreateScreen(board_id_, status_id_);
 }
 
 void StatusWindow::onOpenSettings() {
@@ -137,6 +127,11 @@ void StatusWindow::onStatusDeleteRequest() {
     deleteLater();
 }
 
+void StatusWindow::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
+    Q_UNUSED(endpoint);
+    Q_UNUSED(data);
+    Q_UNUSED(code);
+}
 
 void StatusWindow::dragEnterEvent(QDragEnterEvent* event) {
     auto mime = event->mimeData();

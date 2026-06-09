@@ -15,11 +15,10 @@ TaskCreateScreen::TaskCreateScreen(int board_id, int status_id, QWidget* parent)
 
 void TaskCreateScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
+}
 
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &TaskCreateScreen::onNetworkResponse);
-    }
+void TaskCreateScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
 }
 
 void TaskCreateScreen::setBoardId(int board_id) {
@@ -34,26 +33,6 @@ void TaskCreateScreen::setDatabase(QSqlDatabase* db) {
     db_ = db;
 }
 
-void TaskCreateScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
-                                         int code) {
-    if (!isVisible()) {
-        return;
-    }
-
-    if (endpoint != network_manager_->tasks_create_url_)
-        return;
-
-    if (endpoint == network_manager_->tasks_create_url_) {
-        if (code == 200 || code == 201) {
-            qDebug() << "TaskCreateScreen: Задача успешно создана на сервере";
-            clearFields();
-            emit taskCreated();
-        } else {
-            qDebug() << "TaskCreateScreen: Ошибка создания задачи на сервере:" << code;
-        }
-    }
-}
-
 void TaskCreateScreen::onCreateTaskRequest() {
     QString title = title_input_->text().trimmed();
     QString description = description_input_->toPlainText().trimmed();
@@ -65,63 +44,32 @@ void TaskCreateScreen::onCreateTaskRequest() {
         return;
     }
 
-    // Offline-first: Save to local database first
     if (db_) {
         try {
             LocalTaskRepository repo(*db_);
             int local_id = repo.createLocalId();
-            
+
             QString deadline_str;
             if (deadline_checkbox_->isChecked() && deadline.isValid()) {
                 deadline_str = deadline.toUTC().toString(Qt::ISODate);
             }
 
-            LocalTask local_task(
-                local_id, board_id_, title, status_id_, priority_color, description,
-                deadline_str, false, QString(), QString(), QString(),
-                SyncStatus::PENDING, 0
-            );
+            LocalTask local_task(local_id, board_id_, title, status_id_, priority_color,
+                                 description, deadline_str, false, QString(), QString(), QString(),
+                                 SyncStatus::PENDING, 0);
 
             repo.save(local_task);
             qDebug() << "TaskCreateScreen: Задача сохранена локально с ID:" << local_id;
-            
+
             clearFields();
             emit taskCreated();
-            
-            // Then sync to server if network is available
-            if (network_manager_ && network_manager_->hasToken()) {
-                QJsonObject json;
-                json["board_id"] = board_id_;
-                json["title"] = title;
-                json["description"] = description;
-                json["status_id"] = status_id_;
-                json["priority_color"] = priority_color;
-                json["is_completed"] = false;
 
-                if (!deadline_str.isEmpty()) {
-                    json["deadline"] = deadline_str;
-                }
-
-                network_manager_->POST(network_manager_->tasks_create_url_, json);
+            if (sync_coordinator_) {
+                sync_coordinator_->syncTasks();
             }
         } catch (const std::exception& e) {
             qDebug() << "TaskCreateScreen: Ошибка сохранения в локальную БД:" << e.what();
         }
-    } else if (network_manager_ && board_id_ > 0 && status_id_ > 0) {
-        // Fallback to server-only if no database
-        QJsonObject json;
-        json["board_id"] = board_id_;
-        json["title"] = title;
-        json["description"] = description;
-        json["status_id"] = status_id_;
-        json["priority_color"] = priority_color;
-        json["is_completed"] = false;
-
-        if (deadline_checkbox_->isChecked() && deadline.isValid()) {
-            json["deadline"] = deadline.toUTC().toString(Qt::ISODate);
-        }
-
-        network_manager_->POST(network_manager_->tasks_create_url_, json);
     }
 }
 

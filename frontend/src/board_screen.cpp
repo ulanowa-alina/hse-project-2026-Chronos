@@ -61,7 +61,12 @@ void BoardScreen::loadFromLocalDatabase() {
         if (sync_coordinator_) {
             card->setSyncCoordinator(sync_coordinator_);
         }
-        card->setData(task.title_, task.description_);
+        QDateTime deadline;
+        if (!task.deadline_.isEmpty()) {
+            deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
+        }
+        card->setData(task.title_, task.description_, deadline, task.is_completed_);
+        connect(card, &TaskCard::openTaskEditScreen, this, &BoardScreen::openTaskEditScreen);
         status->addTaskCard(card);
     }
 }
@@ -92,6 +97,7 @@ StatusWindow* BoardScreen::showStatusWindow(int status_id, const QString& name) 
     if (sync_coordinator_) {
         status->setSyncCoordinator(sync_coordinator_);
     }
+    connect(status, &StatusWindow::openTaskCreateScreen, this, &BoardScreen::openTaskCreateScreen);
     board_layout_->insertWidget(board_layout_->count() - 1, status);
     status_windows_.insert(status_id, status);
     return status;

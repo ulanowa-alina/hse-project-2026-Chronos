@@ -1,7 +1,8 @@
 #include "board_edit_screen.h"
 
+#include "../local_repositories/local_board_repository.hpp"
+
 #include <QDebug>
-#include <QJsonObject>
 
 BoardEditScreen::BoardEditScreen(int board_id, QWidget* parent)
     : QWidget(parent)
@@ -11,11 +12,14 @@ BoardEditScreen::BoardEditScreen(int board_id, QWidget* parent)
 
 void BoardEditScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
+}
 
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &BoardEditScreen::onNetworkResponse);
-    }
+void BoardEditScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
+void BoardEditScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
 }
 
 void BoardEditScreen::setBoardId(int board_id) {
@@ -23,43 +27,20 @@ void BoardEditScreen::setBoardId(int board_id) {
 }
 
 void BoardEditScreen::loadBoardData() {
-    if (!network_manager_ || board_id_ <= 0) {
-        return;
-    }
-    network_manager_->GET(network_manager_->board_get_url_ +
-                          "?board_id=" + QString::number(board_id_));
-}
-
-void BoardEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (!isVisible()) {
+    if (board_id_ <= 0) {
         return;
     }
 
-    if (endpoint.startsWith(network_manager_->board_get_url_)) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            QJsonObject board = doc.object()["data"].toObject();
-            title_input_->setText(board["title"].toString());
-            description_input_->setPlainText(board["description"].toString());
-        }
-        return;
-    }
-
-    if (endpoint != network_manager_->boards_edit_url_)
-        return;
-
-    if (endpoint == network_manager_->boards_edit_url_) {
-        if (code == 200) {
-            qDebug() << "BoardEditScreen: Доска успешно обновлена";
-            emit boardUpdated();
-        } else {
-            qDebug() << "BoardEditScreen: Ошибка обновления доски:" << code;
-        }
+    LocalBoardRepository repo(db_);
+    const auto board = repo.findById(board_id_);
+    if (board) {
+        title_input_->setText(board->title_);
+        description_input_->setPlainText(board->description_);
     }
 }
 
 void BoardEditScreen::onUpdateBoardRequest() {
-    if (!network_manager_ || board_id_ <= 0) {
+    if (board_id_ <= 0 || !sync_coordinator_) {
         return;
     }
 
@@ -71,12 +52,23 @@ void BoardEditScreen::onUpdateBoardRequest() {
         return;
     }
 
-    QJsonObject json;
-    json["board_id"] = board_id_;
-    json["title"] = title;
-    json["description"] = description;
+    LocalBoardRepository repo(db_);
+    const auto existing = repo.findById(board_id_);
+    if (!existing) {
+        return;
+    }
 
-    network_manager_->PATCH(network_manager_->boards_edit_url_, json);
+    LocalBoard board = *existing;
+    board.title_ = title;
+    board.description_ = description;
+    board.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(board);
+        emit boardUpdated();
+        sync_coordinator_->syncBoards();
+    } catch (const std::exception& e) {
+        qDebug() << "BoardEditScreen: Ошибка сохранения в локальную БД:" << e.what();
+    }
 }
 
 void BoardEditScreen::onCloseRequest() {

@@ -1,12 +1,14 @@
 #ifndef BOARD_EDIT_SCREEN_H
 #define BOARD_EDIT_SCREEN_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -18,6 +20,8 @@ class BoardEditScreen : public QWidget {
     explicit BoardEditScreen(int board_id, QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
+    void setDatabase(QSqlDatabase db);
     void setBoardId(int board_id);
     void loadBoardData();
 
@@ -26,12 +30,13 @@ class BoardEditScreen : public QWidget {
     void closeRequested();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onUpdateBoardRequest();
     void onCloseRequest();
 
   private:
     NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
+    QSqlDatabase db_;
     int board_id_{-1};
 
     QPushButton* update_button_{nullptr};

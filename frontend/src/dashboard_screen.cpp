@@ -1,9 +1,10 @@
 #include "dashboard_screen.hpp"
 
+#include "../local_repositories/local_board_repository.hpp"
+#include "../local_repositories/local_pomodoro_session_repository.hpp"
+#include "../local_repositories/local_task_repository.hpp"
+
 #include <QHBoxLayout>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QScrollArea>
 #include <QSpacerItem>
 #include <QVBoxLayout>
@@ -15,17 +16,16 @@ DashboardScreen::DashboardScreen(QWidget* parent)
 
 void DashboardScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &DashboardScreen::onNetworkResponse);
-    }
+}
+
+void DashboardScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
 }
 
 void DashboardScreen::reloadDashboardData() {
+    loadStatistics();
     loadBoards();
-    if (network_manager_) {
-        network_manager_->GET(network_manager_->pomodoro_get_user_sessions_url_);
-    }
+    loadDeadlines();
 }
 
 void DashboardScreen::setupLayout() {
@@ -208,7 +208,7 @@ void DashboardScreen::setupStatsFrame() {
     active_tasks_layout->setContentsMargins(20, 15, 20, 15);
     active_tasks_layout->setSpacing(5);
 
-    active_tasks_label_ = new QLabel("Активные задачи:");
+    active_tasks_label_ = new QLabel("Всего актуальных задач:");
     active_tasks_label_->setStyleSheet(stat_label_style);
     active_tasks_value_ = new QLabel("0");
     active_tasks_value_->setStyleSheet(stat_value_style);
@@ -222,7 +222,7 @@ void DashboardScreen::setupStatsFrame() {
     focus_hours_layout->setContentsMargins(20, 15, 20, 15);
     focus_hours_layout->setSpacing(5);
 
-    focus_hours_label_ = new QLabel("Часов в фокусировании:");
+    focus_hours_label_ = new QLabel("Время в фокусировании:");
     focus_hours_label_->setStyleSheet(stat_label_style);
     focus_hours_value_ = new QLabel("0");
     focus_hours_value_->setStyleSheet(stat_value_style);
@@ -245,8 +245,8 @@ void DashboardScreen::setupStatsFrame() {
     completed_tasks_layout->addWidget(completed_tasks_value_);
 
     stats_layout->addWidget(active_tasks_frame_);
-    stats_layout->addWidget(focus_hours_frame_);
     stats_layout->addWidget(completed_tasks_frame_);
+    stats_layout->addWidget(focus_hours_frame_);
 }
 void DashboardScreen::setupDeadlinesFrame() {
     deadlines_frame_ = new QFrame();
@@ -357,197 +357,150 @@ void DashboardScreen::setupBoardsFrame() {
 }
 
 void DashboardScreen::loadStatistics() {
+    if (!db_.isOpen()) {
+        return;
+    }
+
+    LocalTaskRepository task_repo(db_);
+    const std::vector<LocalTask> tasks = task_repo.findAll();
+
+    int active_count = 0;
+    int completed_count = 0;
+
+    for (const LocalTask& task : tasks) {
+        if (task.is_completed_) {
+            completed_count++;
+        } else {
+            active_count++;
+        }
+    }
+
+    active_tasks_value_->setText(QString::number(active_count));
+    completed_tasks_value_->setText(QString::number(completed_count));
+
+    LocalPomodoroSessionRepository pomodoro_repo(db_);
+    const std::vector<LocalPomodoroSession> sessions = pomodoro_repo.findAll();
+
+    int total_focus_seconds = 0;
+    for (const LocalPomodoroSession& session : sessions) {
+        total_focus_seconds += session.work_duration_seconds_;
+    }
+
+    int focus_hours = total_focus_seconds / 3600;
+    int focus_minutes = (total_focus_seconds % 3600) / 60;
+    focus_hours_value_->setText(QString("%1ч %2м").arg(focus_hours).arg(focus_minutes));
 }
 
 void DashboardScreen::loadDeadlines() {
+    if (!db_.isOpen()) {
+        return;
+    }
+
+    LocalTaskRepository task_repo(db_);
+    const std::vector<LocalTask> tasks = task_repo.findAll();
+
+    QVector<QPair<LocalTask, int>> tasks_with_deadlines;
+
+    for (const LocalTask& task : tasks) {
+        if (!task.deadline_.isEmpty() && !task.is_completed_) {
+            tasks_with_deadlines.append(qMakePair(task, task.board_id_));
+        }
+    }
+
+    std::sort(tasks_with_deadlines.begin(), tasks_with_deadlines.end(),
+              [](const QPair<LocalTask, int>& a, const QPair<LocalTask, int>& b) {
+                  return a.first.deadline_ < b.first.deadline_;
+              });
+
+    for (auto* card : deadline_cards_) {
+        card->deleteLater();
+    }
+    deadline_cards_.clear();
+
+    if (tasks_with_deadlines.isEmpty()) {
+        no_deadlines_label_->show();
+    } else {
+        no_deadlines_label_->hide();
+        int count = qMin(tasks_with_deadlines.size(), 3);
+        for (int i = 0; i < count; ++i) {
+            const auto& task_pair = tasks_with_deadlines[i];
+            const LocalTask& task = task_pair.first;
+            int board_id = task_pair.second;
+
+            auto* card = new DdTaskCard(task.id_, board_id, task.status_id_, db_, this);
+
+            QDateTime deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
+            card->setCardData(task.title_, task.description_, deadline, task.is_completed_);
+
+            connect(card, &DdTaskCard::openBoardRequested, this, &DashboardScreen::onBoardRequest);
+
+            auto* container_layout = qobject_cast<QHBoxLayout*>(deadlines_container_->layout());
+            if (container_layout) {
+                container_layout->insertWidget(container_layout->count() - 1, card);
+            }
+            deadline_cards_.append(card);
+        }
+    }
 }
 
 void DashboardScreen::loadBoards() {
-    if (!network_manager_) {
+    if (!db_.isOpen()) {
         return;
     }
 
-    network_manager_->GET(network_manager_->boards_get_all_url_);
+    LocalBoardRepository board_repo(db_);
+    const std::vector<LocalBoard> boards = board_repo.findAll();
+
+    LocalTaskRepository task_repo(db_);
+
+    clearBoards();
+
+    auto* boards_container_layout = qobject_cast<QHBoxLayout*>(boards_container_->layout());
+    if (!boards_container_layout) {
+        return;
+    }
+
+    for (const LocalBoard& board : boards) {
+        auto* card = new BoardCard(board.id_, this);
+        QString description = board.description_;
+        if (description.isEmpty()) {
+            description = "Нет описания";
+        }
+
+        const std::vector<LocalTask> board_tasks = task_repo.findByBoardId(board.id_);
+        int active_tasks = 0;
+        int completed_tasks = 0;
+        QDateTime nearest_deadline;
+
+        for (const LocalTask& task : board_tasks) {
+            if (task.is_completed_) {
+                completed_tasks++;
+            } else {
+                active_tasks++;
+            }
+            if (!task.deadline_.isEmpty()) {
+                QDateTime deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
+                if (!nearest_deadline.isValid() || deadline < nearest_deadline) {
+                    nearest_deadline = deadline;
+                }
+            }
+        }
+
+        card->setBoardData(board.title_, description, active_tasks, completed_tasks,
+                           nearest_deadline);
+
+        connect(card, &BoardCard::openBoardRequested, this, &DashboardScreen::onBoardRequest);
+
+        boards_container_layout->insertWidget(boards_container_layout->count() - 1, card);
+        board_cards_.append(card);
+    }
 }
 
-void DashboardScreen::onNetworkResponse(const QString& endpoint, const QByteArray data, int code) {
-    if (!network_manager_) {
-        return;
+void DashboardScreen::clearBoards() {
+    for (auto* card : board_cards_) {
+        card->deleteLater();
     }
-
-    if (endpoint == network_manager_->tasks_get_all_url_ && code >= 200 && code < 300) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (!doc.isObject() || !doc.object().contains("data")) {
-            return;
-        }
-
-        QJsonArray tasks = doc.object()["data"].toArray();
-        int active_count = 0;
-        int completed_count = 0;
-
-        QMap<int, QVector<QJsonObject>> tasks_by_board;
-        QVector<QPair<QJsonObject, int>> tasks_with_deadlines;
-
-        for (const auto& task_value : tasks) {
-            QJsonObject task = task_value.toObject();
-            int board_id = task["board_id"].toInt();
-            if (task.contains("is_completed")) {
-                bool is_completed = task["is_completed"].toBool();
-                if (is_completed) {
-                    completed_count++;
-                } else {
-                    active_count++;
-                }
-            }
-            tasks_by_board[board_id].append(task);
-            if (task.contains("deadline") && !task["deadline"].isNull()) {
-                bool is_completed = task["is_completed"].toBool(false);
-                if (!is_completed) {
-                    tasks_with_deadlines.append(qMakePair(task, board_id));
-                }
-            }
-        }
-
-        active_tasks_value_->setText(QString::number(active_count));
-        completed_tasks_value_->setText(QString::number(completed_count));
-
-        for (auto* card : board_cards_) {
-            int board_id = card->getBoardId();
-            const QVector<QJsonObject>& board_tasks = tasks_by_board.value(board_id);
-            int active_tasks = 0;
-            int completed_tasks = 0;
-            QDateTime nearest_deadline;
-
-            for (const auto& task : board_tasks) {
-                if (task.contains("is_completed")) {
-                    if (task["is_completed"].toBool()) {
-                        completed_tasks++;
-                    } else {
-                        active_tasks++;
-                    }
-                }
-                if (task.contains("deadline") && !task["deadline"].isNull()) {
-                    QString deadline_str = task["deadline"].toString();
-                    QDateTime deadline = QDateTime::fromString(deadline_str, Qt::ISODate);
-                    if (!nearest_deadline.isValid() || deadline < nearest_deadline) {
-                        nearest_deadline = deadline;
-                    }
-                }
-            }
-
-            QJsonObject board = boards_data_.value(board_id);
-            QString title = board["title"].toString();
-            QString description = board["description"].toString();
-            if (description.isEmpty()) {
-                description = "Нет описания";
-            }
-
-            card->setBoardData(title, description, active_tasks, completed_tasks, nearest_deadline);
-        }
-
-        std::sort(tasks_with_deadlines.begin(), tasks_with_deadlines.end(),
-                  [](const QPair<QJsonObject, int>& a, const QPair<QJsonObject, int>& b) {
-                      QString deadline_a = a.first["deadline"].toString();
-                      QString deadline_b = b.first["deadline"].toString();
-                      return deadline_a < deadline_b;
-                  });
-
-        for (auto* card : deadline_cards_) {
-            card->deleteLater();
-        }
-        deadline_cards_.clear();
-
-        if (tasks_with_deadlines.isEmpty()) {
-            no_deadlines_label_->show();
-        } else {
-            no_deadlines_label_->hide();
-            int count = qMin(tasks_with_deadlines.size(), 3);
-            for (int i = 0; i < count; ++i) {
-                const auto& task_pair = tasks_with_deadlines[i];
-                QJsonObject task = task_pair.first;
-                int board_id = task_pair.second;
-
-                auto* card =
-                    new DdTaskCard(task["id"].toInt(), board_id, task["status_id"].toInt(), this);
-                card->setNetworkManager(network_manager_);
-
-                QString deadline_str = task["deadline"].toString();
-                QDateTime deadline = QDateTime::fromString(deadline_str, Qt::ISODate);
-                card->setCardData(task["title"].toString(), task["description"].toString(),
-                                  deadline, task["is_completed"].toBool());
-
-                connect(card, &DdTaskCard::openBoardRequested, this,
-                        &DashboardScreen::onBoardRequest);
-
-                auto* container_layout = qobject_cast<QHBoxLayout*>(deadlines_container_->layout());
-                if (container_layout) {
-                    container_layout->insertWidget(container_layout->count() - 1, card);
-                }
-                deadline_cards_.append(card);
-            }
-        }
-    }
-
-    if (endpoint == network_manager_->boards_get_all_url_ && code >= 200 && code < 300) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (!doc.isObject() || !doc.object().contains("data")) {
-            return;
-        }
-
-        QJsonArray boards = doc.object()["data"].toArray();
-        boards_data_.clear();
-
-        for (auto* card : board_cards_) {
-            card->deleteLater();
-        }
-        board_cards_.clear();
-
-        auto* boards_container_layout = qobject_cast<QHBoxLayout*>(boards_container_->layout());
-        if (boards_container_layout) {
-            for (const auto& board_value : boards) {
-                QJsonObject board = board_value.toObject();
-                int board_id = board["id"].toInt();
-                boards_data_[board_id] = board;
-
-                auto* card = new BoardCard(board_id, this);
-                QString description = board["description"].toString();
-                if (description.isEmpty()) {
-                    description = "Нет описания";
-                }
-
-                card->setBoardData(board["title"].toString(), description, 0, 0, QDateTime());
-
-                connect(card, &BoardCard::openBoardRequested, this,
-                        &DashboardScreen::onBoardRequest);
-
-                boards_container_layout->insertWidget(boards_container_layout->count() - 1, card);
-                board_cards_.append(card);
-            }
-        }
-
-        network_manager_->GET(network_manager_->tasks_get_all_url_);
-    }
-
-    if (endpoint == network_manager_->pomodoro_get_user_sessions_url_ && code >= 200 &&
-        code < 300) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        if (!doc.isObject() || !doc.object().contains("data")) {
-            return;
-        }
-
-        QJsonArray sessions = doc.object()["data"].toArray();
-        int total_work_seconds = 0;
-
-        for (const auto& session_value : sessions) {
-            QJsonObject session = session_value.toObject();
-            if (session.contains("work_duration_seconds")) {
-                total_work_seconds += session["work_duration_seconds"].toInt();
-            }
-        }
-
-        int total_hours = total_work_seconds / 3600;
-        focus_hours_value_->setText(QString::number(total_hours));
-    }
+    board_cards_.clear();
 }
 
 void DashboardScreen::onBoardCreateRequest() {

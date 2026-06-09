@@ -75,7 +75,9 @@ void TaskCard::setData(const QString& title, const QString& description, const Q
         description_text_->setVisible(true);
     }
 
-    if (deadline_.isValid() && !deadline_.isNull()) {
+    doneVisualState();
+
+    if (deadline_.isValid() && !deadline_.isNull() && !is_completed_) {
         deadline_label_->setVisible(true);
         onUpdateTimer();
         timer_->start();
@@ -83,8 +85,6 @@ void TaskCard::setData(const QString& title, const QString& description, const Q
         deadline_label_->setVisible(false);
         timer_->stop();
     }
-
-    doneVisualState();
 }
 
 void TaskCard::onUpdateTimer() {
@@ -94,11 +94,12 @@ void TaskCard::onUpdateTimer() {
     }
 
     QDateTime current = QDateTime::currentDateTime();
-    QString date_part = deadline_.toString("dd.MM в hh:mm");
+    QDateTime display_deadline = deadline_.addSecs(3 * 3600);
+    QString date_part = display_deadline.toString("dd.MM в hh:mm");
 
     if (current >= deadline_) {
         deadline_label_->setText(QString("%1 (Просрочено!)").arg(date_part));
-        deadline_label_->setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 12px;");
+        deadline_label_->setStyleSheet("color: #e74c3c; font-size: 12px;");
         timer_->stop();
         return;
     }
@@ -110,8 +111,8 @@ void TaskCard::onUpdateTimer() {
         int seconds = secs_to % SECONDS_IN_MIN;
 
         deadline_label_->setText(
-            QString("⏳ %1 (Осталось: %2м %3с!)").arg(date_part).arg(minutes).arg(seconds));
-        deadline_label_->setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 12px;");
+            QString("%1 (Осталось: %2м %3с)").arg(date_part).arg(minutes).arg(seconds));
+        deadline_label_->setStyleSheet("color: #e74c3c; font-size: 12px;");
 
         if (timer_->interval() != SMALL_TIMER_INTERVAL) {
             timer_->setInterval(SMALL_TIMER_INTERVAL);
@@ -124,11 +125,11 @@ void TaskCard::onUpdateTimer() {
 
     if (days > 0) {
         deadline_label_->setText(
-            QString("📅 %1 (Осталось: %2д %3ч)").arg(date_part).arg(days).arg(hours));
+            QString("%1 (Осталось: %2д %3ч)").arg(date_part).arg(days).arg(hours));
         deadline_label_->setStyleSheet("color: #7f8c8d; font-size: 12px;");
     } else {
-        deadline_label_->setText(QString("📅 %1 (Осталось: %2ч)").arg(date_part).arg(hours));
-        deadline_label_->setStyleSheet("color: #e67e22; font-weight: bold; font-size: 12px;");
+        deadline_label_->setText(QString("%1 (Осталось: %2ч)").arg(date_part).arg(hours));
+        deadline_label_->setStyleSheet("color: #e67e22; font-size: 12px;");
     }
 
     if (timer_->interval() != BIG_TIMER_INTERVAL) {
@@ -242,8 +243,7 @@ void TaskCard::onTaskSaveRequest() {
 
     LocalTaskRepository repo(db_);
     if (task_id_ < 0) {
-        LocalTask task(task_id_, board_id_, title, status_id_, QStringLiteral("gray"),
-                       description_edit_->toPlainText());
+        LocalTask task(task_id_, board_id_, title, status_id_, QStringLiteral("gray"), QString());
         task.sync_status_ = SyncStatus::PENDING;
         task.server_version_ = 0;
         try {
@@ -259,7 +259,7 @@ void TaskCard::onTaskSaveRequest() {
         }
         LocalTask task = *existing;
         task.title_ = title;
-        task.description_ = description_edit_->toPlainText();
+        task.description_ = QString();
         task.status_id_ = status_id_;
         task.sync_status_ = SyncStatus::PENDING;
         try {
@@ -447,7 +447,7 @@ void TaskCard::setupLayout() {
     layout->addWidget(deadline_label_);
     description_text_ = new QWidget(this);
     auto* desc_layout = new QHBoxLayout(description_text_);
-    desc_layout->setContentsMargins(0, 4, 0, 4);
+    desc_layout->setContentsMargins(4, 8, 0, 4);
     desc_layout->setSpacing(10);
 
     blue_line_ = new QWidget(description_text_);

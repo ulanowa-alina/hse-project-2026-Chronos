@@ -1,11 +1,11 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "board_create_screen.h"
 #include "board_edit_screen.h"
 #include "board_screen.h"
 #include "dashboard_screen.hpp"
-#include "../sync/sync_coordinator.hpp"
 #include "local_db.h"
 #include "login_screen.h"
 #include "network_manager.h"
@@ -41,6 +41,7 @@ class MainWindow : public QMainWindow {
     void switchToBoardCreate();
     void switchToBoardEdit(int board_id);
     void openLoginScreen();
+    void onLoginSuccess();
     void onProfileLogout();
     void onProfileOpenBoard();
     void onProfileOpenDashboard();
@@ -53,7 +54,6 @@ class MainWindow : public QMainWindow {
     void onBoardCreateDone();
     void onBoardEditClose();
     void onBoardEditDone();
-    void onLoginSuccess();
     void onRegistrationSuccess();
     void onInitialDataReady(int board_id);
     void onDataChanged();

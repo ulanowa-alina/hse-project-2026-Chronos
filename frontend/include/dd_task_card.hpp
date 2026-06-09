@@ -5,13 +5,15 @@
 #include "task_card.h"
 
 #include <QFrame>
+#include <QSqlDatabase>
 #include <QVBoxLayout>
 
 class DdTaskCard : public QFrame {
     Q_OBJECT
 
   public:
-    explicit DdTaskCard(int task_id, int board_id, int status_id, QWidget* parent = nullptr);
+    explicit DdTaskCard(int task_id, int board_id, int status_id, QSqlDatabase db,
+                        QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
 
@@ -22,13 +24,13 @@ class DdTaskCard : public QFrame {
     void openBoardRequested(int board_id);
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onBoardButtonClicked();
 
   private:
     int task_id_;
     int board_id_;
     int status_id_;
+    QSqlDatabase db_;
 
     NetworkManager* network_manager_{nullptr};
 
@@ -38,6 +40,7 @@ class DdTaskCard : public QFrame {
 
     void setupLayout();
     void freezeTaskCard();
+    void loadBoardTitle();
 };
 
 #endif // DD_TASK_CARD_H

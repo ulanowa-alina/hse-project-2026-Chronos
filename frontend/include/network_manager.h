@@ -56,7 +56,6 @@ class NetworkManager : public QObject {
     const QString pomodoro_create_url_ = "/pomodoro/v1/create";
     const QString pomodoro_get_user_sessions_url_ = "/pomodoro/v1/get_user_sessions";
 
-
     void GET(const QString& endpoint);
     void POST(const QString& endpoint, const QJsonObject& data);
     void PATCH(const QString& endpoint, const QJsonObject& data);

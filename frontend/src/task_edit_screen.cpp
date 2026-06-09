@@ -1,9 +1,9 @@
 #include "task_edit_screen.h"
 
+#include "../local_repositories/local_task_repository.hpp"
+
 #include <QCheckBox>
 #include <QDebug>
-#include <QJsonArray>
-#include <QJsonObject>
 
 TaskEditScreen::TaskEditScreen(int task_id, int board_id, int status_id, QWidget* parent)
     : QWidget(parent)
@@ -15,11 +15,14 @@ TaskEditScreen::TaskEditScreen(int task_id, int board_id, int status_id, QWidget
 
 void TaskEditScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
+}
 
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &TaskEditScreen::onNetworkResponse);
-    }
+void TaskEditScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
+void TaskEditScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
 }
 
 void TaskEditScreen::setTaskId(int task_id) {
@@ -35,63 +38,39 @@ void TaskEditScreen::setStatusId(int status_id) {
 }
 
 void TaskEditScreen::loadTaskData() {
-    if (!network_manager_ || board_id_ <= 0) {
-        return;
-    }
-    network_manager_->GET(network_manager_->tasks_get_all_url_ +
-                          "?board_id=" + QString::number(board_id_));
-}
-
-void TaskEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (!isVisible()) {
+    if (task_id_ <= 0) {
         return;
     }
 
-    if (endpoint.startsWith(network_manager_->tasks_get_all_url_)) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            QJsonArray tasks = doc.object()["data"].toArray();
-            for (const QJsonValue& value : tasks) {
-                QJsonObject task = value.toObject();
-                if (task["id"].toInt() == task_id_) {
-                    title_input_->setText(task["title"].toString());
-                    description_input_->setPlainText(task["description"].toString());
-                    priority_combo_->setCurrentText(task["priority_color"].toString());
-                    bool has_deadline =
-                        task.contains("deadline") && !task["deadline"].toString().isEmpty();
-                    if (has_deadline) {
-                        QDateTime deadline =
-                            QDateTime::fromString(task["deadline"].toString(), Qt::ISODate);
-                        deadline_input_->setDateTime(deadline);
-                        deadline_checkbox_->setChecked(true);
-                        deadline_input_->setEnabled(true);
-                    } else {
-                        deadline_input_->clear();
-                        deadline_checkbox_->setChecked(false);
-                        deadline_input_->setEnabled(false);
-                    }
-                    break;
-                }
+    LocalTaskRepository repo(db_);
+    const auto task = repo.findById(task_id_);
+    if (task) {
+        title_input_->setText(task->title_);
+        description_input_->setPlainText(task->description_);
+        priority_combo_->setCurrentText(task->priority_color_);
+
+        if (!task->deadline_.isEmpty()) {
+            QDateTime deadline = QDateTime::fromString(task->deadline_, Qt::ISODate);
+            if (deadline.isValid()) {
+                QDateTime display_deadline = deadline.addSecs(3 * 3600);
+                deadline_input_->setDateTime(display_deadline);
+                deadline_checkbox_->setChecked(true);
+                deadline_input_->setEnabled(true);
+            } else {
+                deadline_input_->clear();
+                deadline_checkbox_->setChecked(false);
+                deadline_input_->setEnabled(false);
             }
-        }
-        return;
-    }
-
-    if (endpoint != network_manager_->tasks_edit_url_)
-        return;
-
-    if (endpoint == network_manager_->tasks_edit_url_) {
-        if (code == 200) {
-            qDebug() << "TaskEditScreen: Задача успешно обновлена";
-            emit taskUpdated();
         } else {
-            qDebug() << "TaskEditScreen: Ошибка обновления задачи:" << code;
+            deadline_input_->clear();
+            deadline_checkbox_->setChecked(false);
+            deadline_input_->setEnabled(false);
         }
     }
 }
 
 void TaskEditScreen::onUpdateTaskRequest() {
-    if (!network_manager_ || task_id_ <= 0 || status_id_ <= 0) {
+    if (task_id_ <= 0 || !sync_coordinator_) {
         return;
     }
 
@@ -105,18 +84,31 @@ void TaskEditScreen::onUpdateTaskRequest() {
         return;
     }
 
-    QJsonObject json;
-    json["task_id"] = task_id_;
-    json["title"] = title;
-    json["description"] = description;
-    json["status_id"] = status_id_;
-    json["priority_color"] = priority_color;
-
-    if (deadline_checkbox_->isChecked() && deadline.isValid()) {
-        json["deadline"] = deadline.toUTC().toString(Qt::ISODate);
+    LocalTaskRepository repo(db_);
+    const auto existing = repo.findById(task_id_);
+    if (!existing) {
+        return;
     }
 
-    network_manager_->PATCH(network_manager_->tasks_edit_url_, json);
+    LocalTask task = *existing;
+    task.title_ = title;
+    task.description_ = description;
+    task.priority_color_ = priority_color;
+
+    if (deadline_checkbox_->isChecked() && deadline.isValid()) {
+        task.deadline_ = deadline.toUTC().toString(Qt::ISODate);
+    } else {
+        task.deadline_ = QString();
+    }
+
+    task.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(task);
+        emit taskUpdated();
+        sync_coordinator_->syncTasks();
+    } catch (const std::exception& e) {
+        qDebug() << "TaskEditScreen: Ошибка сохранения в локальную БД:" << e.what();
+    }
 }
 
 void TaskEditScreen::onCloseRequest() {

@@ -2,6 +2,7 @@
 #define BOARD_CREATE_SCREEN_H
 
 #include "../local_repositories/local_board_repository.hpp"
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QHBoxLayout>
@@ -19,6 +20,7 @@ class BoardCreateScreen : public QWidget {
     explicit BoardCreateScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
     void setDatabase(QSqlDatabase* db);
     void setUserId(int user_id);
 
@@ -27,12 +29,12 @@ class BoardCreateScreen : public QWidget {
     void closeRequested();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onCreateBoardRequest();
     void onCloseRequest();
 
   private:
     NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
     QSqlDatabase* db_{nullptr};
     int user_id_{-1};
 

@@ -21,8 +21,6 @@ class RegistrationScreen : public QWidget {
     void setNetworkManager(NetworkManager* manager);
     void setSyncCoordinator(SyncCoordinator* coordinator);
 
-
-
     void clearInputs();
 
   signals:

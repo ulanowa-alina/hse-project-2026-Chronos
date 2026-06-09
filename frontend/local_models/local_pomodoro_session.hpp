@@ -22,12 +22,12 @@ struct LocalPomodoroSession {
 
     LocalPomodoroSession() = default;
 
-    LocalPomodoroSession(int id, int user_id, int work_duration_seconds, int break_duration_seconds,
-                         int goal_minutes = 0, int completed_cycles = 0,
-                         const QString& started_at = QString(), const QString& completed_at = QString(),
-                         const QString& created_at = QString(), const QString& updated_at = QString(),
-                         const QString& deleted_at = QString(),
-                         const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
+    LocalPomodoroSession(
+        int id, int user_id, int work_duration_seconds, int break_duration_seconds,
+        int goal_minutes = 0, int completed_cycles = 0, const QString& started_at = QString(),
+        const QString& completed_at = QString(), const QString& created_at = QString(),
+        const QString& updated_at = QString(), const QString& deleted_at = QString(),
+        const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
         : id_(id)
         , user_id_(user_id)
         , goal_minutes_(goal_minutes)

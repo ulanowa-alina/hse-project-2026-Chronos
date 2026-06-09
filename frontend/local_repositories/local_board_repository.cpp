@@ -134,6 +134,26 @@ std::optional<LocalBoard> LocalBoardRepository::findById(int board_id) {
     return createBoard(query);
 }
 
+std::vector<LocalBoard> LocalBoardRepository::findAll() {
+    QSqlQuery query(db_);
+    query.prepare("SELECT id, user_id, title, description, "
+                  "created_at, updated_at, deleted_at, sync_status, server_version "
+                  "FROM boards WHERE deleted_at IS NULL");
+
+    if (!query.exec()) {
+        throw std::runtime_error(
+            ("LocalBoardRepository: Error find all boards: " + query.lastError().text())
+                .toStdString());
+    }
+
+    std::vector<LocalBoard> boards;
+    while (query.next()) {
+        boards.push_back(createBoard(query));
+    }
+
+    return boards;
+}
+
 std::optional<int> LocalBoardRepository::findFirstBoard() {
     QSqlQuery query(db_);
     query.prepare("SELECT id FROM boards WHERE deleted_at IS NULL ORDER BY id LIMIT 1");

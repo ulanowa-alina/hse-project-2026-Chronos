@@ -2,6 +2,7 @@
 #define TASK_CREATE_SCREEN_H
 
 #include "../local_repositories/local_task_repository.hpp"
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QCheckBox>
@@ -22,6 +23,7 @@ class TaskCreateScreen : public QWidget {
     explicit TaskCreateScreen(int board_id, int status_id, QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
     void setBoardId(int board_id);
     void setStatusId(int status_id);
     void setDatabase(QSqlDatabase* db);
@@ -31,13 +33,13 @@ class TaskCreateScreen : public QWidget {
     void closeRequested();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onCreateTaskRequest();
     void onCloseRequest();
     void onDeadlineCheckChanged(Qt::CheckState state);
 
   private:
     NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
     QSqlDatabase* db_{nullptr};
     int board_id_{-1};
     int status_id_{-1};

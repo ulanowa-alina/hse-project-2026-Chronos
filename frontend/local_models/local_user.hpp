@@ -20,9 +20,8 @@ struct LocalUser {
     LocalUser() = default;
 
     LocalUser(int id, const QString& email, const QString& name, const QString& status,
-              const QString& password_hash = QString(),
-              const QString& created_at = QString(), const QString& updated_at = QString(),
-              const QString& deleted_at = QString(),
+              const QString& password_hash = QString(), const QString& created_at = QString(),
+              const QString& updated_at = QString(), const QString& deleted_at = QString(),
               const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
         : id_(id)
         , email_(email)

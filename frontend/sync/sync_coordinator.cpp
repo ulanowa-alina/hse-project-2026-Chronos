@@ -40,7 +40,7 @@ void SyncCoordinator::beginUserSession(const QJsonObject& user_obj) {
     clearLocalData();
     current_user_id_ = user_obj["id"].toInt();
     user_manager_->saveFromLogin(user_obj);
-    loadAll();
+    loadAll(true);
 }
 
 void SyncCoordinator::loadCurrentUser() {
@@ -51,29 +51,41 @@ void SyncCoordinator::loadCurrentUser() {
     }
 }
 
-void SyncCoordinator::loadAll() {
+void SyncCoordinator::loadAll(bool emit_initial_data) {
     if (remote_loading_) {
         return;
     }
 
     remote_loading_ = true;
+    emit_initial_after_load_ = emit_initial_data;
     waiting_initial_boards_ = true;
-    waiting_initial_children_ = false;
+    waiting_initial_statuses_ = false;
+    waiting_initial_tasks_ = false;
     user_manager_->load();
     board_manager_->load();
 }
 
 void SyncCoordinator::loadChildrenAfterBoards() {
-    waiting_initial_children_ = true;
     status_manager_->load();
+    waiting_initial_statuses_ = true;
+}
+
+void SyncCoordinator::loadTasksAfterStatuses() {
     task_manager_->load();
+    waiting_initial_tasks_ = true;
 }
 
 void SyncCoordinator::finishInitialLoadCycle() {
     waiting_initial_boards_ = false;
-    waiting_initial_children_ = false;
+    waiting_initial_statuses_ = false;
+    waiting_initial_tasks_ = false;
     remote_loading_ = false;
-    emitInitialData();
+    if (emit_initial_after_load_) {
+        emit_initial_after_load_ = false;
+        emitInitialData();
+    } else {
+        emit dataChanged();
+    }
 }
 
 void SyncCoordinator::syncAll() {
@@ -119,11 +131,14 @@ SyncManager* SyncCoordinator::managerByModel(const QString& entity) const {
 void SyncCoordinator::handleResponse(const QString& endpoint, const QByteArray& data, int code) {
     const bool is_boards = endpoint == network_manager_->boards_get_all_url_;
     const bool is_statuses = endpoint.startsWith(network_manager_->statuses_get_all_url_);
+    const bool is_tasks = endpoint.startsWith(network_manager_->tasks_get_all_url_);
 
     if (codeIsError(code)) {
         if (waiting_initial_boards_ && is_boards) {
             finishInitialLoadCycle();
-        } else if (waiting_initial_children_ && is_statuses) {
+        } else if (waiting_initial_statuses_ && is_statuses) {
+            finishInitialLoadCycle();
+        } else if (waiting_initial_tasks_ && is_tasks) {
             finishInitialLoadCycle();
         }
         return;
@@ -132,6 +147,10 @@ void SyncCoordinator::handleResponse(const QString& endpoint, const QByteArray& 
     const QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isObject()) {
         if (waiting_initial_boards_ && is_boards) {
+            finishInitialLoadCycle();
+        } else if (waiting_initial_statuses_ && is_statuses) {
+            finishInitialLoadCycle();
+        } else if (waiting_initial_tasks_ && is_tasks) {
             finishInitialLoadCycle();
         }
         return;
@@ -156,7 +175,10 @@ void SyncCoordinator::handleResponse(const QString& endpoint, const QByteArray& 
     if (waiting_initial_boards_ && is_boards) {
         waiting_initial_boards_ = false;
         loadChildrenAfterBoards();
-    } else if (waiting_initial_children_ && is_statuses) {
+    } else if (waiting_initial_statuses_ && is_statuses) {
+        waiting_initial_statuses_ = false;
+        loadTasksAfterStatuses();
+    } else if (waiting_initial_tasks_ && is_tasks) {
         finishInitialLoadCycle();
     }
 

@@ -1,28 +1,23 @@
 #include "local_pomodoro_session_repository.hpp"
 
+#include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QDebug>
 
-LocalPomodoroSessionRepository::LocalPomodoroSessionRepository(QSqlDatabase& db) : db_(db) {
+LocalPomodoroSessionRepository::LocalPomodoroSessionRepository(QSqlDatabase& db)
+    : db_(db) {
 }
 
 LocalPomodoroSession LocalPomodoroSessionRepository::fromQuery(const QSqlQuery& query) {
     return LocalPomodoroSession(
-        query.value("id").toInt(),
-        query.value("user_id").toInt(),
-        query.value("work_duration_seconds").toInt(),
-        query.value("break_duration_seconds").toInt(),
-        query.value("goal_minutes").toInt(),
-        query.value("completed_cycles").toInt(),
-        query.value("started_at").toString(),
-        query.value("completed_at").toString(),
-        query.value("created_at").toString(),
-        query.value("updated_at").toString(),
+        query.value("id").toInt(), query.value("user_id").toInt(),
+        query.value("work_duration_seconds").toInt(), query.value("break_duration_seconds").toInt(),
+        query.value("goal_minutes").toInt(), query.value("completed_cycles").toInt(),
+        query.value("started_at").toString(), query.value("completed_at").toString(),
+        query.value("created_at").toString(), query.value("updated_at").toString(),
         query.value("deleted_at").toString(),
         stringToSyncStatus(query.value("sync_status").toString()),
-        query.value("server_version").toInt()
-    );
+        query.value("server_version").toInt());
 }
 
 std::optional<LocalPomodoroSession> LocalPomodoroSessionRepository::findById(int id) {
@@ -40,11 +35,13 @@ std::optional<LocalPomodoroSession> LocalPomodoroSessionRepository::findById(int
 std::vector<LocalPomodoroSession> LocalPomodoroSessionRepository::findByUserId(int user_id) {
     std::vector<LocalPomodoroSession> sessions;
     QSqlQuery query(db_);
-    query.prepare("SELECT * FROM pomodoro_sessions WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC");
+    query.prepare("SELECT * FROM pomodoro_sessions WHERE user_id = ? AND deleted_at IS NULL ORDER "
+                  "BY created_at DESC");
     query.addBindValue(user_id);
 
     if (!query.exec()) {
-        qDebug() << "LocalPomodoroSessionRepository: Error finding sessions by user_id:" << query.lastError().text();
+        qDebug() << "LocalPomodoroSessionRepository: Error finding sessions by user_id:"
+                 << query.lastError().text();
         return sessions;
     }
 
@@ -58,10 +55,12 @@ std::vector<LocalPomodoroSession> LocalPomodoroSessionRepository::findByUserId(i
 std::vector<LocalPomodoroSession> LocalPomodoroSessionRepository::findAll() {
     std::vector<LocalPomodoroSession> sessions;
     QSqlQuery query(db_);
-    query.prepare("SELECT * FROM pomodoro_sessions WHERE deleted_at IS NULL ORDER BY created_at DESC");
+    query.prepare(
+        "SELECT * FROM pomodoro_sessions WHERE deleted_at IS NULL ORDER BY created_at DESC");
 
     if (!query.exec()) {
-        qDebug() << "LocalPomodoroSessionRepository: Error finding all sessions:" << query.lastError().text();
+        qDebug() << "LocalPomodoroSessionRepository: Error finding all sessions:"
+                 << query.lastError().text();
         return sessions;
     }
 
@@ -76,10 +75,10 @@ bool LocalPomodoroSessionRepository::insert(const LocalPomodoroSession& session)
     QSqlQuery query(db_);
     query.prepare(
         "INSERT INTO pomodoro_sessions (id, user_id, goal_minutes, work_duration_seconds, "
-        "break_duration_seconds, completed_cycles, started_at, completed_at, created_at, updated_at, "
+        "break_duration_seconds, completed_cycles, started_at, completed_at, created_at, "
+        "updated_at, "
         "sync_status, server_version) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    );
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     query.addBindValue(session.id_);
     query.addBindValue(session.user_id_);
     query.addBindValue(session.goal_minutes_);
@@ -94,7 +93,8 @@ bool LocalPomodoroSessionRepository::insert(const LocalPomodoroSession& session)
     query.addBindValue(session.server_version_);
 
     if (!query.exec()) {
-        qDebug() << "LocalPomodoroSessionRepository: Error inserting session:" << query.lastError().text();
+        qDebug() << "LocalPomodoroSessionRepository: Error inserting session:"
+                 << query.lastError().text();
         return false;
     }
 
@@ -106,8 +106,7 @@ bool LocalPomodoroSessionRepository::update(const LocalPomodoroSession& session)
     query.prepare(
         "UPDATE pomodoro_sessions SET user_id = ?, goal_minutes = ?, work_duration_seconds = ?, "
         "break_duration_seconds = ?, completed_cycles = ?, started_at = ?, completed_at = ?, "
-        "updated_at = ?, sync_status = ?, server_version = ? WHERE id = ?"
-    );
+        "updated_at = ?, sync_status = ?, server_version = ? WHERE id = ?");
     query.addBindValue(session.user_id_);
     query.addBindValue(session.goal_minutes_);
     query.addBindValue(session.work_duration_seconds_);
@@ -121,7 +120,8 @@ bool LocalPomodoroSessionRepository::update(const LocalPomodoroSession& session)
     query.addBindValue(session.id_);
 
     if (!query.exec()) {
-        qDebug() << "LocalPomodoroSessionRepository: Error updating session:" << query.lastError().text();
+        qDebug() << "LocalPomodoroSessionRepository: Error updating session:"
+                 << query.lastError().text();
         return false;
     }
 
@@ -134,7 +134,8 @@ bool LocalPomodoroSessionRepository::remove(int id) {
     query.addBindValue(id);
 
     if (!query.exec()) {
-        qDebug() << "LocalPomodoroSessionRepository: Error removing session:" << query.lastError().text();
+        qDebug() << "LocalPomodoroSessionRepository: Error removing session:"
+                 << query.lastError().text();
         return false;
     }
 

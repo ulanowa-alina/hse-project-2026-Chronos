@@ -26,7 +26,8 @@ LocalBoard BoardSyncManager::boardFromJson(const QJsonObject& obj) const {
     const QString created_at = jsonTimestamp(obj, "created_at");
     const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
     return LocalBoard(obj["id"].toInt(), obj["user_id"].toInt(), obj["title"].toString(),
-                      obj["description"].toString(), created_at, updated_at, QString(), SyncStatus::SYNCED, 1);
+                      obj["description"].toString(), created_at, updated_at, QString(),
+                      SyncStatus::SYNCED, 1);
 }
 
 void BoardSyncManager::saveFromServer(const LocalBoard& board) {

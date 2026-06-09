@@ -38,11 +38,11 @@ LocalTask TaskSyncManager::taskFromJson(const QJsonObject& obj) const {
         priority_color = QStringLiteral("gray");
     }
     const bool is_completed = obj["is_completed"].isBool() ? obj["is_completed"].toBool()
-                                                            : obj["is_completed"].toInt() != 0;
+                                                           : obj["is_completed"].toInt() != 0;
     return LocalTask(obj["id"].toInt(), obj["board_id"].toInt(), obj["title"].toString(),
                      obj["status_id"].toInt(), priority_color, obj["description"].toString(),
-                     obj.value("deadline").toString(), is_completed, created_at, updated_at, QString(),
-                     SyncStatus::SYNCED, 1);
+                     obj.value("deadline").toString(), is_completed, created_at, updated_at,
+                     QString(), SyncStatus::SYNCED, 1);
 }
 
 void TaskSyncManager::saveFromServer(const LocalTask& task) {

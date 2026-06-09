@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSqlDatabase>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -19,6 +20,7 @@ class DashboardScreen : public QWidget {
     explicit DashboardScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setDatabase(QSqlDatabase db);
     void reloadDashboardData();
 
   signals:
@@ -29,7 +31,6 @@ class DashboardScreen : public QWidget {
     void logoutRequested();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray data, int code);
     void onBoardCreateRequest();
     void onProfileRequest();
     void onPomodoroRequest();
@@ -38,6 +39,7 @@ class DashboardScreen : public QWidget {
 
   private:
     NetworkManager* network_manager_{nullptr};
+    QSqlDatabase db_;
 
     QWidget* sidebar_widget_{nullptr};
     QLabel* logo_label_{nullptr};
@@ -88,6 +90,7 @@ class DashboardScreen : public QWidget {
     void loadStatistics();
     void loadDeadlines();
     void loadBoards();
+    void clearBoards();
     void updateDashboardButton();
 };
 #endif // DASHBOARD_SCREEN_HPP

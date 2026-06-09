@@ -43,7 +43,8 @@ void BoardCard::setBoardData(const QString& title, const QString& description, i
     if (!nearest_deadline.isValid() || nearest_deadline.isNull()) {
         deadline_label_->setText("Нет дедлайнов");
     } else {
-        QString date_str = nearest_deadline.toString("dd.MM.yyyy");
+        QDateTime display_deadline = nearest_deadline.addSecs(3 * 3600);
+        QString date_str = display_deadline.toString("dd.MM.yyyy");
         deadline_label_->setText(QString("Ближайший дедлайн: %1").arg(date_str));
     }
 }

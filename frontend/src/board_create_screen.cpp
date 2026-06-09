@@ -11,11 +11,10 @@ BoardCreateScreen::BoardCreateScreen(QWidget* parent)
 
 void BoardCreateScreen::setNetworkManager(NetworkManager* manager) {
     network_manager_ = manager;
+}
 
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &BoardCreateScreen::onNetworkResponse);
-    }
+void BoardCreateScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
 }
 
 void BoardCreateScreen::setDatabase(QSqlDatabase* db) {
@@ -24,26 +23,6 @@ void BoardCreateScreen::setDatabase(QSqlDatabase* db) {
 
 void BoardCreateScreen::setUserId(int user_id) {
     user_id_ = user_id;
-}
-
-void BoardCreateScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
-                                          int code) {
-    if (!isVisible()) {
-        return;
-    }
-
-    if (endpoint != network_manager_->boards_create_url_)
-        return;
-
-    if (endpoint == network_manager_->boards_create_url_) {
-        if (code == 200 || code == 201) {
-            qDebug() << "BoardCreateScreen: Доска успешно создана на сервере";
-            clearFields();
-            emit boardCreated();
-        } else {
-            qDebug() << "BoardCreateScreen: Ошибка создания доски на сервере:" << code;
-        }
-    }
 }
 
 void BoardCreateScreen::onCreateBoardRequest() {
@@ -55,17 +34,13 @@ void BoardCreateScreen::onCreateBoardRequest() {
         return;
     }
 
-    // Offline-first: Save to local database first
     if (db_ && user_id_ > 0) {
         try {
             LocalBoardRepository repo(*db_);
             int local_id = repo.createLocalId();
 
-            LocalBoard local_board(
-                local_id, user_id_, title, description,
-                QString(), QString(), QString(),
-                SyncStatus::PENDING, 0
-            );
+            LocalBoard local_board(local_id, user_id_, title, description, QString(), QString(),
+                                   QString(), SyncStatus::PENDING, 0);
 
             repo.save(local_board);
             qDebug() << "BoardCreateScreen: Доска сохранена локально с ID:" << local_id;
@@ -73,26 +48,12 @@ void BoardCreateScreen::onCreateBoardRequest() {
             clearFields();
             emit boardCreated();
 
-            // Then sync to server if network is available
-            if (network_manager_ && network_manager_->hasToken()) {
-                QJsonObject json;
-                json["user_id"] = user_id_;
-                json["title"] = title;
-                json["description"] = description;
-
-                network_manager_->POST(network_manager_->boards_create_url_, json);
+            if (sync_coordinator_) {
+                sync_coordinator_->syncBoards();
             }
         } catch (const std::exception& e) {
             qDebug() << "BoardCreateScreen: Ошибка сохранения в локальную БД:" << e.what();
         }
-    } else if (network_manager_) {
-        // Fallback to server-only if no database
-        QJsonObject json;
-        json["user_id"] = user_id_;
-        json["title"] = title;
-        json["description"] = description;
-
-        network_manager_->POST(network_manager_->boards_create_url_, json);
     }
 }
 

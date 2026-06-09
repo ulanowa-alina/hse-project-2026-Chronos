@@ -1,6 +1,7 @@
 #ifndef TASK_EDIT_SCREEN_H
 #define TASK_EDIT_SCREEN_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QCheckBox>
@@ -10,6 +11,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -21,6 +23,8 @@ class TaskEditScreen : public QWidget {
     explicit TaskEditScreen(int task_id, int board_id, int status_id, QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
+    void setDatabase(QSqlDatabase db);
     void setTaskId(int task_id);
     void setBoardId(int board_id);
     void setStatusId(int status_id);
@@ -31,13 +35,14 @@ class TaskEditScreen : public QWidget {
     void closeRequested();
 
   private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onUpdateTaskRequest();
     void onCloseRequest();
     void onDeadlineCheckChanged(Qt::CheckState state);
 
   private:
     NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
+    QSqlDatabase db_;
     int task_id_{-1};
     int board_id_{-1};
     int status_id_{-1};

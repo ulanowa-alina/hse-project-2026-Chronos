@@ -56,7 +56,6 @@ class StatusWindow : public QFrame {
     void onStatusNameSaved();
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
 
-
   private:
     int status_id_;
     int board_id_;
