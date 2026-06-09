@@ -10,8 +10,8 @@
 LocalUser createUser(const QSqlQuery& query) {
     return LocalUser(query.value("id").toInt(), query.value("email").toString(),
                      query.value("name").toString(), query.value("status").toString(),
-                     query.value("created_at").toString(), query.value("updated_at").toString(),
-                     query.value("deleted_at").toString(),
+                     query.value("password_hash").toString(), query.value("created_at").toString(),
+                     query.value("updated_at").toString(), query.value("deleted_at").toString(),
                      stringToSyncStatus(query.value("sync_status").toString()),
                      query.value("server_version").toInt());
 }
@@ -33,10 +33,10 @@ LocalUser LocalUserRepository::insert(const LocalUser& user) {
     QSqlQuery query(db_);
 
     query.prepare("INSERT INTO users ("
-                  "id, email, name, status, "
+                  "id, email, name, status, password_hash, "
                   "created_at, updated_at, deleted_at, sync_status, server_version"
                   ") VALUES ("
-                  ":id, :email, :name, :status, "
+                  ":id, :email, :name, :status, :password_hash, "
                   ":created_at, :updated_at, :deleted_at, :sync_status, :server_version"
                   ")");
 
@@ -44,6 +44,7 @@ LocalUser LocalUserRepository::insert(const LocalUser& user) {
     query.bindValue(":email", user.email_.trimmed());
     query.bindValue(":name", user.name_.trimmed());
     query.bindValue(":status", user.status_.trimmed());
+    query.bindValue(":password_hash", user.password_hash_);
     query.bindValue(":created_at", created_at);
     query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", user.deleted_at_.isEmpty()
@@ -81,6 +82,7 @@ LocalUser LocalUserRepository::update(const LocalUser& user) {
                   "email = :email, "
                   "name = :name, "
                   "status = :status, "
+                  "password_hash = :password_hash, "
                   "created_at = :created_at, "
                   "updated_at = :updated_at, "
                   "deleted_at = :deleted_at, "
@@ -92,6 +94,7 @@ LocalUser LocalUserRepository::update(const LocalUser& user) {
     query.bindValue(":email", user.email_.trimmed());
     query.bindValue(":name", user.name_.trimmed());
     query.bindValue(":status", user.status_.trimmed());
+    query.bindValue(":password_hash", user.password_hash_);
     query.bindValue(":created_at", processingTimestamp(user.created_at_));
     query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", user.deleted_at_.isEmpty()
@@ -122,7 +125,7 @@ LocalUser LocalUserRepository::save(const LocalUser& user) {
 
 std::optional<LocalUser> LocalUserRepository::findById(int user_id) {
     QSqlQuery query(db_);
-    query.prepare("SELECT id, email, name, status, "
+    query.prepare("SELECT id, email, name, status, password_hash, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM users WHERE id = :id");
     query.bindValue(":id", user_id);
@@ -141,7 +144,7 @@ std::optional<LocalUser> LocalUserRepository::findById(int user_id) {
 
 std::optional<LocalUser> LocalUserRepository::getCurrentUser() {
     QSqlQuery query(db_);
-    query.prepare("SELECT id, email, name, status, "
+    query.prepare("SELECT id, email, name, status, password_hash, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM users WHERE deleted_at IS NULL ORDER BY id LIMIT 1");
 
@@ -160,7 +163,7 @@ std::optional<LocalUser> LocalUserRepository::getCurrentUser() {
 
 std::vector<LocalUser> LocalUserRepository::findUnsynced() {
     QSqlQuery query(db_);
-    query.prepare("SELECT id, email, name, status, "
+    query.prepare("SELECT id, email, name, status, password_hash, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM users WHERE sync_status = 'pending'");
 

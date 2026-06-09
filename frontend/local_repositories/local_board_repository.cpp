@@ -7,8 +7,8 @@
 #include <stdexcept>
 
 LocalBoard createBoard(const QSqlQuery& query) {
-    return LocalBoard(query.value("id").toInt(), query.value("title").toString(),
-                      query.value("description").toString(), query.value("is_private").toInt(),
+    return LocalBoard(query.value("id").toInt(), query.value("user_id").toInt(),
+                      query.value("title").toString(), query.value("description").toString(),
                       query.value("created_at").toString(), query.value("updated_at").toString(),
                       query.value("deleted_at").toString(),
                       stringToSyncStatus(query.value("sync_status").toString()),
@@ -31,17 +31,17 @@ LocalBoard LocalBoardRepository::insert(const LocalBoard& board) {
     QSqlQuery query(db_);
 
     query.prepare("INSERT INTO boards ("
-                  "id, title, description, is_private, "
+                  "id, user_id, title, description, "
                   "created_at, updated_at, deleted_at, sync_status, server_version"
                   ") VALUES ("
-                  ":id, :title, :description, :is_private, "
+                  ":id, :user_id, :title, :description, "
                   ":created_at, :updated_at, :deleted_at, :sync_status, :server_version"
                   ")");
 
     query.bindValue(":id", board.id_);
+    query.bindValue(":user_id", board.user_id_);
     query.bindValue(":title", board.title_.trimmed());
     query.bindValue(":description", board.description_);
-    query.bindValue(":is_private", board.is_private_);
     query.bindValue(":created_at", created_at);
     query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", board.deleted_at_.isEmpty()
@@ -73,9 +73,9 @@ LocalBoard LocalBoardRepository::update(const LocalBoard& board) {
     QSqlQuery query(db_);
 
     query.prepare("UPDATE boards SET "
+                  "user_id = :user_id, "
                   "title = :title, "
                   "description = :description, "
-                  "is_private = :is_private, "
                   "created_at = :created_at, "
                   "updated_at = :updated_at, "
                   "deleted_at = :deleted_at, "
@@ -84,9 +84,9 @@ LocalBoard LocalBoardRepository::update(const LocalBoard& board) {
                   "WHERE id = :id");
 
     query.bindValue(":id", board.id_);
+    query.bindValue(":user_id", board.user_id_);
     query.bindValue(":title", board.title_.trimmed());
     query.bindValue(":description", board.description_);
-    query.bindValue(":is_private", board.is_private_);
     query.bindValue(":created_at", processingTimestamp(board.created_at_));
     query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", board.deleted_at_.isEmpty()
@@ -117,7 +117,7 @@ LocalBoard LocalBoardRepository::save(const LocalBoard& board) {
 
 std::optional<LocalBoard> LocalBoardRepository::findById(int board_id) {
     QSqlQuery query(db_);
-    query.prepare("SELECT id, title, description, is_private, "
+    query.prepare("SELECT id, user_id, title, description, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM boards WHERE id = :id");
     query.bindValue(":id", board_id);
@@ -132,6 +132,26 @@ std::optional<LocalBoard> LocalBoardRepository::findById(int board_id) {
     }
 
     return createBoard(query);
+}
+
+std::vector<LocalBoard> LocalBoardRepository::findAll() {
+    QSqlQuery query(db_);
+    query.prepare("SELECT id, user_id, title, description, "
+                  "created_at, updated_at, deleted_at, sync_status, server_version "
+                  "FROM boards WHERE deleted_at IS NULL");
+
+    if (!query.exec()) {
+        throw std::runtime_error(
+            ("LocalBoardRepository: Error find all boards: " + query.lastError().text())
+                .toStdString());
+    }
+
+    std::vector<LocalBoard> boards;
+    while (query.next()) {
+        boards.push_back(createBoard(query));
+    }
+
+    return boards;
 }
 
 std::optional<int> LocalBoardRepository::findFirstBoard() {
@@ -235,7 +255,7 @@ void LocalBoardRepository::markDeletedById(int board_id) {
 std::vector<LocalBoard> LocalBoardRepository::findUnsynced() {
     QSqlQuery query(db_);
 
-    query.prepare("SELECT id, title, description, is_private,"
+    query.prepare("SELECT id, user_id, title, description,"
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM boards WHERE sync_status = 'pending'");
 

@@ -21,6 +21,8 @@ class LoginScreen : public QWidget {
     void setNetworkManager(NetworkManager* manager);
     void setSyncCoordinator(SyncCoordinator* coordinator);
 
+    void clearInputs();
+
   signals:
     void registrationRequested();
     void authenticated(const QString& token);

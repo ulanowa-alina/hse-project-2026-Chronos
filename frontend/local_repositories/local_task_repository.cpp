@@ -11,8 +11,8 @@ LocalTask createTask(const QSqlQuery& query) {
                      query.value("title").toString(), query.value("status_id").toInt(),
                      query.value("priority_color").toString(),
                      query.value("description").toString(), query.value("deadline").toString(),
-                     query.value("created_at").toString(), query.value("updated_at").toString(),
-                     query.value("deleted_at").toString(),
+                     query.value("is_completed").toBool(), query.value("created_at").toString(),
+                     query.value("updated_at").toString(), query.value("deleted_at").toString(),
                      stringToSyncStatus(query.value("sync_status").toString()),
                      query.value("server_version").toInt());
 }
@@ -32,13 +32,15 @@ LocalTask LocalTaskRepository::insert(const LocalTask& task) {
 
     QSqlQuery query(db_);
 
-    query.prepare("INSERT INTO tasks ("
-                  "id, board_id, title, description, status_id, priority_color, deadline, "
-                  "created_at, updated_at, deleted_at, sync_status, server_version"
-                  ") VALUES ("
-                  ":id, :board_id, :title, :description, :status_id, :priority_color, :deadline, "
-                  ":created_at, :updated_at, :deleted_at, :sync_status, :server_version"
-                  ")");
+    query.prepare(
+        "INSERT INTO tasks ("
+        "id, board_id, title, description, status_id, priority_color, deadline, is_completed, "
+        "created_at, updated_at, deleted_at, sync_status, server_version"
+        ") VALUES ("
+        ":id, :board_id, :title, :description, :status_id, :priority_color, :deadline, "
+        ":is_completed, "
+        ":created_at, :updated_at, :deleted_at, :sync_status, :server_version"
+        ")");
 
     query.bindValue(":id", task.id_);
     query.bindValue(":board_id", task.board_id_);
@@ -47,6 +49,7 @@ LocalTask LocalTaskRepository::insert(const LocalTask& task) {
     query.bindValue(":status_id", task.status_id_);
     query.bindValue(":priority_color", task.priority_color_);
     query.bindValue(":deadline", task.deadline_);
+    query.bindValue(":is_completed", task.is_completed_ ? 1 : 0);
     query.bindValue(":created_at", created_at);
     query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", task.deleted_at_.isEmpty()
@@ -84,6 +87,7 @@ LocalTask LocalTaskRepository::update(const LocalTask& task) {
                   "status_id = :status_id, "
                   "priority_color = :priority_color, "
                   "deadline = :deadline, "
+                  "is_completed = :is_completed, "
                   "created_at = :created_at, "
                   "updated_at = :updated_at, "
                   "deleted_at = :deleted_at, "
@@ -98,6 +102,7 @@ LocalTask LocalTaskRepository::update(const LocalTask& task) {
     query.bindValue(":status_id", task.status_id_);
     query.bindValue(":priority_color", task.priority_color_);
     query.bindValue(":deadline", task.deadline_);
+    query.bindValue(":is_completed", task.is_completed_ ? 1 : 0);
     query.bindValue(":created_at", processingTimestamp(task.created_at_));
     query.bindValue(":updated_at", updated_at);
     query.bindValue(":deleted_at", task.deleted_at_.isEmpty()
@@ -129,6 +134,7 @@ LocalTask LocalTaskRepository::save(const LocalTask& task) {
 std::optional<LocalTask> LocalTaskRepository::findById(int task_id) {
     QSqlQuery query(db_);
     query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
+                  "is_completed, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM tasks WHERE id = :id");
     query.bindValue(":id", task_id);
@@ -145,11 +151,33 @@ std::optional<LocalTask> LocalTaskRepository::findById(int task_id) {
     return createTask(query);
 }
 
+std::vector<LocalTask> LocalTaskRepository::findAll() {
+    QSqlQuery query(db_);
+    query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
+                  "is_completed, "
+                  "created_at, updated_at, deleted_at, sync_status, server_version "
+                  "FROM tasks WHERE deleted_at IS NULL");
+
+    if (!query.exec()) {
+        throw std::runtime_error(
+            ("LocalTaskRepository: Error find all tasks: " + query.lastError().text())
+                .toStdString());
+    }
+
+    std::vector<LocalTask> tasks;
+    while (query.next()) {
+        tasks.push_back(createTask(query));
+    }
+
+    return tasks;
+}
+
 std::vector<LocalTask> LocalTaskRepository::findByBoardId(int board_id) {
 
     QSqlQuery query(db_);
 
     query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
+                  "is_completed, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM tasks "
                   "WHERE board_id = :board_id AND deleted_at IS NULL ");
@@ -236,6 +264,7 @@ std::vector<LocalTask> LocalTaskRepository::findUnsynced() {
     QSqlQuery query(db_);
 
     query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
+                  "is_completed, "
                   "created_at, updated_at, deleted_at, sync_status, server_version "
                   "FROM tasks "
                   "WHERE sync_status = 'pending' ");

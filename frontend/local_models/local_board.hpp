@@ -7,9 +7,9 @@
 
 struct LocalBoard {
     int id_;
+    int user_id_;
     QString title_;
     QString description_;
-    int is_private_;
     QString created_at_;
     QString updated_at_;
     QString deleted_at_;
@@ -18,14 +18,14 @@ struct LocalBoard {
 
     LocalBoard() = default;
 
-    LocalBoard(int id, const QString& title, const QString desc, int is_private,
+    LocalBoard(int id, int user_id, const QString& title, const QString desc,
                const QString& created_at = QString(), const QString& updated_at = QString(),
                const QString& deleted_at = QString(),
                const SyncStatus& sync_status = SyncStatus::PENDING, int server_version = 0)
         : id_(id)
+        , user_id_(user_id)
         , title_(title)
         , description_(desc)
-        , is_private_(is_private)
         , created_at_(created_at)
         , updated_at_(updated_at)
         , deleted_at_(deleted_at)

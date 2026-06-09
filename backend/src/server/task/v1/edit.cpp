@@ -29,18 +29,6 @@ json collect_missing_fields(const json& body) {
     if (!body.contains("task_id")) {
         missing.push_back("task_id");
     }
-    if (!body.contains("title")) {
-        missing.push_back("title");
-    }
-    if (!body.contains("description")) {
-        missing.push_back("description");
-    }
-    if (!body.contains("status_id")) {
-        missing.push_back("status_id");
-    }
-    if (!body.contains("priority_color")) {
-        missing.push_back("priority_color");
-    }
 
     return missing;
 }
@@ -84,6 +72,7 @@ json model_to_json(const Task& task) {
                  {"description", task.description_},
                  {"status_id", task.status_id_},
                  {"priority_color", task.priority_color_},
+                 {"is_completed", task.is_completed_},
                  {"created_at", time_to_string_iso8601(task.created_at_)},
                  {"updated_at", time_to_string_iso8601(task.updated_at_)}};
 
@@ -133,31 +122,6 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
 
     try {
         const int task_id = require_positive_int_field(body, "task_id");
-        const std::string title = require_string_field(body, "title");
-        const std::string description = require_string_field(body, "description");
-        const int status_id = require_positive_int_field(body, "status_id");
-        const std::string priority_color = require_string_field(body, "priority_color");
-
-        if (title.empty() || title.size() > MAX_TITLE_SIZE) {
-            spdlog::error("Task edit rejected: invalid title length");
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"title", "Title must be between 1 and 100 characters"}});
-        }
-
-        if (description.size() > MAX_DESCRIPTION_SIZE) {
-            spdlog::error("Task edit rejected: description is too long");
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"description", "Description cannot exceed 1000 characters"}});
-        }
-
-        if (priority_color.empty() || priority_color.size() > MAX_PRIORITY_COLOR_SIZE) {
-            spdlog::error("Task edit rejected: invalid priority color format");
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"priority_color", "Priority color must be between 1 and 50 characters"}});
-        }
 
         TaskRepository task_repository(pool);
         const std::optional<Task> existing_task = task_repository.find_by_id(task_id);
@@ -185,23 +149,66 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                        "Resource belongs to another user");
         }
 
-        StatusRepository status_repository(pool);
-        const std::optional<Status> new_status = status_repository.find_by_id(status_id);
-        if (!new_status.has_value()) {
-            spdlog::error("Task edit rejected: status with id={} not found", status_id);
-            return server::utils::build_error_response(req, http::status::not_found,
-                                                       "STATUS_NOT_FOUND", "Status not found");
+        std::string title = existing_task->title_;
+        if (body.contains("title")) {
+            title = body["title"].get<std::string>();
+            if (title.empty() || title.size() > 100) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"title", "Title must be between 1 and 100 characters"}});
+            }
         }
 
-        if (new_status->board_id_ != existing_task->board_id_) {
-            spdlog::error("Task edit rejected: invalid status_id");
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                json{{"status_id", "status_id must reference a status from this board"}});
+        std::string description = existing_task->description_;
+        if (body.contains("description")) {
+            description = body["description"].get<std::string>();
+            if (description.size() > 1000) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"description", "Description cannot exceed 1000 characters"}});
+            }
+        }
+
+        int status_id = existing_task->status_id_;
+        if (body.contains("status_id")) {
+            status_id = body["status_id"].get<int>();
+            if (status_id <= 0) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"status_id", "Field must be a positive integer"}});
+            }
+
+            StatusRepository status_repository(pool);
+            const std::optional<Status> new_status = status_repository.find_by_id(status_id);
+            if (!new_status.has_value()) {
+                return server::utils::build_error_response(req, http::status::not_found,
+                                                           "STATUS_NOT_FOUND", "Status not found");
+            }
+
+            if (new_status->board_id_ != existing_task->board_id_) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"status_id", "status_id must reference a status from this board"}});
+            }
+        }
+
+        std::string priority_color = existing_task->priority_color_;
+        if (body.contains("priority_color")) {
+            priority_color = body["priority_color"].get<std::string>();
+            if (priority_color.empty() || priority_color.size() > 50) {
+                return server::utils::build_error_response(
+                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                    json{{"priority_color", "Priority color must be between 1 and 50 characters"}});
+            }
+        }
+
+        bool is_completed = existing_task->is_completed_;
+        if (body.contains("is_completed")) {
+            is_completed = body["is_completed"].get<bool>();
         }
 
         const Task task_to_save(existing_task->id_, existing_task->board_id_, title, description,
-                                existing_task->deadline_, status_id, priority_color,
+                                existing_task->deadline_, status_id, priority_color, is_completed,
                                 existing_task->created_at_, existing_task->updated_at_);
 
         const Task updated_task = task_repository.save(task_to_save);

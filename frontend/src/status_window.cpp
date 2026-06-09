@@ -19,22 +19,24 @@ StatusWindow::StatusWindow(int status_id, int board_id, const QString& name, QSq
     setAcceptDrops(true);
 }
 
+void StatusWindow::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &StatusWindow::onNetworkResponse);
+    }
+    network_manager_ = manager;
+    if (network_manager_) {
+        connect(network_manager_, &NetworkManager::responseReceived, this,
+                &StatusWindow::onNetworkResponse);
+    }
+}
+
 void StatusWindow::setSyncCoordinator(SyncCoordinator* coordinator) {
     sync_coordinator_ = coordinator;
 }
 
 void StatusWindow::onCreateTaskRequest() {
-    if (!sync_coordinator_) {
-        return;
-    }
-
-    LocalTaskRepository repo(db_);
-    const int temp_id = repo.createLocalId();
-
-    auto* card = new TaskCard(temp_id, board_id_, status_id_, db_, this);
-    card->setSyncCoordinator(sync_coordinator_);
-    tasks_layout_->insertWidget(0, card);
-    updateGeometry();
+    emit openTaskCreateScreen(board_id_, status_id_);
 }
 
 void StatusWindow::onOpenSettings() {
@@ -123,6 +125,12 @@ void StatusWindow::onStatusDeleteRequest() {
     repo.markDeletedById(status_id_);
     sync_coordinator_->syncStatuses();
     deleteLater();
+}
+
+void StatusWindow::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
+    Q_UNUSED(endpoint);
+    Q_UNUSED(data);
+    Q_UNUSED(code);
 }
 
 void StatusWindow::dragEnterEvent(QDragEnterEvent* event) {
@@ -261,6 +269,20 @@ void StatusWindow::addTaskCard(TaskCard* card) {
 
 void StatusWindow::removeTaskCard(TaskCard* card) {
     tasks_layout_->removeWidget(card);
+}
+
+void StatusWindow::clearTasks() {
+    while (tasks_layout_->count() > 1) {
+        QLayoutItem* item = tasks_layout_->takeAt(0);
+        if (!item) {
+            continue;
+        }
+
+        if (item->widget()) {
+            delete item->widget();
+        }
+        delete item;
+    }
 }
 
 void StatusWindow::processHighlight() {

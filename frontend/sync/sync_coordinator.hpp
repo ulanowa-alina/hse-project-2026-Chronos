@@ -24,7 +24,7 @@ class SyncCoordinator : public QObject {
     void beginUserSession(const QJsonObject& user_obj);
     void loadCurrentUser();
     void clearLocalData();
-    void loadAll();
+    void loadAll(bool emit_initial_data = false);
     void syncAll();
     void syncBoards();
     void syncStatuses();
@@ -57,8 +57,10 @@ class SyncCoordinator : public QObject {
     std::vector<SyncManager*> managers_;
     QTimer* periodic_timer_{nullptr};
     bool waiting_initial_boards_{false};
-    bool waiting_initial_children_{false};
+    bool waiting_initial_statuses_{false};
+    bool waiting_initial_tasks_{false};
     bool remote_loading_{false};
+    bool emit_initial_after_load_{false};
     int current_user_id_{-1};
 
     static const int INTERVAL = 30'000;
@@ -67,6 +69,7 @@ class SyncCoordinator : public QObject {
     void emitInitialData();
     void finishInitialLoadCycle();
     void loadChildrenAfterBoards();
+    void loadTasksAfterStatuses();
 };
 
 #endif // SYNC_COORDINATOR_HPP

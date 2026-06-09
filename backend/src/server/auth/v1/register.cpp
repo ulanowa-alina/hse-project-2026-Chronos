@@ -105,7 +105,7 @@ User createUser(ConnectionPool& pool, const User& user) {
 void create_board(ConnectionPool& pool, int user_id) {
     BoardRepository repo(pool);
     const std::time_t now = std::time(nullptr);
-    const Board b(0, user_id, "My board", "", false, now, now);
+    const Board b(0, user_id, "My board", "", now, now);
     (void) repo.save(b);
 }
 

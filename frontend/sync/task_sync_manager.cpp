@@ -37,10 +37,12 @@ LocalTask TaskSyncManager::taskFromJson(const QJsonObject& obj) const {
     if (priority_color.isEmpty()) {
         priority_color = QStringLiteral("gray");
     }
+    const bool is_completed = obj["is_completed"].isBool() ? obj["is_completed"].toBool()
+                                                           : obj["is_completed"].toInt() != 0;
     return LocalTask(obj["id"].toInt(), obj["board_id"].toInt(), obj["title"].toString(),
                      obj["status_id"].toInt(), priority_color, obj["description"].toString(),
-                     obj.value("deadline").toString(), created_at, updated_at, QString(),
-                     SyncStatus::SYNCED, 1);
+                     obj.value("deadline").toString(), is_completed, created_at, updated_at,
+                     QString(), SyncStatus::SYNCED, 1);
 }
 
 void TaskSyncManager::saveFromServer(const LocalTask& task) {
@@ -112,6 +114,7 @@ void TaskSyncManager::sync() {
             json["description"] = task.description_;
             json["status_id"] = task.status_id_;
             json["priority_color"] = task.priority_color_;
+            json["is_completed"] = task.is_completed_;
             if (!task.deadline_.isEmpty()) {
                 json["deadline"] = task.deadline_;
             }
@@ -124,6 +127,7 @@ void TaskSyncManager::sync() {
             json["description"] = task.description_;
             json["status_id"] = task.status_id_;
             json["priority_color"] = task.priority_color_;
+            json["is_completed"] = task.is_completed_;
             if (!task.deadline_.isEmpty()) {
                 json["deadline"] = task.deadline_;
             }

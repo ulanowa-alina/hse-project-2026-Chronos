@@ -61,7 +61,12 @@ void BoardScreen::loadFromLocalDatabase() {
         if (sync_coordinator_) {
             card->setSyncCoordinator(sync_coordinator_);
         }
-        card->setData(task.title_, task.description_);
+        QDateTime deadline;
+        if (!task.deadline_.isEmpty()) {
+            deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
+        }
+        card->setData(task.title_, task.description_, deadline, task.is_completed_);
+        connect(card, &TaskCard::openTaskEditScreen, this, &BoardScreen::openTaskEditScreen);
         status->addTaskCard(card);
     }
 }
@@ -92,6 +97,7 @@ StatusWindow* BoardScreen::showStatusWindow(int status_id, const QString& name) 
     if (sync_coordinator_) {
         status->setSyncCoordinator(sync_coordinator_);
     }
+    connect(status, &StatusWindow::openTaskCreateScreen, this, &BoardScreen::openTaskCreateScreen);
     board_layout_->insertWidget(board_layout_->count() - 1, status);
     status_windows_.insert(status_id, status);
     return status;
@@ -110,7 +116,10 @@ void BoardScreen::setupLayout() {
     header_layout->setContentsMargins(20, 0, 20, 0);
 
     logo_label_ = new QLabel("Chronos", this);
-    logo_label_->setStyleSheet("font-size: 20px; font-weight: bold; color: #305CDE;");
+    logo_label_->setStyleSheet("QLabel { font-size: 22px; font-weight: bold; color: #305CDE; }"
+                               "QLabel:hover { color: #2549B3; }");
+    logo_label_->setCursor(Qt::PointingHandCursor);
+    logo_label_->installEventFilter(this);
 
     board_name_label_ = new QLabel("| Board Name", this);
     board_name_label_->setStyleSheet("font-size: 18px; color: #172b4d;");
@@ -119,15 +128,35 @@ void BoardScreen::setupLayout() {
     header_layout->addWidget(board_name_label_);
     header_layout->addStretch();
 
-    status_create_button_ = new QPushButton("+ Add status", this);
+    status_create_button_ = new QPushButton("+ Создать статус", this);
     status_create_button_->setCursor(Qt::PointingHandCursor);
     status_create_button_->setStyleSheet(
-        "QPushButton { background: #ebedf0; border: none; padding: 8px 15px; border-radius: 5px; "
+        "QPushButton { background: #ebedf0; border: 2px solid transparent; padding: 8px 15px; "
+        "border-radius: 5px; "
         "font-weight: bold; }"
-        "QPushButton:hover { background: #dadce2; }");
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
     connect(status_create_button_, &QPushButton::clicked, this,
             &BoardScreen::onStatusCreateRequest);
     header_layout->addWidget(status_create_button_);
+
+    board_settings_button_ = new QPushButton("⚙️", this);
+    board_settings_button_->setFixedSize(40, 40);
+    board_settings_button_->setStyleSheet(
+        "QPushButton { background: #dfe1e6; border: 2px solid transparent; border-radius: 20px; "
+        "font-size: 18px; }"
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
+    connect(board_settings_button_, &QPushButton::clicked, this,
+            &BoardScreen::onBoardSettingsRequested);
+    header_layout->addWidget(board_settings_button_);
+
+    pomodoro_button_ = new QPushButton("🍅", this);
+    pomodoro_button_->setFixedSize(40, 40);
+    pomodoro_button_->setStyleSheet(
+        "QPushButton { background: #dfe1e6; border: 2px solid transparent; border-radius: 20px; "
+        "font-size: 18px; }"
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
+    connect(pomodoro_button_, &QPushButton::clicked, this, &BoardScreen::onPomodoroRequest);
+    header_layout->addWidget(pomodoro_button_);
 
     profile_button_ = new QPushButton("👤", this);
     profile_button_->setFixedSize(40, 40);
@@ -206,4 +235,20 @@ void BoardScreen::onStatusCreateRequest() {
 
 void BoardScreen::onProfileRequest() {
     emit openProfileScreen();
+}
+
+void BoardScreen::onPomodoroRequest() {
+    emit openPomodoroScreen();
+}
+
+void BoardScreen::onBoardSettingsRequested() {
+    emit openBoardEditScreen(board_id_);
+}
+
+bool BoardScreen::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == logo_label_ && event->type() == QEvent::MouseButtonPress) {
+        emit openDashboardScreen();
+        return true;
+    }
+    return QWidget::eventFilter(watched, event);
 }

@@ -152,7 +152,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         if (existing_status.has_value()) {
             spdlog::error("Status create rejected: status with name already exists");
             return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
+                req, http::status::conflict, "DUPLICATE_RESOURCE",
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
 
@@ -203,7 +203,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
             msg.find("duplicate key") != std::string::npos) {
             spdlog::error("Status create rejected: status with name already exists");
             return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
+                req, http::status::conflict, "DUPLICATE_RESOURCE",
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
         spdlog::error("Status create failed with database error: {}", e.what());

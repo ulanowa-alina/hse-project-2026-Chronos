@@ -25,6 +25,7 @@ class ProfileScreen : public QWidget {
     void logoutRequested();
     void boardRequested();
     void profileEditRequested();
+    void openDashboardScreen();
 
   private:
     QSqlDatabase db_;

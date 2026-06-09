@@ -25,8 +25,9 @@ bool UserSyncManager::handlesLoadEndpoint(const QString& endpoint) const {
 LocalUser UserSyncManager::userFromJson(const QJsonObject& obj) const {
     const QString created_at = jsonTimestamp(obj, "created_at");
     const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
+    const QString password_hash = obj.value("password_hash").toString();
     return LocalUser(obj["id"].toInt(), obj["email"].toString(), obj["name"].toString(),
-                     obj["status"].toString(), created_at, updated_at, QString(),
+                     obj["status"].toString(), password_hash, created_at, updated_at, QString(),
                      SyncStatus::SYNCED, 1);
 }
 

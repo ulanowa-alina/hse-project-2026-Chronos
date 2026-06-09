@@ -21,6 +21,8 @@ class RegistrationScreen : public QWidget {
     void setNetworkManager(NetworkManager* manager);
     void setSyncCoordinator(SyncCoordinator* coordinator);
 
+    void clearInputs();
+
   signals:
     void loginRequested();
     void registrationRequested(int board_id);

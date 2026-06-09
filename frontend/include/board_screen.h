@@ -32,10 +32,20 @@ class BoardScreen : public QWidget {
 
   signals:
     void openProfileScreen();
+    void openPomodoroScreen();
+    void openTaskCreateScreen(int board_id, int status_id);
+    void openDashboardScreen();
+    void openTaskEditScreen(int task_id, int board_id, int status_id);
+    void openBoardEditScreen(int board_id);
 
   private slots:
     void onStatusCreateRequest();
     void onProfileRequest();
+    void onPomodoroRequest();
+    void onBoardSettingsRequested();
+
+  protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
   private:
     int board_id_;
@@ -46,6 +56,8 @@ class BoardScreen : public QWidget {
 
     QPushButton* profile_button_{nullptr};
     QPushButton* status_create_button_{nullptr};
+    QPushButton* pomodoro_button_{nullptr};
+    QPushButton* board_settings_button_{nullptr};
 
     QLabel* logo_label_{nullptr};
     QLabel* board_name_label_{nullptr};

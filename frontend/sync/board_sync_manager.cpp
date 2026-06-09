@@ -23,12 +23,11 @@ bool BoardSyncManager::handlesLoadEndpoint(const QString& endpoint) const {
 }
 
 LocalBoard BoardSyncManager::boardFromJson(const QJsonObject& obj) const {
-    const int is_private = obj["is_private"].isBool() ? (obj["is_private"].toBool() ? 1 : 0)
-                                                      : obj["is_private"].toInt();
     const QString created_at = jsonTimestamp(obj, "created_at");
     const QString updated_at = jsonTimestamp(obj, "updated_at", "created_at");
-    return LocalBoard(obj["id"].toInt(), obj["title"].toString(), obj["description"].toString(),
-                      is_private, created_at, updated_at, QString(), SyncStatus::SYNCED, 1);
+    return LocalBoard(obj["id"].toInt(), obj["user_id"].toInt(), obj["title"].toString(),
+                      obj["description"].toString(), created_at, updated_at, QString(),
+                      SyncStatus::SYNCED, 1);
 }
 
 void BoardSyncManager::saveFromServer(const LocalBoard& board) {
@@ -80,9 +79,9 @@ void BoardSyncManager::sync() {
 
         if (board.server_version_ == 0) {
             QJsonObject json;
+            json["user_id"] = board.user_id_;
             json["title"] = board.title_;
             json["description"] = board.description_;
-            json["is_private"] = board.is_private_ != 0;
             network_manager_->syncPOST(network_manager_->boards_create_url_, json, modelName(),
                                        board.id_, "create");
         } else {
@@ -90,7 +89,6 @@ void BoardSyncManager::sync() {
             json["board_id"] = board.id_;
             json["title"] = board.title_;
             json["description"] = board.description_;
-            json["is_private"] = board.is_private_ != 0;
             network_manager_->syncPATCH(network_manager_->boards_edit_url_, json, modelName(),
                                         board.id_, "update");
         }

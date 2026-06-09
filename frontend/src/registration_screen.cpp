@@ -17,6 +17,21 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void RegistrationScreen::clearInputs() {
+    if (email_input_) {
+        email_input_->clear();
+    }
+    if (password_input_) {
+        password_input_->clear();
+    }
+    if (name_input_) {
+        name_input_->clear();
+    }
+    if (status_input_) {
+        status_input_->clear();
+    }
+}
+
 void RegistrationScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
     sync_coordinator_ = coordinator;
 }
@@ -152,10 +167,10 @@ void RegistrationScreen::setupLayout() {
         return container;
     };
 
-    main_layout->addWidget(create_field("Name", name_input_, "Enter name"));
-    main_layout->addWidget(create_field("Email", email_input_, "Enter email"));
-    main_layout->addWidget(create_field("Status", status_input_, "What is your position?"));
-    main_layout->addWidget(create_field("Password", password_input_, "Create a password", true));
+    main_layout->addWidget(create_field("Имя", name_input_, "Введите имя"));
+    main_layout->addWidget(create_field("Email", email_input_, "Введите email"));
+    main_layout->addWidget(create_field("Статус", status_input_, "Введите свою роль"));
+    main_layout->addWidget(create_field("Пароль", password_input_, "Придумайте пароль", true));
 
     main_layout->addSpacing(15);
 
