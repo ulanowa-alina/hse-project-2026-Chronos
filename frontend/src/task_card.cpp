@@ -24,10 +24,15 @@ const int BIG_TIMER_INTERVAL = 60'000;
 const int COMPLETE_BTN_SIZE = 22;
 const int COMPLETE_BTN_RADIUS = COMPLETE_BTN_SIZE / 2;
 const int BLUE_LINE_WIDTH = 3;
+const int DRAG_HANDLE_SIZE = 24;
 
 const int HTTP_OK = 200;
 const int HTTP_CREATED = 201;
 const int HTTP_NO_CONTENT = 204;
+
+bool hasNeutralPriority(const QString& priority_color) {
+    return priority_color.isEmpty() || priority_color == "none" || priority_color == "gray";
+}
 } // namespace
 
 TaskCard::TaskCard(int task_id, int board_id, int status_id, QSqlDatabase db, QWidget* parent)
@@ -75,7 +80,7 @@ void TaskCard::setData(const QString& title, const QString& description, const Q
         description_text_->setVisible(true);
     }
 
-    if (priority_color == "none") {
+    if (hasNeutralPriority(priority_color)) {
         this->setStyleSheet("TaskCard { "
                             "   background-color: white; "
                             "   border: 4px solid transparent; "
@@ -198,35 +203,39 @@ void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data
     }
 }
 
-void TaskCard::mousePressEvent(QMouseEvent* event) {
-    title_->setFocus();
-    QFrame::mousePressEvent(event);
+bool TaskCard::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == drag_handle_) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto* mouse_event = static_cast<QMouseEvent*>(event);
+            if (mouse_event->button() == Qt::LeftButton) {
+                drag_start_position_ = mouse_event->pos();
+                return true;
+            }
+        }
 
-    if (event->button() == Qt::LeftButton) {
-        drag_start_position_ = event->pos();
+        if (event->type() == QEvent::MouseMove) {
+            auto* mouse_event = static_cast<QMouseEvent*>(event);
+            if (!(mouse_event->buttons() & Qt::LeftButton)) {
+                return false;
+            }
+
+            if (QLineF(mouse_event->pos(), drag_start_position_).length() >
+                QApplication::startDragDistance()) {
+                startDrag();
+                return true;
+            }
+        }
     }
+
+    return QFrame::eventFilter(watched, event);
+}
+
+void TaskCard::mousePressEvent(QMouseEvent* event) {
+    QFrame::mousePressEvent(event);
 }
 
 void TaskCard::mouseMoveEvent(QMouseEvent* event) {
-    if (!(event->buttons() & Qt::LeftButton))
-        return;
-
-    if (QLineF(event->pos(), drag_start_position_).length() > QApplication::startDragDistance()) {
-        QMimeData* mime = new QMimeData;
-
-        QByteArray data;
-        QDataStream stream(&data, QIODevice::WriteOnly);
-        stream << task_id_ << board_id_ << status_id_;
-        mime->setData("application/task", data);
-
-        QDrag* drag = new QDrag(this);
-        drag->setMimeData(mime);
-
-        QPixmap task_image = grab();
-        drag->setPixmap(task_image);
-        drag->setHotSpot(event->pos());
-        drag->exec(Qt::MoveAction);
-    }
+    QFrame::mouseMoveEvent(event);
 }
 
 void TaskCard::updateTaskStatus() {
@@ -440,8 +449,24 @@ void TaskCard::scheduleDeletion() {
         }
     }
 
-    setParent(nullptr);
     deleteLater();
+}
+
+void TaskCard::startDrag() {
+    QMimeData* mime = new QMimeData;
+
+    QByteArray data;
+    QDataStream stream(&data, QIODevice::WriteOnly);
+    stream << task_id_ << board_id_ << status_id_;
+    mime->setData("application/task", data);
+
+    QDrag* drag = new QDrag(this);
+    drag->setMimeData(mime);
+
+    QPixmap task_image = grab();
+    drag->setPixmap(task_image);
+    drag->setHotSpot(rect().center());
+    drag->exec(Qt::MoveAction);
 }
 
 void TaskCard::setupLayout() {
@@ -466,6 +491,16 @@ void TaskCard::setupLayout() {
     header_layout->setContentsMargins(0, 0, 0, 0);
     header_layout->setSpacing(6);
 
+    drag_handle_ = new QLabel("⋮⋮", this);
+    drag_handle_->setObjectName("dragHandle");
+    drag_handle_->setFixedSize(DRAG_HANDLE_SIZE, DRAG_HANDLE_SIZE);
+    drag_handle_->setAlignment(Qt::AlignCenter);
+    drag_handle_->setCursor(Qt::OpenHandCursor);
+    drag_handle_->setStyleSheet("QLabel { color: #7f8c8d; font-size: 14px; font-weight: bold; "
+                                "background: transparent; }"
+                                "QLabel:hover { color: #305CDE; }");
+    drag_handle_->installEventFilter(this);
+
     title_ = new QLineEdit(this);
     title_->setPlaceholderText("Введите название...");
     title_->setStyleSheet("font-weight: bold; font-size: 18px; border: none; "
@@ -477,6 +512,7 @@ void TaskCard::setupLayout() {
     settings_button_->setFixedSize(26, 26);
     settings_button_->setStyleSheet(
         "border: none; color: #5e6c84; font-size: 20px; font-weight: bold;");
+    header_layout->addWidget(drag_handle_);
     header_layout->addWidget(title_);
     header_layout->addWidget(settings_button_);
     layout->addLayout(header_layout);

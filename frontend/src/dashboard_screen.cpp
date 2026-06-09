@@ -416,7 +416,6 @@ void DashboardScreen::loadDeadlines() {
         if (auto* layout = qobject_cast<QHBoxLayout*>(deadlines_container_->layout())) {
             layout->removeWidget(card);
         }
-        card->setParent(nullptr);
         card->deleteLater();
     }
     deadline_cards_.clear();
@@ -506,7 +505,6 @@ void DashboardScreen::clearBoards() {
         if (auto* layout = qobject_cast<QHBoxLayout*>(boards_container_->layout())) {
             layout->removeWidget(card);
         }
-        card->setParent(nullptr);
         card->deleteLater();
     }
     board_cards_.clear();
