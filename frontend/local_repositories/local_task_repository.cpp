@@ -153,10 +153,12 @@ std::optional<LocalTask> LocalTaskRepository::findById(int task_id) {
 
 std::vector<LocalTask> LocalTaskRepository::findAll() {
     QSqlQuery query(db_);
-    query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
-                  "is_completed, "
-                  "created_at, updated_at, deleted_at, sync_status, server_version "
-                  "FROM tasks WHERE deleted_at IS NULL");
+    query.prepare("SELECT t.id, t.board_id, t.title, t.description, t.status_id, "
+                  "t.priority_color, t.deadline, t.is_completed, "
+                  "t.created_at, t.updated_at, t.deleted_at, t.sync_status, t.server_version "
+                  "FROM tasks t "
+                  "JOIN statuses s ON s.id = t.status_id "
+                  "WHERE t.deleted_at IS NULL AND s.deleted_at IS NULL");
 
     if (!query.exec()) {
         throw std::runtime_error(
@@ -176,11 +178,12 @@ std::vector<LocalTask> LocalTaskRepository::findByBoardId(int board_id) {
 
     QSqlQuery query(db_);
 
-    query.prepare("SELECT id, board_id, title, description, status_id, priority_color, deadline, "
-                  "is_completed, "
-                  "created_at, updated_at, deleted_at, sync_status, server_version "
-                  "FROM tasks "
-                  "WHERE board_id = :board_id AND deleted_at IS NULL ");
+    query.prepare("SELECT t.id, t.board_id, t.title, t.description, t.status_id, "
+                  "t.priority_color, t.deadline, t.is_completed, "
+                  "t.created_at, t.updated_at, t.deleted_at, t.sync_status, t.server_version "
+                  "FROM tasks t "
+                  "JOIN statuses s ON s.id = t.status_id "
+                  "WHERE t.board_id = :board_id AND t.deleted_at IS NULL AND s.deleted_at IS NULL");
 
     query.bindValue(":board_id", board_id);
 

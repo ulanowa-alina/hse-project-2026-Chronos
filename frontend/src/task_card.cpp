@@ -146,7 +146,7 @@ void TaskCard::onNetworkResponse(const QString& endpoint, const QByteArray& data
     if (endpoint == network_manager_->tasks_delete_url_) {
         if (should_be_delete_ && (code == HTTP_OK || code == HTTP_NO_CONTENT)) {
             qDebug() << "TaskCard: Задача успешно удалена";
-            deleteLater();
+            scheduleDeletion();
         } else if (should_be_delete_) {
             qDebug() << "TaskCard: Ошибка удаления. Код:" << code;
             should_be_delete_ = false;
@@ -229,7 +229,7 @@ void TaskCard::onTaskSaveRequest() {
     if (task_id_ < 0 && title.isEmpty()) {
         LocalTaskRepository repo(db_);
         repo.deleteById(task_id_);
-        deleteLater();
+        scheduleDeletion();
         return;
     }
 
@@ -387,20 +387,31 @@ void TaskCard::doneVisualState() {
 
 void TaskCard::onDeleteTaskRequest() {
     if (!sync_coordinator_) {
-        deleteLater();
+        scheduleDeletion();
         return;
     }
 
     if (task_id_ < 0) {
         LocalTaskRepository repo(db_);
         repo.deleteById(task_id_);
-        deleteLater();
+        scheduleDeletion();
         return;
     }
 
     LocalTaskRepository repo(db_);
     repo.markDeletedById(task_id_);
     sync_coordinator_->syncTasks();
+    scheduleDeletion();
+}
+
+void TaskCard::scheduleDeletion() {
+    if (QWidget* parent_widget = parentWidget()) {
+        if (QLayout* parent_layout = parent_widget->layout()) {
+            parent_layout->removeWidget(this);
+        }
+    }
+
+    setParent(nullptr);
     deleteLater();
 }
 

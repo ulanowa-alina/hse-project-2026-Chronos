@@ -83,6 +83,7 @@ class TaskCard : public QFrame {
     QPushButton* settings_button_{nullptr};
     QPushButton* complete_button_{nullptr};
 
+    void scheduleDeletion();
     void setupLayout();
     void doneVisualState();
 };

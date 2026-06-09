@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QMap>
+#include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSqlDatabase>
@@ -40,6 +41,7 @@ class BoardScreen : public QWidget {
 
   private slots:
     void onStatusCreateRequest();
+    void onStatusDeleteRequested(int status_id);
     void onProfileRequest();
     void onPomodoroRequest();
     void onBoardSettingsRequested();
@@ -64,9 +66,10 @@ class BoardScreen : public QWidget {
 
     QScrollArea* scroll_area_{nullptr};
     QHBoxLayout* board_layout_{nullptr};
-    QMap<int, StatusWindow*> status_windows_;
+    QMap<int, QPointer<StatusWindow>> status_windows_;
     QMap<int, QString> status_names_;
 
+    void removeStatusWindow(int status_id);
     StatusWindow* showStatusWindow(int status_id, const QString& name);
     void loadFromLocalDatabase();
     void setupLayout();

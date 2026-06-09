@@ -40,6 +40,7 @@ class StatusWindow : public QFrame {
 
   signals:
     void openTaskCreateScreen(int board_id, int status_id);
+    void deleteRequested(int status_id);
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -76,6 +77,8 @@ class StatusWindow : public QFrame {
 
     void insertTaskCard(TaskCard* card);
     void removeTaskCard(TaskCard* card);
+    void installDropForwarding(QWidget* widget);
+    void removeDropForwarding(QWidget* widget);
     void processHighlight();
     void setupLayout(const QString& name);
 };

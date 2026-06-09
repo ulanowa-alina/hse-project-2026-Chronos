@@ -117,14 +117,14 @@ void StatusWindow::onStatusNameSaved() {
 
 void StatusWindow::onStatusDeleteRequest() {
     if (!sync_coordinator_) {
-        deleteLater();
+        emit deleteRequested(status_id_);
         return;
     }
 
     LocalStatusRepository repo(db_);
     repo.markDeletedById(status_id_);
     sync_coordinator_->syncStatuses();
-    deleteLater();
+    emit deleteRequested(status_id_);
 }
 
 void StatusWindow::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
@@ -260,6 +260,12 @@ bool StatusWindow::eventFilter(QObject* watched, QEvent* event) {
 }
 
 void StatusWindow::insertTaskCard(TaskCard* card) {
+    if (!card) {
+        return;
+    }
+
+    card->setParent(tasks_container_);
+    installDropForwarding(card);
     tasks_layout_->insertWidget(0, card);
 }
 
@@ -268,7 +274,40 @@ void StatusWindow::addTaskCard(TaskCard* card) {
 }
 
 void StatusWindow::removeTaskCard(TaskCard* card) {
+    if (!card) {
+        return;
+    }
+
+    removeDropForwarding(card);
     tasks_layout_->removeWidget(card);
+}
+
+void StatusWindow::installDropForwarding(QWidget* widget) {
+    if (!widget) {
+        return;
+    }
+
+    widget->setAcceptDrops(true);
+    widget->installEventFilter(this);
+
+    const auto child_widgets = widget->findChildren<QWidget*>();
+    for (QWidget* child : child_widgets) {
+        child->setAcceptDrops(true);
+        child->installEventFilter(this);
+    }
+}
+
+void StatusWindow::removeDropForwarding(QWidget* widget) {
+    if (!widget) {
+        return;
+    }
+
+    widget->removeEventFilter(this);
+
+    const auto child_widgets = widget->findChildren<QWidget*>();
+    for (QWidget* child : child_widgets) {
+        child->removeEventFilter(this);
+    }
 }
 
 void StatusWindow::clearTasks() {
