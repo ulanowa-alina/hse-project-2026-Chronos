@@ -9,6 +9,7 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QPushButton>
+#include <QString>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -31,9 +32,11 @@ class RegistrationScreen : public QWidget {
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
     void onRegisterRequest();
+    void onAvatarPickRequested();
 
   private:
     NetworkManager* network_manager_{nullptr};
+    QString avatar_file_path_;
     SyncCoordinator* sync_coordinator_{nullptr};
 
     QPushButton* login_button_{nullptr};
@@ -50,5 +53,6 @@ class RegistrationScreen : public QWidget {
     QLineEdit* status_input_{nullptr};
 
     void setupLayout();
+    void updateAvatarButton(const QString& file_path);
 };
 #endif // REGISTRATION_SCREEN_H

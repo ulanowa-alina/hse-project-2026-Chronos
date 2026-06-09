@@ -10,6 +10,8 @@
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QMap>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSqlDatabase>
@@ -41,8 +43,10 @@ class BoardScreen : public QWidget {
   private slots:
     void onStatusCreateRequest();
     void onProfileRequest();
+    void onAvatarImageDownloaded(QNetworkReply* reply);
     void onPomodoroRequest();
     void onBoardSettingsRequested();
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -52,6 +56,7 @@ class BoardScreen : public QWidget {
     QSqlDatabase db_;
 
     NetworkManager* network_manager_{nullptr};
+    QNetworkAccessManager* avatar_network_manager_{nullptr};
     SyncCoordinator* sync_coordinator_{nullptr};
 
     QPushButton* profile_button_{nullptr};
@@ -67,6 +72,8 @@ class BoardScreen : public QWidget {
     QMap<int, StatusWindow*> status_windows_;
     QMap<int, QString> status_names_;
 
+    void loadAvatar(const QString& avatar_s3_key);
+    void setDefaultAvatar();
     StatusWindow* showStatusWindow(int status_id, const QString& name);
     void loadFromLocalDatabase();
     void setupLayout();

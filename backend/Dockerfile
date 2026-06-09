@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     libboost-dev \
     libboost-json-dev \
     libboost-url-dev \
+    libcurl4-openssl-dev \
     libpq-dev \
     libpqxx-dev \
     libargon2-dev \

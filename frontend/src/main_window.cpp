@@ -203,6 +203,7 @@ void MainWindow::switchToProfile() {
     closeAllSmallWindows();
     if (!profile_screen_) {
         profile_screen_ = new ProfileScreen();
+        profile_screen_->setNetworkManager(network_manager_);
         profile_screen_->setDatabase(db_);
         profile_screen_->setSyncCoordinator(sync_coordinator_);
         connect(profile_screen_, &ProfileScreen::logoutRequested, this,

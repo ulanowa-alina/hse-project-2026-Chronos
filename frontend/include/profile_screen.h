@@ -6,6 +6,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMainWindow>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSqlDatabase>
 #include <QVBoxLayout>
@@ -20,6 +23,7 @@ class ProfileScreen : public QWidget {
     void setDatabase(QSqlDatabase db);
     void setSyncCoordinator(SyncCoordinator* coordinator);
     void reloadFromLocal();
+    void setNetworkManager(NetworkManager* manager);
 
   signals:
     void logoutRequested();
@@ -27,7 +31,14 @@ class ProfileScreen : public QWidget {
     void profileEditRequested();
     void openDashboardScreen();
 
+  private slots:
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onAvatarImageDownloaded(QNetworkReply* reply);
+
   private:
+    NetworkManager* network_manager_{nullptr};
+    QNetworkAccessManager* avatar_network_manager_{nullptr};
+
     QSqlDatabase db_;
     SyncCoordinator* sync_coordinator_{nullptr};
 
@@ -41,6 +52,9 @@ class ProfileScreen : public QWidget {
     QLabel* email_label_{nullptr};
 
     void setupLayout();
+    void showEvent(QShowEvent* event) override;
+    void updateAvatarPreview(const QString& avatar_s3_key);
+    void setDefaultAvatar();
 };
 
 #endif // PROFILE_SCREEN_H

@@ -44,7 +44,10 @@ class NetworkManager : public QObject {
     const QString statuses_create_url_ = "/status/v1/create";
     const QString statuses_get_all_url_ = "/status/v1/get_all";
     const QString statuses_delete_url_ = "/status/v1/delete";
-    const QString statieses_edit_url_ = "/status/v1/edit";
+
+    const QString user_avatar_upload_url_ = "/personal/v1/avatar/upload";
+    const QString user_avatar_delete_url_ = "/personal/v1/avatar";
+    const QString avatar_public_base_url_ = "https://storage.yandexcloud.net/chronos/";
 
     const QString board_get_url_ = "/board/v1/get";
     const QString boards_get_all_url_ = "/board/v1/get_all";
