@@ -1,22 +1,30 @@
 #include "main_window.h"
 
+#include <QDir>
+#include <QSqlDatabase>
 #include <QStackedWidget>
-
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
     network_manager_ = new NetworkManager(this);
 
+    local_db_ = new LocalDatabaseManager(this);
+    const QString db_path = QDir::current().absoluteFilePath("chronos_local.db");
+    local_db_->open(db_path);
+    local_db_->createSchema(QDir::current().filePath("../sql/local_init.sql"));
+
+    db_ = local_db_->getDatabase();
+    sync_coordinator_ = new SyncCoordinator(db_, network_manager_, this);
+
     stacked_widget_ = new QStackedWidget(this);
     setCentralWidget(stacked_widget_);
 
     welcome_screen_ = new WelcomeScreen(this);
-    board_screen_ = new BoardScreen(current_board_id_, this);
+    board_screen_ = new BoardScreen(current_board_id_, db_, this);
     dashboard_screen_ = new DashboardScreen(this);
 
     board_screen_->setNetworkManager(network_manager_);
+    board_screen_->setSyncCoordinator(sync_coordinator_);
     dashboard_screen_->setNetworkManager(network_manager_);
 
     stacked_widget_->addWidget(welcome_screen_);
@@ -39,6 +47,14 @@ MainWindow::MainWindow(QWidget* parent)
     connect(dashboard_screen_, &DashboardScreen::openBoardCreateScreen, this,
             &MainWindow::switchToBoardCreate);
     connect(dashboard_screen_, &DashboardScreen::logoutRequested, this, &MainWindow::switchToLogin);
+
+    connect(network_manager_, &NetworkManager::responseReceived, sync_coordinator_,
+            &SyncCoordinator::handleResponse);
+    connect(network_manager_, &NetworkManager::syncResponseReceived, sync_coordinator_,
+            &SyncCoordinator::handleSyncResponse);
+    connect(sync_coordinator_, &SyncCoordinator::initialDataReady, this,
+            &MainWindow::onInitialDataReady);
+    connect(sync_coordinator_, &SyncCoordinator::dataChanged, this, &MainWindow::onDataChanged);
 
     setWindowTitle("Chronos");
     showFullScreen();
@@ -65,14 +81,83 @@ void MainWindow::closeAllSmallWindows() {
         board_edit_screen_->close();
 }
 
+void MainWindow::restoreSession() {
+    QSettings settings;
+    QString token = settings.value("auth/token").toString();
+
+    if (token.isEmpty()) {
+        return;
+    }
+
+    network_manager_->setToken(token);
+
+    if (!sync_coordinator_->hasLocalData()) {
+        settings.remove("auth/token");
+        network_manager_->clearToken();
+        return;
+    }
+
+    sync_coordinator_->loadCurrentUser();
+
+    const int board_id = sync_coordinator_->defaultBoardId();
+    if (board_id > 0) {
+        current_board_id_ = board_id;
+        board_screen_->setId(board_id);
+        board_screen_->reloadBoardData();
+        stacked_widget_->setCurrentWidget(board_screen_);
+    }
+
+    sync_coordinator_->loadAll();
+    sync_coordinator_->startPeriodicSync();
+}
+
+void MainWindow::onAuthenticated(const QString& token) {
+    QSettings settings;
+    settings.setValue("auth/token", token);
+    sync_coordinator_->startPeriodicSync();
+}
+
+void MainWindow::clearSession() {
+    QSettings settings;
+    settings.remove("auth/token");
+    sync_coordinator_->stopPeriodicSync();
+    sync_coordinator_->clearLocalData();
+}
+
+void MainWindow::onInitialDataReady(int board_id) {
+    if (board_id <= 0) {
+        return;
+    }
+
+    if (stacked_widget_->currentWidget() != board_screen_) {
+        current_board_id_ = board_id;
+        board_screen_->setId(board_id);
+        board_screen_->reloadBoardData();
+        stacked_widget_->setCurrentWidget(board_screen_);
+        return;
+    }
+
+    current_board_id_ = board_id;
+    board_screen_->setId(board_id);
+    board_screen_->reloadBoardData();
+}
+
+void MainWindow::onDataChanged() {
+    if (stacked_widget_->currentWidget() == board_screen_) {
+        board_screen_->reloadBoardData();
+    }
+}
+
 void MainWindow::openLoginScreen() {
     closeAllSmallWindows();
     if (!login_screen_) {
         login_screen_ = new LoginScreen();
         login_screen_->setNetworkManager(network_manager_);
+        login_screen_->setSyncCoordinator(sync_coordinator_);
         connect(login_screen_, &LoginScreen::loginRequested, this, &MainWindow::onLoginSuccess);
         connect(login_screen_, &LoginScreen::registrationRequested, this,
                 &MainWindow::switchToRegistration);
+        connect(login_screen_, &LoginScreen::authenticated, this, &MainWindow::onAuthenticated);
     }
     login_screen_->clearInputs();
     login_screen_->show();
@@ -93,10 +178,13 @@ void MainWindow::switchToRegistration() {
     if (!registration_screen_) {
         registration_screen_ = new RegistrationScreen();
         registration_screen_->setNetworkManager(network_manager_);
+        registration_screen_->setSyncCoordinator(sync_coordinator_);
         connect(registration_screen_, &RegistrationScreen::loginRequested, this,
                 &MainWindow::openLoginScreen);
         connect(registration_screen_, &RegistrationScreen::registrationRequested, this,
                 &MainWindow::onRegistrationSuccess);
+        connect(registration_screen_, &RegistrationScreen::authenticated, this,
+                &MainWindow::onAuthenticated);
     }
     registration_screen_->clearInputs();
     registration_screen_->show();
@@ -115,7 +203,8 @@ void MainWindow::switchToProfile() {
     closeAllSmallWindows();
     if (!profile_screen_) {
         profile_screen_ = new ProfileScreen();
-        profile_screen_->setNetworkManager(network_manager_);
+        profile_screen_->setDatabase(db_);
+        profile_screen_->setSyncCoordinator(sync_coordinator_);
         connect(profile_screen_, &ProfileScreen::logoutRequested, this,
                 &MainWindow::onProfileLogout);
         connect(profile_screen_, &ProfileScreen::boardRequested, this,
@@ -125,6 +214,7 @@ void MainWindow::switchToProfile() {
         connect(profile_screen_, &ProfileScreen::profileEditRequested, this,
                 &MainWindow::switchToProfileEdit);
     }
+    profile_screen_->reloadFromLocal();
     profile_screen_->show();
     profile_screen_->raise();
     profile_screen_->activateWindow();
@@ -152,10 +242,12 @@ void MainWindow::switchToProfileEdit() {
         profile_screen_->close();
     if (!profile_edit_screen_) {
         profile_edit_screen_ = new ProfileEditScreen();
-        profile_edit_screen_->setNetworkManager(network_manager_);
+        profile_edit_screen_->setDatabase(db_);
+        profile_edit_screen_->setSyncCoordinator(sync_coordinator_);
         connect(profile_edit_screen_, &ProfileEditScreen::profileRequested, this,
                 &MainWindow::onProfileEditBack);
     }
+    profile_edit_screen_->reloadFromLocal();
     profile_edit_screen_->show();
     profile_edit_screen_->raise();
     profile_edit_screen_->activateWindow();
@@ -166,21 +258,18 @@ void MainWindow::switchToProfileEdit() {
 void MainWindow::onProfileEditBack() {
     switchToProfile();
 }
-
 void MainWindow::switchToLogin() {
+    clearSession();
     network_manager_->clearToken();
     current_board_id_ = -1;
     board_screen_->setId(-1);
     board_screen_->clearBoardData();
     closeAllSmallWindows();
-
-    stacked_widget_->setCurrentWidget(welcome_screen_);
-    setWindowTitle("Chronos");
-    showFullScreen();
+    openLoginScreen();
 }
 
 void MainWindow::switchToBoard(int board_id) {
-    if (board_id != -1) {
+    if (board_id > 0) {
         current_board_id_ = board_id;
     }
 
@@ -219,6 +308,7 @@ void MainWindow::switchToTaskCreate(int board_id, int status_id) {
     if (!task_create_screen_) {
         task_create_screen_ = new TaskCreateScreen(board_id, status_id);
         task_create_screen_->setNetworkManager(network_manager_);
+        task_create_screen_->setDatabase(&db_);
         connect(task_create_screen_, &TaskCreateScreen::closeRequested, this,
                 &MainWindow::onTaskCreateClose);
         connect(task_create_screen_, &TaskCreateScreen::taskCreated, this,
@@ -294,6 +384,8 @@ void MainWindow::switchToBoardCreate() {
     if (!board_create_screen_) {
         board_create_screen_ = new BoardCreateScreen();
         board_create_screen_->setNetworkManager(network_manager_);
+        board_create_screen_->setDatabase(&db_);
+        board_create_screen_->setUserId(sync_coordinator_->currentUserId());
         connect(board_create_screen_, &BoardCreateScreen::closeRequested, this,
                 &MainWindow::onBoardCreateClose);
         connect(board_create_screen_, &BoardCreateScreen::boardCreated, this,

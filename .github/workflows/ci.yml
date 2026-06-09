@@ -15,12 +15,12 @@ jobs:
       - name: Install LLVM and Clang Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-tidy cmake libboost-all-dev libpq-dev libpqxx-dev
+          sudo apt-get install -y clang-format clang-tidy cmake libboost-all-dev libpq-dev libpqxx-dev libspdlog-dev libargon2-dev
 
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libpq-dev libpqxx-dev nlohmann-json3-dev
+          sudo apt-get install -y pkg-config libpq-dev libpqxx-dev libargon2-dev nlohmann-json3-dev libspdlog-dev
 
       - name: Install Qt6
         run: |

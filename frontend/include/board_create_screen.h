@@ -1,6 +1,7 @@
 #ifndef BOARD_CREATE_SCREEN_H
 #define BOARD_CREATE_SCREEN_H
 
+#include "../local_repositories/local_board_repository.hpp"
 #include "network_manager.h"
 
 #include <QHBoxLayout>
@@ -18,6 +19,8 @@ class BoardCreateScreen : public QWidget {
     explicit BoardCreateScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setDatabase(QSqlDatabase* db);
+    void setUserId(int user_id);
 
   signals:
     void boardCreated();
@@ -30,6 +33,8 @@ class BoardCreateScreen : public QWidget {
 
   private:
     NetworkManager* network_manager_{nullptr};
+    QSqlDatabase* db_{nullptr};
+    int user_id_{-1};
 
     QPushButton* create_button_{nullptr};
     QPushButton* cancel_button_{nullptr};

@@ -1,6 +1,7 @@
 #ifndef LOGIN_SCREEN_H
 #define LOGIN_SCREEN_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QHBoxLayout>
@@ -18,11 +19,13 @@ class LoginScreen : public QWidget {
     explicit LoginScreen(QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
-    void clearInputs();
+    void setSyncCoordinator(SyncCoordinator* coordinator);
 
+    void clearInputs();
+    
   signals:
-    void loginRequested(int board_id);
     void registrationRequested();
+    void authenticated(const QString& token);
 
   private slots:
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
@@ -30,6 +33,7 @@ class LoginScreen : public QWidget {
 
   private:
     NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
 
     QPushButton* login_button_{nullptr};
     QPushButton* registration_button_{nullptr};

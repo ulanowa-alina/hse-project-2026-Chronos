@@ -5,6 +5,8 @@
 #include "board_edit_screen.h"
 #include "board_screen.h"
 #include "dashboard_screen.hpp"
+#include "../sync/sync_coordinator.hpp"
+#include "local_db.h"
 #include "login_screen.h"
 #include "network_manager.h"
 #include "pomodoro_screen.h"
@@ -17,6 +19,8 @@
 
 #include <QMainWindow>
 #include <QPointer>
+#include <QSettings>
+#include <QSqlDatabase>
 #include <QStackedWidget>
 
 class MainWindow : public QMainWindow {
@@ -51,9 +55,18 @@ class MainWindow : public QMainWindow {
     void onBoardEditDone();
     void onLoginSuccess();
     void onRegistrationSuccess();
+    void onInitialDataReady(int board_id);
+    void onDataChanged();
+    void onAuthenticated(const QString& token);
 
   private:
+    void restoreSession();
+    void clearSession();
+
     NetworkManager* network_manager_;
+    SyncCoordinator* sync_coordinator_;
+    LocalDatabaseManager* local_db_{nullptr};
+    QSqlDatabase db_;
 
     QStackedWidget* stacked_widget_{nullptr};
     WelcomeScreen* welcome_screen_{nullptr};

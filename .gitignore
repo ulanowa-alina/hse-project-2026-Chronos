@@ -1,0 +1,5 @@
+backend/.env
+backend/logs/
+backend/build/
+frontend/build/
+build/

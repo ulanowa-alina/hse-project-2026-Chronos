@@ -1,9 +1,7 @@
 #include "profile_edit_screen.h"
 
-#include <QDebug>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QShowEvent>
+#include "../local_repositories/local_user_repository.hpp"
+
 #include <QVBoxLayout>
 
 ProfileEditScreen::ProfileEditScreen(QWidget* parent)
@@ -11,66 +9,72 @@ ProfileEditScreen::ProfileEditScreen(QWidget* parent)
     setupLayout();
 }
 
-void ProfileEditScreen::setNetworkManager(NetworkManager* manager) {
-    network_manager_ = manager;
-    if (network_manager_) {
-        connect(network_manager_, &NetworkManager::responseReceived, this,
-                &ProfileEditScreen::onNetworkResponse);
-    }
+void ProfileEditScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
 }
 
-void ProfileEditScreen::showEvent(QShowEvent* event) {
-    QWidget::showEvent(event);
-    if (network_manager_) {
-        qDebug() << "ProfileEditScreen: Открыто, запрашиваю данные...";
-        network_manager_->GET(network_manager_->user_info_url_);
-    }
+void ProfileEditScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
 }
 
-void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
-                                          int code) {
-    if (!network_manager_)
-        return;
-
-    if (endpoint == network_manager_->user_info_url_) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            QJsonObject data_obj = doc.object()["data"].toObject();
-
-            name_input_->setText(data_obj["name"].toString());
-            email_input_->setText(data_obj["email"].toString());
-            status_input_->setText(data_obj["status"].toString());
-        }
+void ProfileEditScreen::reloadFromLocal() {
+    if (!db_.isOpen()) {
         return;
     }
 
-    if (endpoint == network_manager_->user_edit_info_url_) {
-        if (code == 200) {
-            qDebug() << "ProfileEditScreen: Изменения успешно сохранены";
-            password_input_->clear();
-
-            emit profileRequested();
-        } else {
-            qDebug() << "ProfileEditScreen: Ошибка сохранения! Код:" << code << "Данные:" << data;
-        }
+    LocalUserRepository repo(db_);
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
     }
+    if (!user) {
+        return;
+    }
+
+    name_input_->setText(user->name_);
+    email_input_->setText(user->email_);
+    status_input_->setText(user->status_);
 }
 
 void ProfileEditScreen::onProfileEditRequest() {
-    if (!network_manager_)
+    if (!sync_coordinator_ || !db_.isOpen()) {
         return;
-
-    QJsonObject json;
-    json["name"] = name_input_->text();
-    json["email"] = email_input_->text();
-    json["status"] = status_input_->text();
-
-    if (!password_input_->text().isEmpty()) {
-        json["password"] = password_input_->text();
     }
 
-    qDebug() << "ProfileEditScreen: Отправляю новые данные на сервер...";
-    network_manager_->PUT(network_manager_->user_edit_info_url_, json);
+    LocalUserRepository repo(db_);
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
+    if (!user) {
+        return;
+    }
+
+    LocalUser updated = *user;
+    updated.name_ = name_input_->text().trimmed();
+    updated.email_ = email_input_->text().trimmed();
+    updated.status_ = status_input_->text().trimmed();
+    updated.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(updated);
+    } catch (const std::exception& e) {
+        qDebug() << "ProfileEditScreen: failed to save user:" << e.what();
+        return;
+    }
+
+    pending_password_ = password_input_->text();
+    password_input_->clear();
+
+    if (!pending_password_.isEmpty()) {
+        sync_coordinator_->setPassword(pending_password_);
+        pending_password_.clear();
+    }
+    sync_coordinator_->syncUsers();
+    emit profileRequested();
 }
 
 void ProfileEditScreen::setupLayout() {

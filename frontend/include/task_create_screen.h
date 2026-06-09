@@ -1,6 +1,7 @@
 #ifndef TASK_CREATE_SCREEN_H
 #define TASK_CREATE_SCREEN_H
 
+#include "../local_repositories/local_task_repository.hpp"
 #include "network_manager.h"
 
 #include <QCheckBox>
@@ -23,6 +24,7 @@ class TaskCreateScreen : public QWidget {
     void setNetworkManager(NetworkManager* manager);
     void setBoardId(int board_id);
     void setStatusId(int status_id);
+    void setDatabase(QSqlDatabase* db);
 
   signals:
     void taskCreated();
@@ -36,6 +38,7 @@ class TaskCreateScreen : public QWidget {
 
   private:
     NetworkManager* network_manager_{nullptr};
+    QSqlDatabase* db_{nullptr};
     int board_id_{-1};
     int status_id_{-1};
 

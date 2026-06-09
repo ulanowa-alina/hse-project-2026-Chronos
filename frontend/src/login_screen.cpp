@@ -1,9 +1,7 @@
 #include "login_screen.h"
 
 #include <QDebug>
-#include <QJsonArray>
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
+#include <QJsonDocument>
 
 LoginScreen::LoginScreen(QWidget* parent)
     : QWidget(parent) {
@@ -28,58 +26,37 @@ void LoginScreen::clearInputs() {
     }
 }
 
+void LoginScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
 void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
     if (!isVisible()) {
         return;
     }
 
-    if (endpoint != network_manager_->login_url_ &&
-        endpoint != network_manager_->boards_get_all_url_)
-        return;
-
-    if (endpoint == network_manager_->login_url_) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            QJsonObject data_obj = doc.object()["data"].toObject();
-
-            QString token = data_obj["token"].toString();
-            network_manager_->setToken(token);
-
-            qDebug() << "LoginScreen: успешный вход";
-            network_manager_->GET(network_manager_->boards_get_all_url_);
-        } else {
-            qDebug() << "LoginScreen: Ошибка входа:" << code;
-        }
+    if (endpoint != network_manager_->login_url_) {
         return;
     }
 
-    if (endpoint == network_manager_->boards_get_all_url_) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            const QJsonArray boards = doc.object()["data"].toArray();
-            if (boards.isEmpty()) {
-                qDebug() << "LoginScreen: Для пользователя не найдено ни одной доски";
-                return;
-            }
+    if (code == 200) {
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject data_obj = doc.object()["data"].toObject();
 
-            const int board_id = boards.first().toObject()["id"].toInt(-1);
-            if (board_id <= 0) {
-                qDebug() << "LoginScreen: Некорректный board_id в ответе /board/v1/get_all";
-                return;
-            }
+        const QString token = data_obj["token"].toString();
+        network_manager_->setToken(token);
 
-            emit loginRequested(board_id);
-        } else {
-            qDebug() << "LoginScreen: Ошибка получения доски:" << code;
+        if (sync_coordinator_ != nullptr) {
+            sync_coordinator_->beginUserSession(data_obj["user"].toObject());
         }
+
+        emit authenticated(token);
+
+        qDebug() << "LoginScreen: успешный вход";
+    } else {
+        qDebug() << "LoginScreen: Ошибка входа:" << code;
     }
 }
-/*
-void LoginScreen::onLoginRequest() {
-    qDebug() << "DEBUG MODE: Пропускаю авторизацию...";
-    emit loginRequested();
-}
-*/
 
 void LoginScreen::onLoginRequest() {
     if (!network_manager_)
@@ -206,4 +183,3 @@ void LoginScreen::setupLayout() {
     connect(login_button_, &QPushButton::clicked, this, &LoginScreen::onLoginRequest);
     connect(reg_btn, &QPushButton::clicked, this, &LoginScreen::registrationRequested);
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

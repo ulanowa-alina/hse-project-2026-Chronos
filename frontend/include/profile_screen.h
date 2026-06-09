@@ -1,12 +1,13 @@
 #ifndef PROFILE_SCREEN_H
 #define PROFILE_SCREEN_H
 
-#include "network_manager.h"
+#include "../sync/sync_coordinator.hpp"
 
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMainWindow>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -16,7 +17,9 @@ class ProfileScreen : public QWidget {
   public:
     explicit ProfileScreen(QWidget* parent = nullptr);
 
-    void setNetworkManager(NetworkManager* manager);
+    void setDatabase(QSqlDatabase db);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
+    void reloadFromLocal();
 
   signals:
     void logoutRequested();
@@ -24,11 +27,9 @@ class ProfileScreen : public QWidget {
     void profileEditRequested();
     void openDashboardScreen();
 
-  private slots:
-    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
-
   private:
-    NetworkManager* network_manager_{nullptr};
+    QSqlDatabase db_;
+    SyncCoordinator* sync_coordinator_{nullptr};
 
     QPushButton* edit_button_{nullptr};
     QPushButton* logout_button_{nullptr};
@@ -40,7 +41,6 @@ class ProfileScreen : public QWidget {
     QLabel* email_label_{nullptr};
 
     void setupLayout();
-    void showEvent(QShowEvent* event) override;
 };
 
 #endif // PROFILE_SCREEN_H

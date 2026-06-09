@@ -1,6 +1,7 @@
 #ifndef TASK_CARD_H
 #define TASK_CARD_H
 
+#include "../sync/sync_coordinator.hpp"
 #include "network_manager.h"
 
 #include <QDateTime>
@@ -10,6 +11,7 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QPushButton>
+#include <QSqlDatabase>
 #include <QStackedWidget>
 #include <QTextEdit>
 #include <QTimer>
@@ -19,9 +21,11 @@ class TaskCard : public QFrame {
     Q_OBJECT
 
   public:
-    explicit TaskCard(int task_id, int board_id, int status_id, QWidget* parent = nullptr);
+    explicit TaskCard(int task_id, int board_id, int status_id, QSqlDatabase db,
+                      QWidget* parent = nullptr);
 
     void setNetworkManager(NetworkManager* manager);
+    void setSyncCoordinator(SyncCoordinator* coordinator);
     int getId() const {
         return task_id_;
     }
@@ -39,7 +43,9 @@ class TaskCard : public QFrame {
     void openTaskEditScreen(int task_id, int board_id, int status_id);
 
   private slots:
+
     void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
+    void onTaskSaveRequest();
     void onOpenSettings();
     void onTitleEditRequest();
     void onDeleteTaskRequest();
@@ -51,14 +57,17 @@ class TaskCard : public QFrame {
     void mouseMoveEvent(QMouseEvent* event) override;
 
   private:
+    QSqlDatabase db_;
+
     int task_id_;
     int board_id_;
     int status_id_;
     bool is_completed_{false};
+
     QPoint drag_start_position_;
-    bool should_be_delete_{false};
 
     NetworkManager* network_manager_{nullptr};
+    SyncCoordinator* sync_coordinator_{nullptr};
 
     QDateTime deadline_;
     QTimer* timer_{nullptr};
