@@ -15,7 +15,7 @@ jobs:
       - name: Install LLVM and Clang Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-tidy cmake libboost-all-dev libpq-dev libpqxx-dev libcurl4-openssl-dev
+          sudo apt-get install -y clang-format-18 clang-tidy cmake libboost-all-dev libpq-dev libpqxx-dev libcurl4-openssl-dev
 
       - name: Install deps
         run: |
@@ -32,4 +32,4 @@ jobs:
       - name: Run Clang-Format Check
         run: |
           find . -not -path '*/build/*' \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print0 \
-          | xargs -0 -r clang-format --style=file --dry-run -Werror
+          | xargs -0 -r clang-format-18 --style=file --dry-run -Werror
