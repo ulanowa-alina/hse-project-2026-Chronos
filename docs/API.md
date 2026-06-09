@@ -41,8 +41,8 @@
 | POST   | /personal/v1/avatar/upload | Загрузить фото профиля       | {"file_name": "...",<br>"content_type": "...",<br>"file_base64": "...",<br>"email": "...",<br>"name": "...",<br>"status": "...",<br>"password": "... (optional)"} | `data.avatar_s3_key` |
 | DELETE | /personal/v1/avatar | Удалить фото профиля              | {"email": "...",<br>"name": "...",<br>"status": "...",<br>"password": "... (optional)"}                          | `data.avatar_s3_key` |
 | GET    | /board/v1/get_all | Получить список досок пользователя  | —                                                                                                                | `data: Board[]`     |
-| POST   | /board/v1/create  | Создать новую доску                 | {"title": "...",<br>"description": "...",<br>"is_private": false}                                                | `data: Board`       |
-| PATCH  | /board/v1/edit    | Обновить доску                      | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"is_private": false}                           | `data: Board`       |
+| POST   | /board/v1/create  | Создать новую доску                 | {"title": "...",<br>"description": "..."}                                                | `data: Board`       |
+| PATCH  | /board/v1/edit    | Обновить доску                      | {"board_id": "id",<br>"title": "...",<br>"description": "..."}                           | `data: Board`       |
 | GET    | /board/v1/get     | Получить доску по id                | `query: board_id=<id>`                                                                                           | `data: Board`       |
 | DELETE | /board/v1/delete  | Удалить доску                       | {"board_id": "id"}                                                                                               | 204 No Content      |
 | GET    | /board/v1/tasks   | Получить задачи доски               | `query: board_id=<id>`                                                                                           | `data: Task[]`      |
@@ -78,9 +78,8 @@
 | 2   | user_id     | integer           | да             | id владельца доски     | 1                    |
 | 3   | title       | string            | да             | Название доски         | Project              |
 | 4   | description | string            | нет            | Описание доски         | Мой первый проект    |
-| 5   | is_private  | bool              | да             | Приватная ли доска     | true                 |
-| 6   | created_at  | string (ISO 8601) | да             | Дата создания доски    | 2026-01-10T12:00:00Z |
-| 7   | updated_at  | string (ISO 8601) | да             | Дата обновления доски  | 2026-01-10T12:00:00Z |
+| 5   | created_at  | string (ISO 8601) | да             | Дата создания доски    | 2026-01-10T12:00:00Z |
+| 6   | updated_at  | string (ISO 8601) | да             | Дата обновления доски  | 2026-01-10T12:00:00Z |
 
 3. Task (Карточка задачи)
    Task object
@@ -93,9 +92,10 @@
 | 4   | description    | string            | нет            | Описание задачи               | Финальная версия     |
 | 5   | status_id      | integer           | да             | Идентификатор статуса         | 2                    |
 | 6   | priority_color | string            | да             | Цвет приоритета               | red                  |
-| 7   | created_at     | string (ISO 8601) | да             | Дата создания карточки        | 2026-01-10T12:00:00Z |
-| 8   | updated_at     | string (ISO 8601) | да             | Дата обновления карточки      | 2026-01-10T12:00:00Z |
-| 9   | deadline       | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
+| 7   | is_completed   | bool              | да             | Выполнена ли задача           | false                |
+| 8   | created_at     | string (ISO 8601) | да             | Дата создания карточки        | 2026-01-10T12:00:00Z |
+| 9   | updated_at     | string (ISO 8601) | да             | Дата обновления карточки      | 2026-01-10T12:00:00Z |
+| 10  | deadline       | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
 
 4. Status (Статус доски)
    Status object
@@ -595,6 +595,7 @@ Content-Type: application/json
     "title": "Оформить README",
     "status_id": 1,
     "priority_color": "red",
+    "is_completed": false,
     "created_at": "2026-02-07T10:30:00Z",
     "updated_at": "2026-02-07T10:30:00Z"
   }
@@ -654,6 +655,7 @@ Authorization: Bearer <JWT>
          "description": "Финальная версия",
          "status_id": 2,
          "priority_color": "red",
+         "is_completed": false,
          "deadline": "2026-05-20T18:00:00Z",
          "created_at": "2026-02-07T10:30:00Z",
          "updated_at": "2026-02-08T12:10:00Z"

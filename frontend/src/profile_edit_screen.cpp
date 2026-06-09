@@ -1,5 +1,7 @@
 #include "profile_edit_screen.h"
 
+#include "../local_repositories/local_user_repository.hpp"
+
 #include <QDebug>
 #include <QFile>
 #include <QFileDialog>
@@ -25,19 +27,25 @@ ProfileEditScreen::ProfileEditScreen(QWidget* parent)
             &ProfileEditScreen::onAvatarImageDownloaded);
 }
 
+void ProfileEditScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
+}
+
+void ProfileEditScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
 void ProfileEditScreen::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &ProfileEditScreen::onNetworkResponse);
+    }
+
     network_manager_ = manager;
+
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &ProfileEditScreen::onNetworkResponse);
-    }
-}
-
-void ProfileEditScreen::showEvent(QShowEvent* event) {
-    QWidget::showEvent(event);
-    if (network_manager_) {
-        qDebug() << "ProfileEditScreen: Открыто, запрашиваю данные...";
-        network_manager_->GET(network_manager_->user_info_url_);
     }
 }
 
@@ -135,10 +143,38 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
         }
     }
 }
+void ProfileEditScreen::reloadFromLocal() {
+    if (!db_.isOpen()) {
+        return;
+    }
+
+    LocalUserRepository repo(db_);
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
+    if (!user) {
+        return;
+    }
+
+    name_input_->setText(user->name_);
+    email_input_->setText(user->email_);
+    status_input_->setText(user->status_);
+}
+
+void ProfileEditScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+    if (network_manager_) {
+        network_manager_->GET(network_manager_->user_info_url_);
+    }
+}
 
 void ProfileEditScreen::onProfileEditRequest() {
-    if (!network_manager_)
+    if (!sync_coordinator_ || !db_.isOpen()) {
         return;
+    }
 
     if (!selected_avatar_file_path_.isEmpty()) {
         sendAvatarUpload();
@@ -160,17 +196,38 @@ void ProfileEditScreen::onProfileEditRequest() {
 }
 
 void ProfileEditScreen::sendProfileUpdate() {
-    QJsonObject json;
-    json["name"] = name_input_->text();
-    json["email"] = email_input_->text();
-    json["status"] = status_input_->text();
-
-    if (!password_input_->text().isEmpty()) {
-        json["password"] = password_input_->text();
+    LocalUserRepository repo(db_);
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
+    if (!user) {
+        return;
     }
 
-    qDebug() << "ProfileEditScreen: Отправляю новые данные на сервер...";
-    network_manager_->PUT(network_manager_->user_edit_info_url_, json);
+    LocalUser updated = *user;
+    updated.name_ = name_input_->text().trimmed();
+    updated.email_ = email_input_->text().trimmed();
+    updated.status_ = status_input_->text().trimmed();
+    updated.sync_status_ = SyncStatus::PENDING;
+    try {
+        repo.save(updated);
+    } catch (const std::exception& e) {
+        qDebug() << "ProfileEditScreen: failed to save user:" << e.what();
+        return;
+    }
+
+    pending_password_ = password_input_->text();
+    password_input_->clear();
+
+    if (!pending_password_.isEmpty()) {
+        sync_coordinator_->setPassword(pending_password_);
+        pending_password_.clear();
+    }
+    sync_coordinator_->syncUsers();
+    emit profileRequested();
 }
 
 void ProfileEditScreen::sendAvatarDelete() {

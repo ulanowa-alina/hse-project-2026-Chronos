@@ -1,13 +1,14 @@
 #include "profile_screen.h"
 
+#include "../local_repositories/local_user_repository.hpp"
+
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QNetworkRequest>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPixmap>
 #include <QShowEvent>
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 
 ProfileScreen::ProfileScreen(QWidget* parent)
     : QWidget(parent)
@@ -18,7 +19,20 @@ ProfileScreen::ProfileScreen(QWidget* parent)
             &ProfileScreen::onAvatarImageDownloaded);
 }
 
+void ProfileScreen::setDatabase(QSqlDatabase db) {
+    db_ = db;
+}
+
+void ProfileScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
 void ProfileScreen::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &ProfileScreen::onNetworkResponse);
+    }
+
     network_manager_ = manager;
 
     if (network_manager_) {
@@ -27,38 +41,52 @@ void ProfileScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void ProfileScreen::reloadFromLocal() {
+    if (!db_.isOpen()) {
+        return;
+    }
+
+    LocalUserRepository repo(db_);
+    std::optional<LocalUser> user;
+    if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
+        user = repo.findById(sync_coordinator_->currentUserId());
+    } else {
+        user = repo.getCurrentUser();
+    }
+    if (!user) {
+        name_label_->setText("Нет данных");
+        email_label_->setText("");
+        status_label_->setText("");
+        setDefaultAvatar();
+        return;
+    }
+
+    name_label_->setText(user->name_);
+    email_label_->setText(user->email_);
+    status_label_->setText(user->status_);
+}
+
 void ProfileScreen::showEvent(QShowEvent* event) {
     QWidget::showEvent(event);
-
     if (network_manager_) {
-        qDebug() << "ProfileScreen: Окно открыто, запрашиваю данные аккаунта...";
         network_manager_->GET(network_manager_->user_info_url_);
     }
 }
 
 void ProfileScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->user_info_url_)
+    if (!network_manager_ || endpoint != network_manager_->user_info_url_) {
         return;
+    }
 
     if (code == 200) {
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        QJsonObject root = doc.object();
-        QJsonObject data_obj = root["data"].toObject();
-
-        QString name = data_obj["name"].toString();
-        QString email = data_obj["email"].toString();
-        QString status = data_obj["status"].toString();
-        QString avatar_s3_key = data_obj["avatar_s3_key"].toString();
-
-        name_label_->setText(name);
-        email_label_->setText(email);
-        status_label_->setText(status);
+        const QJsonDocument doc = QJsonDocument::fromJson(data);
+        const QJsonObject data_obj = doc.object()["data"].toObject();
+        const QString avatar_s3_key = data_obj["avatar_s3_key"].toString();
         updateAvatarPreview(avatar_s3_key);
         qDebug() << "ProfileScreen avatar_s3_key:" << avatar_s3_key;
-        qDebug() << "ProfileScreen: Данные получены";
     } else {
-        qDebug() << "Ошибка сервера, код:" << code;
-        name_label_->setText("Ошибка загрузки");
+        qDebug() << "ProfileScreen: failed to load avatar, code =" << code;
+        setDefaultAvatar();
     }
 }
 
@@ -203,8 +231,7 @@ void ProfileScreen::setupLayout() {
                                 "}");
     main_layout->addWidget(edit_button_);
 
-    connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::boardRequested);
+    connect(logo_button_, &QPushButton::clicked, this, &ProfileScreen::openDashboardScreen);
     connect(logout_button_, &QPushButton::clicked, this, &ProfileScreen::logoutRequested);
     connect(edit_button_, &QPushButton::clicked, this, &ProfileScreen::profileEditRequested);
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

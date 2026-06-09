@@ -5,14 +5,12 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QIcon>
-#include <QJsonArray>
+#include <QJsonDocument>
 #include <QMessageBox>
 #include <QMimeDatabase>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers,cppcoreguidelines-owning-memory)
 
 RegistrationScreen::RegistrationScreen(QWidget* parent)
     : QWidget(parent) {
@@ -20,6 +18,11 @@ RegistrationScreen::RegistrationScreen(QWidget* parent)
 }
 
 void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &RegistrationScreen::onNetworkResponse);
+    }
+
     network_manager_ = manager;
 
     if (network_manager_) {
@@ -28,14 +31,41 @@ void RegistrationScreen::setNetworkManager(NetworkManager* manager) {
     }
 }
 
+void RegistrationScreen::clearInputs() {
+    if (email_input_) {
+        email_input_->clear();
+    }
+    if (password_input_) {
+        password_input_->clear();
+    }
+    if (name_input_) {
+        name_input_->clear();
+    }
+    if (status_input_) {
+        status_input_->clear();
+    }
+    avatar_file_path_.clear();
+    if (avatar_button_) {
+        avatar_button_->setText("+");
+        avatar_button_->setIcon(QIcon());
+    }
+}
+
+void RegistrationScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
 void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
                                            int code) {
+    if (!network_manager_) {
+        return;
+    }
+
     if (!isVisible()) {
         return;
     }
 
     if (endpoint != network_manager_->register_url_ && endpoint != network_manager_->login_url_ &&
-        endpoint != network_manager_->boards_get_all_url_ &&
         endpoint != network_manager_->user_avatar_upload_url_) {
         return;
     }
@@ -55,22 +85,24 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonObject data_obj = doc.object()["data"].toObject();
 
-            QString token = data_obj["token"].toString();
+            const QString token = data_obj["token"].toString();
             network_manager_->setToken(token);
+
+            if (sync_coordinator_) {
+                sync_coordinator_->beginUserSession(data_obj["user"].toObject());
+            }
+
+            emit authenticated(token);
 
             qDebug() << "RegistrationScreen: Зашел в аккаунт и получил токен";
 
-            if (avatar_file_path_.isEmpty()) {
-                qDebug() << "RegistrationScreen: Фото не выбрано, перехожу на доску";
-                network_manager_->GET(network_manager_->boards_get_all_url_);
-            } else {
+            if (!avatar_file_path_.isEmpty()) {
                 QFile file(avatar_file_path_);
                 if (!file.open(QIODevice::ReadOnly)) {
                     qDebug() << "RegistrationScreen: Не удалось открыть файл аватара:"
                              << avatar_file_path_;
                     QMessageBox::warning(this, "Ошибка чтения файла",
                                          "Аккаунт создан, но выбранное фото открыть не удалось.");
-                    network_manager_->GET(network_manager_->boards_get_all_url_);
                     return;
                 }
 
@@ -103,31 +135,10 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
     } else if (endpoint == network_manager_->user_avatar_upload_url_) {
         if (code == 200) {
             qDebug() << "RegistrationScreen: Фото профиля успешно загружено";
-            network_manager_->GET(network_manager_->boards_get_all_url_);
         } else {
             qDebug() << "RegistrationScreen: Ошибка загрузки фото после регистрации:" << code;
             QMessageBox::warning(this, "Ошибка загрузки фото",
                                  "Аккаунт создан, но фото профиля загрузить не удалось.");
-            network_manager_->GET(network_manager_->boards_get_all_url_);
-        }
-    } else if (endpoint == network_manager_->boards_get_all_url_) {
-        if (code == 200) {
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            const QJsonArray boards = doc.object()["data"].toArray();
-            if (boards.isEmpty()) {
-                qDebug() << "RegistrationScreen: Для пользователя не найдено ни одной доски";
-                return;
-            }
-
-            const int board_id = boards.first().toObject()["id"].toInt(-1);
-            if (board_id <= 0) {
-                qDebug() << "RegistrationScreen: Некорректный board_id в ответе /board/v1/get_all";
-                return;
-            }
-
-            emit registrationRequested(board_id);
-        } else {
-            qDebug() << "RegistrationScreen: Ошибка получения доски:" << code;
         }
     }
 }
@@ -272,10 +283,10 @@ void RegistrationScreen::setupLayout() {
         return container;
     };
 
-    main_layout->addWidget(create_field("Name", name_input_, "Enter name"));
-    main_layout->addWidget(create_field("Email", email_input_, "Enter email"));
-    main_layout->addWidget(create_field("Status", status_input_, "What is your position?"));
-    main_layout->addWidget(create_field("Password", password_input_, "Create a password", true));
+    main_layout->addWidget(create_field("Имя", name_input_, "Введите имя"));
+    main_layout->addWidget(create_field("Email", email_input_, "Введите email"));
+    main_layout->addWidget(create_field("Статус", status_input_, "Введите свою роль"));
+    main_layout->addWidget(create_field("Пароль", password_input_, "Придумайте пароль", true));
 
     main_layout->addSpacing(15);
 
@@ -309,5 +320,3 @@ void RegistrationScreen::setupLayout() {
     connect(avatar_button_, &QPushButton::clicked, this,
             &RegistrationScreen::onAvatarPickRequested);
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

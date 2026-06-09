@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <openssl/hmac.h>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -19,10 +20,16 @@ constexpr const char* kBase64Alphabet =
 
 auto get_jwt_secret() -> std::string {
     const char* env = std::getenv("JWT_SECRET");
-    if (env != nullptr && *env != '\0') {
-        return std::string(env);
+    if (env == nullptr || *env == '\0') {
+        throw std::runtime_error("JWT_SECRET is not set");
     }
-    return "dev-secret-change-me";
+
+    std::string secret(env);
+    if (secret.size() < 32) {
+        throw std::runtime_error("JWT_SECRET must be at least 32 characters long");
+    }
+
+    return secret;
 }
 
 auto get_jwt_ttl_seconds() -> std::time_t {
@@ -278,6 +285,11 @@ bool parse_and_validate_token(const std::string& token, TokenPayload& payload, T
         error = TokenError::InvalidToken;
         return false;
     }
+}
+
+void validate_jwt_config() {
+    (void) get_jwt_secret();
+    (void) get_jwt_ttl_seconds();
 }
 
 } // namespace auth

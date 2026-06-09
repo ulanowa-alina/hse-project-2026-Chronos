@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <pqxx/pqxx>
+#include <spdlog/spdlog.h>
 #include <string>
 
 using json = nlohmann::json;
@@ -14,6 +15,8 @@ using json = nlohmann::json;
 namespace status::v1 {
 
 namespace {
+
+const size_t MAX_NAME_SIZE = 50;
 
 int require_positive_int_field(const json& body, const std::string& key) {
     try {
@@ -83,7 +86,9 @@ json collect_missing_fields(const json& body) {
 auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& pool,
                   int user_id) -> http::response<http::string_body> {
 
+    spdlog::info("Status create request received");
     if (req.method() != http::verb::post) {
+        spdlog::error("Status create rejected: method not allowed");
         return server::utils::build_error_response(req, http::status::method_not_allowed,
                                                    "DUPLICATE_RESOURCE", "Method not allowed");
     }
@@ -92,17 +97,20 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
     try {
         body = json::parse(req.body());
     } catch (const json::exception&) {
+        spdlog::error("Status create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     if (!body.is_object()) {
+        spdlog::error("Status create rejected: invalid JSON format");
         return server::utils::build_error_response(req, http::status::bad_request, "INVALID_FORMAT",
                                                    "Invalid JSON format");
     }
 
     const json missing_fields = collect_missing_fields(body);
     if (!missing_fields.empty()) {
+        spdlog::error("Status create rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
                                                    "Missing required fields",
                                                    json{{"missing_fields", missing_fields}});
@@ -113,7 +121,8 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::string name = require_string_field(body, "name");
         const int position = require_non_negative_int_field(body, "position");
 
-        if (name.empty() || name.size() > 50) {
+        if (name.empty() || name.size() > MAX_NAME_SIZE) {
+            spdlog::error("Status create rejected: invalid name format");
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                 json{{"name", "Name length must be between 1 and 50 symbols"}});
@@ -123,11 +132,14 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::optional<Board> board = board_repository.find_by_id(board_id);
 
         if (!board.has_value()) {
+            spdlog::error("Status create rejected: board with id={} not found", board_id);
             return server::utils::build_error_response(req, http::status::not_found,
                                                        "BOARD_NOT_FOUND", "Board not found");
         }
 
         if (board->user_id_ != user_id) {
+            spdlog::error("Status create rejected: board with id={} belongs to another user",
+                          board_id);
             return server::utils::build_error_response(req, http::status::forbidden,
                                                        "RESOURCE_NOT_OWNED",
                                                        "Resource belongs to another user");
@@ -138,14 +150,17 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
             status_repository.find_by_board_and_name(board_id, name);
 
         if (existing_status.has_value()) {
+            spdlog::error("Status create rejected: status with name already exists");
             return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
+                req, http::status::conflict, "DUPLICATE_RESOURCE",
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
 
         const Status new_status(0, board_id, name, position);
         const Status created_status = status_repository.save(new_status);
 
+        spdlog::info("Status with id={} successfully created for board_id={}", created_status.id_,
+                     board_id);
         return server::utils::build_json_response(req, http::status::ok,
                                                   json{{"data", model_to_json(created_status)}});
 
@@ -153,6 +168,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::string message = e.what();
 
         if (message.rfind("missing:", 0) == 0) {
+            spdlog::error("Status create rejected: missing required fields");
             const std::string field = message.substr(8);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
@@ -160,6 +176,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         }
 
         if (message.rfind("type:", 0) == 0) {
+            spdlog::error("Status create rejected: invalid field format");
             const std::string field = message.substr(5);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "INVALID_FORMAT", "Invalid field format",
@@ -167,6 +184,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         }
 
         if (message.rfind("value:", 0) == 0) {
+            spdlog::error("Status create rejected: invalid field value");
             const std::string field = message.substr(6);
             const std::string detail = field == "position"
                                            ? "Position must be greater than or equal to 0"
@@ -176,22 +194,25 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
                                                        json{{field, detail}});
         }
 
+        spdlog::error("Status create rejected: validation error");
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", "Validation failed");
     } catch (const pqxx::sql_error& e) {
         const std::string msg = e.what();
         if (msg.find("statuses_board_id_name_key") != std::string::npos ||
             msg.find("duplicate key") != std::string::npos) {
+            spdlog::error("Status create rejected: status with name already exists");
             return server::utils::build_error_response(
-                req, static_cast<http::status>(405), "DUPLICATE_RESOURCE",
+                req, http::status::conflict, "DUPLICATE_RESOURCE",
                 "Status with this name already exists", json{{"name", "already exists"}});
         }
-
+        spdlog::error("Status create failed with database error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
                                                    "DATABASE_ERROR", "Database error");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::error("Status create with unexpected error: {}", e.what());
         return server::utils::build_error_response(req, http::status::internal_server_error,
-                                                   "DATABASE_ERROR", "Database error");
+                                                   "INTERNAL_ERROR", "Internal error");
     }
 }
 

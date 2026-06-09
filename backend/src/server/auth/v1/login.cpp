@@ -1,12 +1,14 @@
 #include "login.hpp"
 
 #include "repositories/user_repository.hpp"
+#include "security/password_hashing.hpp"
 #include "server/auth/jwt.hpp"
 
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
 #include <pqxx/pqxx>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <string>
 
@@ -44,12 +46,14 @@ struct LoginRequest {
     std::string password;
 };
 
-auto parse_login_request(const http::request<http::string_body>& req, LoginRequest& out,
-                         http::response<http::string_body>& error_response) -> bool {
+bool parse_login_request(const http::request<http::string_body>& req, LoginRequest& out,
+                         http::response<http::string_body>& error_response) {
     json body;
     try {
         body = json::parse(req.body());
     } catch (...) {
+        spdlog::error("Login rejected: request body contains invalid JSON");
+
         error_response = build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                          "Invalid JSON format");
         return false;
@@ -59,6 +63,8 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     const bool has_password = body.contains("password");
 
     if (has_email && !body["email"].is_string()) {
+        spdlog::error("Login rejected: Invalid email format");
+
         error_response =
             build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                             "Invalid email format", json{{"email", "Invalid email format"}});
@@ -66,6 +72,8 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     }
 
     if (has_password && !body["password"].is_string()) {
+        spdlog::error("Login rejected: Invalid password format");
+
         error_response = build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                          "Invalid password format",
                                          json{{"password", "Invalid password format"}});
@@ -81,6 +89,8 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     }
 
     if (!missing_fields.empty()) {
+        spdlog::error("Request rejected: Required fields are missing");
+
         error_response =
             build_api_error(req, http::status::bad_request, "MISSING_FIELD",
                             "Missing required fields", json{{"missing_fields", missing_fields}});
@@ -95,6 +105,8 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
                              out.email.find('.', out.email.find('@') + 1) != std::string::npos;
 
     if (!valid_email) {
+        spdlog::error("Request rejected: Invalid email format");
+
         error_response =
             build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                             "Invalid email format", json{{"email", "Invalid email format"}});
@@ -102,6 +114,8 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     }
 
     if (out.password.empty()) {
+        spdlog::error("Request rejected: Empty password's field");
+
         error_response =
             build_api_error(req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
                             json{{"password", "Password cannot be empty"}});
@@ -111,12 +125,8 @@ auto parse_login_request(const http::request<http::string_body>& req, LoginReque
     return true;
 }
 
-auto build_password_hash(const std::string& password) -> std::string {
-    return "hash:" + password;
-}
-
 auto is_password_valid(const User& user, const std::string& password) -> bool {
-    return user.password_hash_ == build_password_hash(password);
+    return security::verify_password(password, user.password_hash_);
 }
 
 auto to_iso8601(std::time_t t) -> std::string {
@@ -143,6 +153,8 @@ auto build_login_success_response(const http::request<http::string_body>& req, c
 
 auto handleLogin(const http::request<http::string_body>& req,
                  ConnectionPool& pool) -> http::response<http::string_body> {
+    spdlog::info("Login request received");
+
     http::response<http::string_body> error_response{http::status::bad_request, req.version()};
     LoginRequest login_request;
 
@@ -155,16 +167,23 @@ auto handleLogin(const http::request<http::string_body>& req,
         const auto user = repo.find_by_email(login_request.email);
 
         if (!user.has_value() || !is_password_valid(*user, login_request.password)) {
+            spdlog::error("Login failed: invalid login Credentials");
             return build_api_error(req, http::status::unauthorized, "UNAUTHORIZED",
                                    "Invalid email or password");
         }
 
         const std::string token = auth::create_token(user->id_);
+        spdlog::info("Successful login for user: {}", user->id_);
+
         return build_login_success_response(req, *user, token);
-    } catch (const pqxx::sql_error&) {
+    } catch (const pqxx::sql_error& e) {
+        spdlog::error("Login failed with database error: {}", e.what());
+
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::error("Login failed with unexpected error: {}", e.what());
+
         return build_api_error(req, http::status::internal_server_error, "DATABASE_ERROR",
                                "Database error");
     }

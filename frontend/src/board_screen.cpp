@@ -1,20 +1,22 @@
 #include "board_screen.h"
 
+#include "../local_repositories/local_board_repository.hpp"
+#include "../local_repositories/local_status_repository.hpp"
+#include "../local_repositories/local_task_repository.hpp"
+
 #include <QDebug>
 #include <QInputDialog>
-#include <QJsonArray>
 #include <QJsonDocument>
-#include <QJsonObject>
 #include <QNetworkRequest>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
 #include <QUrl>
-#include <QUrlQuery>
 
-BoardScreen::BoardScreen(int board_id, QWidget* parent)
+BoardScreen::BoardScreen(int board_id, QSqlDatabase db, QWidget* parent)
     : QWidget(parent)
     , board_id_(board_id)
+    , db_(db)
     , avatar_network_manager_(new QNetworkAccessManager(this)) {
     setupLayout();
 
@@ -23,26 +25,74 @@ BoardScreen::BoardScreen(int board_id, QWidget* parent)
 }
 
 void BoardScreen::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &BoardScreen::onNetworkResponse);
+    }
+
     network_manager_ = manager;
+
     if (network_manager_) {
         connect(network_manager_, &NetworkManager::responseReceived, this,
                 &BoardScreen::onNetworkResponse);
     }
 }
 
+void BoardScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
+    sync_coordinator_ = coordinator;
+}
+
 void BoardScreen::reloadBoardData() {
-    if (!network_manager_ || board_id_ <= 0) {
+    if (board_id_ <= 0) {
         return;
     }
 
-    clearBoardData();
-    board_name_label_->setText(QString("| Board %1").arg(board_id_));
+    loadFromLocalDatabase();
 
-    network_manager_->GET(network_manager_->board_get_url_ +
-                          "?board_id=" + QString::number(board_id_));
-    network_manager_->GET(network_manager_->board_tasks_url_ +
-                          "?board_id=" + QString::number(board_id_));
-    network_manager_->GET(network_manager_->user_info_url_);
+    if (network_manager_) {
+        network_manager_->GET(network_manager_->user_info_url_);
+    }
+}
+
+void BoardScreen::loadFromLocalDatabase() {
+    clearBoardData();
+
+    LocalBoardRepository board_repo(db_);
+    const auto board = board_repo.findById(board_id_);
+    if (board) {
+        board_name_label_->setText("| " + board->title_);
+    } else {
+        board_name_label_->setText("| Board " + QString::number(board_id_));
+    }
+
+    LocalStatusRepository status_repo(db_);
+    const std::vector<LocalStatus> statuses = status_repo.findByBoardId(board_id_);
+    for (const LocalStatus& status : statuses) {
+        status_names_.insert(status.id_, status.name_);
+        showStatusWindow(status.id_, status.name_);
+    }
+
+    LocalTaskRepository task_repo(db_);
+    const std::vector<LocalTask> tasks = task_repo.findByBoardId(board_id_);
+    for (const LocalTask& task : tasks) {
+        const QString status_name = status_names_.contains(task.status_id_)
+                                        ? status_names_.value(task.status_id_)
+                                        : "Status " + QString::number(task.status_id_);
+
+        StatusWindow* status = showStatusWindow(task.status_id_, status_name);
+
+        auto* card = new TaskCard(task.id_, task.board_id_, task.status_id_, db_, status);
+        if (sync_coordinator_) {
+            card->setSyncCoordinator(sync_coordinator_);
+        }
+        QDateTime deadline;
+        if (!task.deadline_.isEmpty()) {
+            deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
+        }
+        card->setData(task.title_, task.description_, deadline, task.is_completed_);
+        connect(card, &TaskCard::openTaskEditScreen, this, &BoardScreen::openTaskEditScreen);
+        status->addTaskCard(card);
+    }
 }
 
 void BoardScreen::clearBoardData() {
@@ -62,54 +112,19 @@ void BoardScreen::clearBoardData() {
     }
 }
 
-StatusWindow* BoardScreen::ensureStatusWindow(int status_id, const QString& name) {
+StatusWindow* BoardScreen::showStatusWindow(int status_id, const QString& name) {
     if (status_windows_.contains(status_id)) {
         return status_windows_.value(status_id);
     }
 
-    auto* status = new StatusWindow(status_id, board_id_, name, this);
-    status->setNetworkManager(network_manager_);
+    auto* status = new StatusWindow(status_id, board_id_, name, db_, this);
+    if (sync_coordinator_) {
+        status->setSyncCoordinator(sync_coordinator_);
+    }
+    connect(status, &StatusWindow::openTaskCreateScreen, this, &BoardScreen::openTaskCreateScreen);
     board_layout_->insertWidget(board_layout_->count() - 1, status);
     status_windows_.insert(status_id, status);
     return status;
-}
-
-void BoardScreen::loadTasksFromResponse(const QByteArray& data) {
-    clearBoardData();
-
-    const QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isObject()) {
-        qDebug() << "BoardScreen: Некорректный JSON в ответе /board/v1/tasks";
-        return;
-    }
-
-    const QJsonArray tasks = doc.object()["data"].toArray();
-    for (const QJsonValue& value : tasks) {
-        if (!value.isObject()) {
-            continue;
-        }
-
-        const QJsonObject task = value.toObject();
-        const int status_id = task["status_id"].toInt(-1);
-        const int task_id = task["id"].toInt(-1);
-        if (status_id <= 0 || task_id <= 0) {
-            continue;
-        }
-
-        const QString status_name_from_api = task["status_name"].toString();
-        if (!status_name_from_api.isEmpty()) {
-            status_names_.insert(status_id, status_name_from_api);
-        }
-
-        const QString status_name =
-            status_names_.contains(status_id) ? status_names_.value(status_id) : "Status";
-        StatusWindow* status = ensureStatusWindow(status_id, status_name);
-
-        auto* card = new TaskCard(task_id, board_id_, status_id, status);
-        card->setNetworkManager(network_manager_);
-        card->setData(task["title"].toString(), task["description"].toString());
-        status->addTaskCard(card);
-    }
 }
 
 void BoardScreen::setupLayout() {
@@ -125,7 +140,10 @@ void BoardScreen::setupLayout() {
     header_layout->setContentsMargins(20, 0, 20, 0);
 
     logo_label_ = new QLabel("Chronos", this);
-    logo_label_->setStyleSheet("font-size: 20px; font-weight: bold; color: #305CDE;");
+    logo_label_->setStyleSheet("QLabel { font-size: 22px; font-weight: bold; color: #305CDE; }"
+                               "QLabel:hover { color: #2549B3; }");
+    logo_label_->setCursor(Qt::PointingHandCursor);
+    logo_label_->installEventFilter(this);
 
     board_name_label_ = new QLabel("| Board Name", this);
     board_name_label_->setStyleSheet("font-size: 18px; color: #172b4d;");
@@ -134,15 +152,35 @@ void BoardScreen::setupLayout() {
     header_layout->addWidget(board_name_label_);
     header_layout->addStretch();
 
-    status_create_button_ = new QPushButton("+ Add status", this);
+    status_create_button_ = new QPushButton("+ Создать статус", this);
     status_create_button_->setCursor(Qt::PointingHandCursor);
     status_create_button_->setStyleSheet(
-        "QPushButton { background: #ebedf0; border: none; padding: 8px 15px; border-radius: 5px; "
+        "QPushButton { background: #ebedf0; border: 2px solid transparent; padding: 8px 15px; "
+        "border-radius: 5px; "
         "font-weight: bold; }"
-        "QPushButton:hover { background: #dadce2; }");
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
     connect(status_create_button_, &QPushButton::clicked, this,
             &BoardScreen::onStatusCreateRequest);
     header_layout->addWidget(status_create_button_);
+
+    board_settings_button_ = new QPushButton("⚙️", this);
+    board_settings_button_->setFixedSize(40, 40);
+    board_settings_button_->setStyleSheet(
+        "QPushButton { background: #dfe1e6; border: 2px solid transparent; border-radius: 20px; "
+        "font-size: 18px; }"
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
+    connect(board_settings_button_, &QPushButton::clicked, this,
+            &BoardScreen::onBoardSettingsRequested);
+    header_layout->addWidget(board_settings_button_);
+
+    pomodoro_button_ = new QPushButton("🍅", this);
+    pomodoro_button_->setFixedSize(40, 40);
+    pomodoro_button_->setStyleSheet(
+        "QPushButton { background: #dfe1e6; border: 2px solid transparent; border-radius: 20px; "
+        "font-size: 18px; }"
+        "QPushButton:hover { border-color: #305CDE; background: #d4dbeb; }");
+    connect(pomodoro_button_, &QPushButton::clicked, this, &BoardScreen::onPomodoroRequest);
+    header_layout->addWidget(pomodoro_button_);
 
     profile_button_ = new QPushButton("👤", this);
     profile_button_->setFixedSize(40, 40);
@@ -186,25 +224,37 @@ void BoardScreen::setupLayout() {
 }
 
 void BoardScreen::onStatusCreateRequest() {
-    if (!network_manager_)
+    if (!sync_coordinator_) {
         return;
+    }
+
     bool flag;
-    QString name =
+    const QString name =
         QInputDialog::getText(this, "New Status", "Column Name:", QLineEdit::Normal, "", &flag);
 
-    if (flag && !name.isEmpty()) {
-        auto* new_status = new StatusWindow(-1, board_id_, name, this);
-        new_status->setNetworkManager(network_manager_);
-
-        board_layout_->insertWidget(board_layout_->count() - 1, new_status);
-
-        QJsonObject json;
-        json["status_id"] = -1;
-        json["board_id"] = board_id_;
-        json["name"] = name;
-        json["position"] = 0; // TODO: внедрить эту всю тему
-        network_manager_->POST(network_manager_->statuses_create_url_, json);
+    const QString trimmed_name = name.trimmed();
+    if (!flag || trimmed_name.isEmpty()) {
+        return;
     }
+
+    LocalStatusRepository repo(db_);
+    const int temp_id = repo.createLocalId();
+    LocalStatus status(temp_id, board_id_, trimmed_name, 0);
+    status.sync_status_ = SyncStatus::PENDING;
+    status.server_version_ = 0;
+    try {
+        repo.save(status);
+    } catch (const std::exception& e) {
+        qDebug() << "BoardScreen: failed to save status:" << e.what();
+        return;
+    }
+
+    auto* new_status = new StatusWindow(temp_id, board_id_, trimmed_name, db_, this);
+    new_status->setSyncCoordinator(sync_coordinator_);
+    board_layout_->insertWidget(board_layout_->count() - 1, new_status);
+    status_windows_.insert(temp_id, new_status);
+
+    sync_coordinator_->syncStatuses();
 }
 
 void BoardScreen::onProfileRequest() {
@@ -275,90 +325,30 @@ void BoardScreen::loadAvatar(const QString& avatar_s3_key) {
 }
 
 void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
-    if (endpoint != network_manager_->statuses_create_url_ &&
-        endpoint != network_manager_->user_info_url_ &&
-        !endpoint.startsWith(network_manager_->board_get_url_) &&
-        !endpoint.startsWith(network_manager_->board_tasks_url_))
-        return;
-
-    if (endpoint.startsWith(network_manager_->board_get_url_) ||
-        endpoint.startsWith(network_manager_->board_tasks_url_)) {
-        if (!isVisible()) {
-            return;
-        }
-
-        const QUrl url("http://localhost" + endpoint);
-        const QUrlQuery query(url);
-        bool ok = false;
-        const int response_board_id = query.queryItemValue("board_id").toInt(&ok);
-        if (!ok || response_board_id != board_id_) {
-            return;
-        }
-    }
-
-    if (endpoint.startsWith(network_manager_->board_get_url_)) {
-        if (code == 200) {
-            const QJsonDocument doc = QJsonDocument::fromJson(data);
-            const QString title = doc.object()["data"].toObject()["title"].toString();
-            if (!title.isEmpty()) {
-                board_name_label_->setText("| " + title);
-            } else {
-                board_name_label_->setText(QString("| Board %1").arg(board_id_));
-            }
-        } else {
-            qDebug() << "BoardScreen: Ошибка получения доски:" << code;
-        }
+    if (!network_manager_ || endpoint != network_manager_->user_info_url_) {
         return;
     }
 
-    if (endpoint.startsWith(network_manager_->board_tasks_url_)) {
-        if (code == 200) {
-            loadTasksFromResponse(data);
-        } else {
-            qDebug() << "BoardScreen: Ошибка получения задач:" << code;
-            clearBoardData();
-        }
-        return;
+    if (code == 200) {
+        const QJsonDocument doc = QJsonDocument::fromJson(data);
+        const QString avatar_s3_key = doc.object()["data"].toObject()["avatar_s3_key"].toString();
+        loadAvatar(avatar_s3_key);
+    } else {
+        setDefaultAvatar();
     }
+}
+void BoardScreen::onPomodoroRequest() {
+    emit openPomodoroScreen();
+}
 
-    if (endpoint == network_manager_->user_info_url_) {
-        if (code == 200) {
-            const QJsonDocument doc = QJsonDocument::fromJson(data);
-            const QString avatar_s3_key =
-                doc.object()["data"].toObject()["avatar_s3_key"].toString();
-            loadAvatar(avatar_s3_key);
-        } else {
-            setDefaultAvatar();
-        }
-        return;
+void BoardScreen::onBoardSettingsRequested() {
+    emit openBoardEditScreen(board_id_);
+}
+
+bool BoardScreen::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == logo_label_ && event->type() == QEvent::MouseButtonPress) {
+        emit openDashboardScreen();
+        return true;
     }
-
-    if (code < 200 || code >= 300) {
-        qDebug() << "BoardScreen: Ошибка сервера" << code << "на" << endpoint;
-        return;
-    }
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonObject root = doc.object();
-    QJsonObject data_obj = root["data"].toObject();
-
-    if (endpoint == network_manager_->statuses_create_url_) {
-        int new_id = data_obj["id"].toInt();
-        const QString created_name = data_obj["name"].toString();
-        qDebug() << "BoardScreen: Успешное создание статуса";
-
-        QList<StatusWindow*> windows = this->findChildren<StatusWindow*>();
-
-        for (StatusWindow* window : windows) {
-            if (window->getId() == -1) {
-                window->setId(new_id);
-                status_windows_.insert(new_id, window);
-                if (!created_name.isEmpty()) {
-                    status_names_.insert(new_id, created_name);
-                }
-                qDebug() << "BoardScreen: ID статуса обновлен";
-                break;
-            }
-        }
-    }
+    return QWidget::eventFilter(watched, event);
 }
