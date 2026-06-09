@@ -29,6 +29,7 @@ SyncCoordinator::SyncCoordinator(QSqlDatabase& db, NetworkManager* network_manag
 
 void SyncCoordinator::clearLocalData() {
     QSqlQuery query(db_);
+    query.exec("DELETE FROM pomodoro_sessions");
     query.exec("DELETE FROM tasks");
     query.exec("DELETE FROM statuses");
     query.exec("DELETE FROM boards");

@@ -3,11 +3,15 @@
 #include "../local_repositories/local_board_repository.hpp"
 #include "../local_repositories/local_pomodoro_session_repository.hpp"
 #include "../local_repositories/local_task_repository.hpp"
+#include "../local_repositories/local_user_repository.hpp"
 
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QScrollArea>
 #include <QSpacerItem>
 #include <QVBoxLayout>
+
+#include <exception>
 
 DashboardScreen::DashboardScreen(QWidget* parent)
     : QWidget(parent) {
@@ -378,12 +382,21 @@ void DashboardScreen::loadStatistics() {
     active_tasks_value_->setText(QString::number(active_count));
     completed_tasks_value_->setText(QString::number(completed_count));
 
-    LocalPomodoroSessionRepository pomodoro_repo(db_);
-    const std::vector<LocalPomodoroSession> sessions = pomodoro_repo.findAll();
-
     int total_focus_seconds = 0;
-    for (const LocalPomodoroSession& session : sessions) {
-        total_focus_seconds += session.work_duration_seconds_;
+    try {
+        LocalUserRepository user_repo(db_);
+        const auto user = user_repo.getCurrentUser();
+        if (user) {
+            LocalPomodoroSessionRepository pomodoro_repo(db_);
+            const std::vector<LocalPomodoroSession> sessions =
+                pomodoro_repo.findByUserId(user->id_);
+
+            for (const LocalPomodoroSession& session : sessions) {
+                total_focus_seconds += session.work_duration_seconds_;
+            }
+        }
+    } catch (const std::exception& e) {
+        qDebug() << "DashboardScreen: Error loading pomodoro statistics:" << e.what();
     }
 
     int focus_hours = total_focus_seconds / 3600;

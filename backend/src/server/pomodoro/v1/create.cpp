@@ -57,6 +57,20 @@ int require_int_field(const json& body, const std::string& key) {
     }
 }
 
+int require_non_negative_int_field(const json& body, const std::string& key) {
+    try {
+        const int value = body.at(key).get<int>();
+        if (value < 0) {
+            throw std::invalid_argument("value:" + key);
+        }
+        return value;
+    } catch (const json::out_of_range&) {
+        throw std::invalid_argument("missing:" + key);
+    } catch (const json::type_error&) {
+        throw std::invalid_argument("type:" + key);
+    }
+}
+
 json model_to_json(const PomodoroSession& session) {
     json data = {
         {"id", session.id_},
@@ -109,7 +123,7 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         const std::optional<int> goal_minutes = optional_int_field(body, "goal_minutes");
         const int work_duration_seconds = require_int_field(body, "work_duration_seconds");
         const int break_duration_seconds = require_int_field(body, "break_duration_seconds");
-        const int completed_cycles = require_int_field(body, "completed_cycles");
+        const int completed_cycles = require_non_negative_int_field(body, "completed_cycles");
 
         PomodoroSessionRepository repository(pool);
         const std::time_t now =
@@ -139,7 +153,9 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
             const std::string field = message.substr(6);
             return server::utils::build_error_response(
                 req, http::status::bad_request, "VALIDATION_ERROR", "Invalid field value",
-                json{{field, "Field " + field + " must be a positive integer"}});
+                json{{field, field == "completed_cycles"
+                                 ? "Field completed_cycles must be a non-negative integer"
+                                 : "Field " + field + " must be a positive integer"}});
         }
         return server::utils::build_error_response(req, http::status::bad_request,
                                                    "VALIDATION_ERROR", e.what());
