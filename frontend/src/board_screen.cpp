@@ -92,7 +92,8 @@ void BoardScreen::loadFromLocalDatabase() {
         if (!task.deadline_.isEmpty()) {
             deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
         }
-        card->setData(task.title_, task.description_, deadline, task.is_completed_);
+        card->setData(task.title_, task.description_, deadline, task.is_completed_,
+                      task.priority_color_);
         connect(card, &TaskCard::openTaskEditScreen, this, &BoardScreen::openTaskEditScreen);
         status->addTaskCard(card);
     }

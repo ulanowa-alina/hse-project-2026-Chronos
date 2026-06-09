@@ -18,7 +18,8 @@ class DdTaskCard : public QFrame {
     void setNetworkManager(NetworkManager* manager);
 
     void setCardData(const QString& title, const QString& description,
-                     const QDateTime& deadline = QDateTime(), bool is_completed = false);
+                     const QDateTime& deadline = QDateTime(), bool is_completed = false,
+                     const QString& priority_color = QString());
 
   signals:
     void openBoardRequested(int board_id);

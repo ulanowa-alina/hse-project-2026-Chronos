@@ -93,7 +93,15 @@ void TaskEditScreen::onUpdateTaskRequest() {
     LocalTask task = *existing;
     task.title_ = title;
     task.description_ = description;
-    task.priority_color_ = priority_color;
+    if (priority_color == "🟢Низкий") {
+        task.priority_color_ = "green";
+    } else if (priority_color == "🟡Средний") {
+        task.priority_color_ = "yellow";
+    } else if (priority_color == "🔴Высокий") {
+        task.priority_color_ = "red";
+    } else {
+        task.priority_color_ = "none";
+    }
 
     if (deadline_checkbox_->isChecked() && deadline.isValid()) {
         task.deadline_ = deadline.toUTC().toString(Qt::ISODate);
@@ -187,15 +195,13 @@ void TaskEditScreen::setupLayout() {
     main_layout->addSpacing(10);
 
     priority_combo_ = new QComboBox(this);
-    priority_combo_->addItem("red");
-    priority_combo_->addItem("orange");
-    priority_combo_->addItem("yellow");
-    priority_combo_->addItem("green");
-    priority_combo_->addItem("blue");
-    priority_combo_->addItem("purple");
+    priority_combo_->addItem("Не установлен");
+    priority_combo_->addItem("🟢Низкий");
+    priority_combo_->addItem("🟡Средний");
+    priority_combo_->addItem("🔴Высокий");
     priority_combo_->setStyleSheet(
         "border: none; font-size: 16px; background: transparent; color: #333333;");
-    main_layout->addWidget(create_field("Приоритет", priority_combo_));
+    main_layout->addWidget(create_field("Уровень приоритетности", priority_combo_));
 
     main_layout->addSpacing(10);
 

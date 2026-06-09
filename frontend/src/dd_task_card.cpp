@@ -104,9 +104,10 @@ void DdTaskCard::freezeTaskCard() {
 }
 
 void DdTaskCard::setCardData(const QString& title, const QString& description,
-                             const QDateTime& deadline, bool is_completed) {
+                             const QDateTime& deadline, bool is_completed,
+                             const QString& priority_color) {
     if (inner_task_card_ != nullptr) {
-        inner_task_card_->setData(title, description, deadline, is_completed);
+        inner_task_card_->setData(title, description, deadline, is_completed, priority_color);
         if (auto* title_edit = inner_task_card_->findChild<QLineEdit*>()) {
             title_edit->setReadOnly(true);
             title_edit->setFocusPolicy(Qt::NoFocus);
