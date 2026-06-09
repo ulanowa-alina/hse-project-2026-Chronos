@@ -147,7 +147,6 @@ LoginResponse
 | ----------- | ---------------- |
 | title       | 1–100 символов   |
 | description | До 1000 символов |
-| is_private  | true / false     |
 
 Примечание:
 Поле `user_id` не передаётся клиентом при создании доски. Оно определяется сервером на основе JWT токена авторизованного пользователя.
@@ -532,7 +531,6 @@ Authorization: Bearer <JWT>
       "user_id": 1,
       "title": "Project",
       "description": "Мой первый проект",
-      "is_private": true,
       "created_at": "2026-01-10T12:00:00Z",
       "updated_at": "2026-01-10T12:00:00Z"
     }
@@ -550,8 +548,7 @@ Content-Type: application/json
 
 {
   "title": "Учёба",
-  "description": "Весенний семестр",
-  "is_private": false
+  "description": "Весенний семестр"
 }
 ```
 
@@ -563,7 +560,6 @@ Content-Type: application/json
     "user_id": 1,
     "title": "Учёба",
     "description": "Весенний семестр",
-    "is_private": false,
     "created_at": "2026-02-07T10:15:00Z",
     "updated_at": "2026-02-07T10:15:00Z"
   }

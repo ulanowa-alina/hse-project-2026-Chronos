@@ -29,7 +29,7 @@ AlignTrailingComments: true
 DerivePointerAlignment: false
 PointerAlignment: Left
 
-SortIncludes: true
+SortIncludes: false
 IncludeBlocks: Regroup
 
 BreakConstructorInitializers: BeforeComma
