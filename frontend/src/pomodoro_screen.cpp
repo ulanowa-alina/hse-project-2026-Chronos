@@ -362,6 +362,44 @@ void PomodoroScreen::saveLocalSession() {
     }
 }
 
+void PomodoroScreen::saveLocalSessionFromServer(const QJsonObject& obj) {
+    if (!db_.isOpen() || !obj.contains("id")) {
+        return;
+    }
+
+    try {
+        LocalPomodoroSessionRepository session_repo(db_);
+        const int server_id = obj["id"].toInt();
+        const int goal_minutes =
+            obj.value("goal_minutes").isNull() ? 0 : obj.value("goal_minutes").toInt();
+        const QString started_at = obj.value("started_at").toString();
+        const QString completed_at =
+            obj.value("completed_at").isNull() ? QString() : obj.value("completed_at").toString();
+        const QString updated_at = completed_at.isEmpty() ? started_at : completed_at;
+
+        if (local_session_id_ > 0 && local_session_id_ != server_id) {
+            session_repo.deleteById(local_session_id_);
+        }
+
+        LocalPomodoroSession session(
+            server_id, obj["user_id"].toInt(), obj["work_duration_seconds"].toInt(),
+            obj["break_duration_seconds"].toInt(), goal_minutes, obj["completed_cycles"].toInt(),
+            started_at, completed_at, started_at, updated_at, QString(), SyncStatus::SYNCED, 1);
+
+        if (session_repo.findById(server_id)) {
+            session_repo.update(session);
+        } else {
+            session_repo.insert(session);
+        }
+
+        local_session_id_ = server_id;
+        last_saved_work_minutes_ = session.work_duration_seconds_ / 60;
+        emit sessionSaved();
+    } catch (const std::exception& e) {
+        qDebug() << "PomodoroScreen: Error saving server session locally:" << e.what();
+    }
+}
+
 QString PomodoroScreen::formatTime(int seconds) {
     int minutes = seconds / 60;
     int secs = seconds % 60;
@@ -374,6 +412,11 @@ void PomodoroScreen::onNetworkResponse(const QString& endpoint, const QByteArray
     }
 
     if (code >= 200 && code < 300) {
+        const QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isObject()) {
+            const QJsonObject session = doc.object().value("data").toObject();
+            saveLocalSessionFromServer(session);
+        }
         qDebug() << "PomodoroScreen: Session saved successfully";
     } else {
         qDebug() << "PomodoroScreen: Error saving session:" << code;

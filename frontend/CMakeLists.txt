@@ -75,6 +75,8 @@ add_executable(ChronosClient
         local_models/sync_status.hpp
         sync/sync_coordinator.cpp
         sync/sync_coordinator.hpp
+        sync/pomodoro_sync_manager.hpp
+        sync/pomodoro_sync_manager.cpp
         sync/user_sync_manager.cpp
         sync/task_sync_manager.cpp
         sync/board_sync_manager.cpp

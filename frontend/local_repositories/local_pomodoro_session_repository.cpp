@@ -142,6 +142,20 @@ bool LocalPomodoroSessionRepository::remove(int id) {
     return true;
 }
 
+bool LocalPomodoroSessionRepository::deleteById(int id) {
+    QSqlQuery query(db_);
+    query.prepare("DELETE FROM pomodoro_sessions WHERE id = ?");
+    query.addBindValue(id);
+
+    if (!query.exec()) {
+        qDebug() << "LocalPomodoroSessionRepository: Error deleting session:"
+                 << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
 int LocalPomodoroSessionRepository::getNextId() {
     QSqlQuery query(db_);
     query.prepare("SELECT MAX(id) FROM pomodoro_sessions");

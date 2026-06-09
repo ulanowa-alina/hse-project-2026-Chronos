@@ -19,9 +19,10 @@ SyncCoordinator::SyncCoordinator(QSqlDatabase& db, NetworkManager* network_manag
     , user_manager_(std::make_unique<UserSyncManager>(db_, network_manager_))
     , board_manager_(std::make_unique<BoardSyncManager>(db_, network_manager_))
     , status_manager_(std::make_unique<StatusSyncManager>(db_, network_manager_))
-    , task_manager_(std::make_unique<TaskSyncManager>(db_, network_manager_)) {
+    , task_manager_(std::make_unique<TaskSyncManager>(db_, network_manager_))
+    , pomodoro_manager_(std::make_unique<PomodoroSyncManager>(db_, network_manager_)) {
     managers_ = {user_manager_.get(), board_manager_.get(), status_manager_.get(),
-                 task_manager_.get()};
+                 task_manager_.get(), pomodoro_manager_.get()};
 
     periodic_timer_ = new QTimer(this);
     connect(periodic_timer_, &QTimer::timeout, this, &SyncCoordinator::onPeriodicSync);
@@ -64,6 +65,7 @@ void SyncCoordinator::loadAll(bool emit_initial_data) {
     waiting_initial_tasks_ = false;
     user_manager_->load();
     board_manager_->load();
+    pomodoro_manager_->load();
 }
 
 void SyncCoordinator::loadChildrenAfterBoards() {
