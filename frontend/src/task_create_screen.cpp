@@ -6,6 +6,14 @@
 #include <QJsonObject>
 #include <QSqlDatabase>
 
+namespace {
+const QString kInlineErrorStyle =
+    QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
+const QString kTitleRequiredMessage = QStringLiteral("Название задачи не может быть пустым");
+const QString kLocalSaveErrorMessage =
+    QStringLiteral("Не удалось сохранить задачу. Попробуйте еще раз.");
+} // namespace
+
 TaskCreateScreen::TaskCreateScreen(int board_id, int status_id, QWidget* parent)
     : QWidget(parent)
     , board_id_(board_id)
@@ -34,6 +42,8 @@ void TaskCreateScreen::setDatabase(QSqlDatabase* db) {
 }
 
 void TaskCreateScreen::onCreateTaskRequest() {
+    clearErrorMessage();
+
     QString title = title_input_->text().trimmed();
     QString description = description_input_->toPlainText().trimmed();
     QString priority_color = priority_combo_->currentText();
@@ -51,6 +61,7 @@ void TaskCreateScreen::onCreateTaskRequest() {
 
     if (title.isEmpty()) {
         qDebug() << "TaskCreateScreen: Название задачи не может быть пустым";
+        showErrorMessage(kTitleRequiredMessage);
         return;
     }
 
@@ -79,16 +90,42 @@ void TaskCreateScreen::onCreateTaskRequest() {
             }
         } catch (const std::exception& e) {
             qDebug() << "TaskCreateScreen: Ошибка сохранения в локальную БД:" << e.what();
+            showErrorMessage(kLocalSaveErrorMessage);
         }
     }
 }
 
 void TaskCreateScreen::onCloseRequest() {
+    clearErrorMessage();
     emit closeRequested();
 }
 
 void TaskCreateScreen::onDeadlineCheckChanged(Qt::CheckState state) {
     deadline_input_->setEnabled(state == Qt::Checked);
+}
+
+void TaskCreateScreen::showErrorMessage(const QString& message) {
+    if (!error_label_) {
+        return;
+    }
+
+    const QString trimmed_message = message.trimmed();
+    if (trimmed_message.isEmpty()) {
+        clearErrorMessage();
+        return;
+    }
+
+    error_label_->setText(trimmed_message);
+    error_label_->show();
+}
+
+void TaskCreateScreen::clearErrorMessage() {
+    if (!error_label_) {
+        return;
+    }
+
+    error_label_->clear();
+    error_label_->hide();
 }
 
 void TaskCreateScreen::setupLayout() {
@@ -205,6 +242,13 @@ void TaskCreateScreen::setupLayout() {
 
     main_layout->addSpacing(20);
 
+    error_label_ = new QLabel(this);
+    error_label_->setWordWrap(true);
+    error_label_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    error_label_->setStyleSheet(kInlineErrorStyle);
+    error_label_->hide();
+    main_layout->addWidget(error_label_);
+
     auto* button_layout = new QHBoxLayout();
     button_layout->setSpacing(10);
 
@@ -233,6 +277,14 @@ void TaskCreateScreen::setupLayout() {
     connect(close_button_, &QPushButton::clicked, this, &TaskCreateScreen::onCloseRequest);
     connect(deadline_checkbox_, &QCheckBox::checkStateChanged, this,
             &TaskCreateScreen::onDeadlineCheckChanged);
+    connect(title_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(description_input_, &QTextEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(priority_combo_, &QComboBox::currentTextChanged, this,
+            [this](const QString&) { clearErrorMessage(); });
+    connect(deadline_checkbox_, &QCheckBox::checkStateChanged, this,
+            [this](Qt::CheckState) { clearErrorMessage(); });
+    connect(deadline_input_, &QDateTimeEdit::dateTimeChanged, this,
+            [this](const QDateTime&) { clearErrorMessage(); });
 }
 
 void TaskCreateScreen::clearFields() {
@@ -242,4 +294,5 @@ void TaskCreateScreen::clearFields() {
     deadline_checkbox_->setChecked(false);
     deadline_input_->setEnabled(false);
     deadline_input_->setDateTime(QDateTime::currentDateTime().addDays(1));
+    clearErrorMessage();
 }

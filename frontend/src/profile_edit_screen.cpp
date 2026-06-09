@@ -1,5 +1,6 @@
 #include "profile_edit_screen.h"
 
+#include "api_error_utils.h"
 #include "../local_repositories/local_user_repository.hpp"
 
 #include <QDebug>
@@ -17,6 +18,13 @@
 #include <QPixmap>
 #include <QShowEvent>
 #include <QVBoxLayout>
+
+namespace {
+const QString kInlineErrorStyle =
+    QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
+const QString kLocalSaveErrorMessage =
+    QStringLiteral("Не удалось сохранить изменения. Попробуйте еще раз.");
+} // namespace
 
 ProfileEditScreen::ProfileEditScreen(QWidget* parent)
     : QWidget(parent)
@@ -56,6 +64,7 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
 
     if (endpoint == network_manager_->user_info_url_) {
         if (code == 200) {
+            clearErrorMessage();
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonObject data_obj = doc.object()["data"].toObject();
             QString avatar_s3_key = data_obj["avatar_s3_key"].toString();
@@ -90,16 +99,15 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
         } else {
             qDebug() << "ProfileEditScreen: Ошибка удаления аватара. Код:" << code
                      << "Данные:" << data;
-            QMessageBox::warning(this, "Ошибка удаления фото",
-                                 parseErrorMessage(data).isEmpty()
-                                     ? "Не удалось удалить фото профиля."
-                                     : parseErrorMessage(data));
+            showErrorMessage(ApiErrorUtils::parseApiErrorMessage(
+                data, QStringLiteral("Не удалось удалить фото профиля.")));
         }
         return;
     }
 
     if (endpoint == network_manager_->user_avatar_upload_url_) {
         if (code == 200) {
+            clearErrorMessage();
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonObject data_obj = doc.object()["data"].toObject();
 
@@ -116,16 +124,15 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
         } else {
             qDebug() << "ProfileEditScreen: Ошибка загрузки аватара. Код:" << code
                      << "Данные:" << data;
-            QMessageBox::warning(this, "Ошибка загрузки фото",
-                                 parseErrorMessage(data).isEmpty()
-                                     ? "Не удалось загрузить фото профиля."
-                                     : parseErrorMessage(data));
+            showErrorMessage(ApiErrorUtils::parseApiErrorMessage(
+                data, QStringLiteral("Не удалось загрузить фото профиля.")));
         }
         return;
     }
 
     if (endpoint == network_manager_->user_edit_info_url_) {
         if (code == 200) {
+            clearErrorMessage();
             qDebug() << "ProfileEditScreen: Изменения успешно сохранены";
             password_input_->clear();
             original_name_ = name_input_->text();
@@ -136,10 +143,8 @@ void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteAr
             emit profileRequested();
         } else {
             qDebug() << "ProfileEditScreen: Ошибка сохранения! Код:" << code << "Данные:" << data;
-            QMessageBox::warning(this, "Ошибка сохранения профиля",
-                                 parseErrorMessage(data).isEmpty()
-                                     ? "Не удалось сохранить изменения профиля."
-                                     : parseErrorMessage(data));
+            showErrorMessage(ApiErrorUtils::parseApiErrorMessage(
+                data, QStringLiteral("Не удалось сохранить изменения профиля.")));
         }
     }
 }
@@ -175,6 +180,8 @@ void ProfileEditScreen::onProfileEditRequest() {
     if (!sync_coordinator_ || !db_.isOpen()) {
         return;
     }
+
+    clearErrorMessage();
 
     if (!selected_avatar_file_path_.isEmpty()) {
         sendAvatarUpload();
@@ -216,6 +223,7 @@ void ProfileEditScreen::sendProfileUpdate() {
         repo.save(updated);
     } catch (const std::exception& e) {
         qDebug() << "ProfileEditScreen: failed to save user:" << e.what();
+        showErrorMessage(kLocalSaveErrorMessage);
         return;
     }
 
@@ -282,6 +290,7 @@ void ProfileEditScreen::sendAvatarUpload() {
 }
 
 void ProfileEditScreen::onAvatarPickRequested() {
+    clearErrorMessage();
     const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
                                                            "Images (*.png *.jpg *.jpeg *.webp)");
 
@@ -296,6 +305,7 @@ void ProfileEditScreen::onAvatarPickRequested() {
 }
 
 void ProfileEditScreen::onAvatarDeleteRequested() {
+    clearErrorMessage();
     if (avatar_delete_requested_) {
         avatar_delete_requested_ = false;
         updateAvatarDeleteButtonState();
@@ -430,16 +440,6 @@ auto ProfileEditScreen::hasPendingTextChanges() const -> bool {
            status_input_->text() != original_status_ || !password_input_->text().isEmpty();
 }
 
-auto ProfileEditScreen::parseErrorMessage(const QByteArray& data) const -> QString {
-    const QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isObject()) {
-        return {};
-    }
-
-    const QJsonObject error_obj = doc.object().value("error").toObject();
-    return error_obj.value("message").toString();
-}
-
 void ProfileEditScreen::resetAvatarSelection() {
     selected_avatar_file_path_.clear();
     avatar_button_->setText("Выбрать фото");
@@ -466,6 +466,30 @@ void ProfileEditScreen::updateAvatarDeleteButtonState() {
 
     delete_avatar_button_->setEnabled(!current_avatar_s3_key_.isEmpty());
     delete_avatar_button_->setText("Удалить фото");
+}
+
+void ProfileEditScreen::showErrorMessage(const QString& message) {
+    if (!error_label_) {
+        return;
+    }
+
+    const QString trimmed_message = message.trimmed();
+    if (trimmed_message.isEmpty()) {
+        clearErrorMessage();
+        return;
+    }
+
+    error_label_->setText(trimmed_message);
+    error_label_->show();
+}
+
+void ProfileEditScreen::clearErrorMessage() {
+    if (!error_label_) {
+        return;
+    }
+
+    error_label_->clear();
+    error_label_->hide();
 }
 
 void ProfileEditScreen::setupLayout() {
@@ -622,6 +646,13 @@ void ProfileEditScreen::setupLayout() {
     main_layout->addStretch();
     main_layout->addStretch();
 
+    error_label_ = new QLabel(this);
+    error_label_->setWordWrap(true);
+    error_label_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    error_label_->setStyleSheet(kInlineErrorStyle);
+    error_label_->hide();
+    main_layout->addWidget(error_label_);
+
     save_button_ = new QPushButton("Сохранить изменения");
     save_button_->setMinimumHeight(45);
     save_button_->setStyleSheet("QPushButton { "
@@ -641,6 +672,10 @@ void ProfileEditScreen::setupLayout() {
     connect(avatar_button_, &QPushButton::clicked, this, &ProfileEditScreen::onAvatarPickRequested);
     connect(delete_avatar_button_, &QPushButton::clicked, this,
             &ProfileEditScreen::onAvatarDeleteRequested);
+    connect(name_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(email_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(status_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(password_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
 
     updateAvatarDeleteButtonState();
 }

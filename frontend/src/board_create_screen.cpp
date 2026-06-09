@@ -4,6 +4,14 @@
 #include <QJsonObject>
 #include <QSqlDatabase>
 
+namespace {
+const QString kInlineErrorStyle =
+    QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
+const QString kTitleRequiredMessage = QStringLiteral("Название доски не может быть пустым");
+const QString kLocalSaveErrorMessage =
+    QStringLiteral("Не удалось сохранить доску. Попробуйте еще раз.");
+} // namespace
+
 BoardCreateScreen::BoardCreateScreen(QWidget* parent)
     : QWidget(parent) {
     setupLayout();
@@ -26,11 +34,14 @@ void BoardCreateScreen::setUserId(int user_id) {
 }
 
 void BoardCreateScreen::onCreateBoardRequest() {
+    clearErrorMessage();
+
     QString title = title_input_->text().trimmed();
     QString description = description_input_->toPlainText().trimmed();
 
     if (title.isEmpty()) {
         qDebug() << "BoardCreateScreen: Название доски не может быть пустым";
+        showErrorMessage(kTitleRequiredMessage);
         return;
     }
 
@@ -53,12 +64,38 @@ void BoardCreateScreen::onCreateBoardRequest() {
             }
         } catch (const std::exception& e) {
             qDebug() << "BoardCreateScreen: Ошибка сохранения в локальную БД:" << e.what();
+            showErrorMessage(kLocalSaveErrorMessage);
         }
     }
 }
 
 void BoardCreateScreen::onCloseRequest() {
+    clearErrorMessage();
     emit closeRequested();
+}
+
+void BoardCreateScreen::showErrorMessage(const QString& message) {
+    if (!error_label_) {
+        return;
+    }
+
+    const QString trimmed_message = message.trimmed();
+    if (trimmed_message.isEmpty()) {
+        clearErrorMessage();
+        return;
+    }
+
+    error_label_->setText(trimmed_message);
+    error_label_->show();
+}
+
+void BoardCreateScreen::clearErrorMessage() {
+    if (!error_label_) {
+        return;
+    }
+
+    error_label_->clear();
+    error_label_->hide();
 }
 
 void BoardCreateScreen::setupLayout() {
@@ -128,6 +165,13 @@ void BoardCreateScreen::setupLayout() {
 
     main_layout->addSpacing(20);
 
+    error_label_ = new QLabel(this);
+    error_label_->setWordWrap(true);
+    error_label_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    error_label_->setStyleSheet(kInlineErrorStyle);
+    error_label_->hide();
+    main_layout->addWidget(error_label_);
+
     auto* button_layout = new QHBoxLayout();
     button_layout->setSpacing(10);
 
@@ -154,9 +198,12 @@ void BoardCreateScreen::setupLayout() {
     connect(create_button_, &QPushButton::clicked, this, &BoardCreateScreen::onCreateBoardRequest);
     connect(cancel_button_, &QPushButton::clicked, this, &BoardCreateScreen::onCloseRequest);
     connect(close_button_, &QPushButton::clicked, this, &BoardCreateScreen::onCloseRequest);
+    connect(title_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(description_input_, &QTextEdit::textChanged, this, [this]() { clearErrorMessage(); });
 }
 
 void BoardCreateScreen::clearFields() {
     title_input_->clear();
     description_input_->clear();
+    clearErrorMessage();
 }

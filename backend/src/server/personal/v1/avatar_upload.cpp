@@ -1,5 +1,6 @@
 #include "avatar_upload.hpp"
 
+#include "models/user.hpp"
 #include "repositories/user_repository.hpp"
 #include "server/utils/base64.hpp"
 #include "storage/s3_config.hpp"
@@ -30,28 +31,6 @@ struct ProfilePayload {
     std::string password;
     bool has_password = false;
 };
-
-auto is_valid_email(const std::string& email) -> bool {
-    if (email.empty() || email.size() > 255) {
-        return false;
-    }
-
-    if (email.find(' ') != std::string::npos) {
-        return false;
-    }
-
-    const auto at_pos = email.find('@');
-    if (at_pos == std::string::npos || at_pos == 0 || at_pos + 1 >= email.size()) {
-        return false;
-    }
-
-    const auto dot_pos = email.find('.', at_pos + 1);
-    if (dot_pos == std::string::npos || dot_pos == at_pos + 1 || dot_pos + 1 >= email.size()) {
-        return false;
-    }
-
-    return true;
-}
 
 auto is_valid_name(const std::string& name) -> bool {
     return !name.empty() && name.size() <= 50;
@@ -148,7 +127,7 @@ auto validate_profile_payload(const http::request<http::string_body>& req, const
     payload.has_password = has_password;
     payload.password = has_password ? body["password"].get<std::string>() : "";
 
-    if (!is_valid_email(payload.email)) {
+    if (!user_validation::is_valid_email(payload.email)) {
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid email format", json{{"email", "Invalid email format"}});
     }

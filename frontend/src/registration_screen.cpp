@@ -1,5 +1,7 @@
 #include "registration_screen.h"
 
+#include "api_error_utils.h"
+
 #include <QDebug>
 #include <QFile>
 #include <QFileDialog>
@@ -11,6 +13,11 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
+
+namespace {
+const QString kInlineErrorStyle =
+    QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
+}
 
 RegistrationScreen::RegistrationScreen(QWidget* parent)
     : QWidget(parent) {
@@ -49,6 +56,7 @@ void RegistrationScreen::clearInputs() {
         avatar_button_->setText("+");
         avatar_button_->setIcon(QIcon());
     }
+    clearErrorMessage();
 }
 
 void RegistrationScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
@@ -71,6 +79,7 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
     }
     if (endpoint == network_manager_->register_url_) {
         if (code == 200) {
+            clearErrorMessage();
             qDebug() << "RegistrationScreen: Успешная регистрация. Входим в аккаунт...";
             QJsonObject login_json;
             login_json["email"] = email_input_->text();
@@ -79,9 +88,11 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
             network_manager_->POST(network_manager_->login_url_, login_json);
         } else {
             qDebug() << "RegistrationScreen: Ошибка регистрации. Ответ сервера: " << code;
+            showErrorMessage(ApiErrorUtils::parseApiErrorMessage(data));
         }
     } else if (endpoint == network_manager_->login_url_) {
         if (code == 200) {
+            clearErrorMessage();
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonObject data_obj = doc.object()["data"].toObject();
 
@@ -131,14 +142,16 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
             }
         } else {
             qDebug() << "RegistrationScreen: Ошибка входа после регистрации:" << code;
+            showErrorMessage(ApiErrorUtils::parseApiErrorMessage(data));
         }
     } else if (endpoint == network_manager_->user_avatar_upload_url_) {
         if (code == 200) {
+            clearErrorMessage();
             qDebug() << "RegistrationScreen: Фото профиля успешно загружено";
         } else {
             qDebug() << "RegistrationScreen: Ошибка загрузки фото после регистрации:" << code;
-            QMessageBox::warning(this, "Ошибка загрузки фото",
-                                 "Аккаунт создан, но фото профиля загрузить не удалось.");
+            showErrorMessage(ApiErrorUtils::parseApiErrorMessage(
+                data, QStringLiteral("Аккаунт создан, но фото профиля загрузить не удалось.")));
         }
     }
 }
@@ -146,6 +159,8 @@ void RegistrationScreen::onNetworkResponse(const QString& endpoint, const QByteA
 void RegistrationScreen::onRegisterRequest() {
     if (!network_manager_)
         return;
+
+    clearErrorMessage();
 
     QJsonObject json;
     json["name"] = name_input_->text();
@@ -158,6 +173,7 @@ void RegistrationScreen::onRegisterRequest() {
 }
 
 void RegistrationScreen::onAvatarPickRequested() {
+    clearErrorMessage();
     qDebug() << "RegistrationScreen: onAvatarPickRequested called";
     const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
                                                            "Images (*.png *.jpg *.jpeg *.webp)");
@@ -169,6 +185,30 @@ void RegistrationScreen::onAvatarPickRequested() {
     avatar_file_path_ = file_path;
     qDebug() << "RegistrationScreen avatar file:" << avatar_file_path_;
     updateAvatarButton(avatar_file_path_);
+}
+
+void RegistrationScreen::showErrorMessage(const QString& message) {
+    if (!error_label_) {
+        return;
+    }
+
+    const QString trimmed_message = message.trimmed();
+    if (trimmed_message.isEmpty()) {
+        clearErrorMessage();
+        return;
+    }
+
+    error_label_->setText(trimmed_message);
+    error_label_->show();
+}
+
+void RegistrationScreen::clearErrorMessage() {
+    if (!error_label_) {
+        return;
+    }
+
+    error_label_->clear();
+    error_label_->hide();
 }
 
 void RegistrationScreen::updateAvatarButton(const QString& file_path) {
@@ -307,6 +347,14 @@ void RegistrationScreen::setupLayout() {
     main_layout->addLayout(footer_layout);
 
     main_layout->addStretch();
+
+    error_label_ = new QLabel(this);
+    error_label_->setWordWrap(true);
+    error_label_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    error_label_->setStyleSheet(kInlineErrorStyle);
+    error_label_->hide();
+    main_layout->addWidget(error_label_);
+
     registration_button_ = new QPushButton("Создать аккаунт", this);
     registration_button_->setMinimumHeight(50);
     registration_button_->setCursor(Qt::PointingHandCursor);
@@ -320,4 +368,8 @@ void RegistrationScreen::setupLayout() {
     connect(login_button_, &QPushButton::clicked, this, &RegistrationScreen::loginRequested);
     connect(avatar_button_, &QPushButton::clicked, this,
             &RegistrationScreen::onAvatarPickRequested);
+    connect(name_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(email_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(status_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(password_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
 }

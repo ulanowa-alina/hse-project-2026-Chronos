@@ -50,6 +50,7 @@ class TaskCreateScreen : public QWidget {
 
     QLabel* logo_label_{nullptr};
     QLabel* title_label_{nullptr};
+    QLabel* error_label_{nullptr};
 
     QLineEdit* title_input_{nullptr};
     QTextEdit* description_input_{nullptr};
@@ -59,6 +60,8 @@ class TaskCreateScreen : public QWidget {
 
     void setupLayout();
     void clearFields();
+    void showErrorMessage(const QString& message);
+    void clearErrorMessage();
 };
 
 #endif // TASK_CREATE_SCREEN_H

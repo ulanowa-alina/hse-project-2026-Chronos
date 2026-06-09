@@ -22,28 +22,6 @@ const size_t MAX_NAME_SIZE = 50;
 const size_t MIN_PASS_SIZE = 8;
 
 using nlohmann::json;
-auto is_valid_email(const std::string& email) -> bool {
-    if (email.empty() || email.size() > 255) {
-        return false;
-    }
-
-    if (email.find(' ') != std::string::npos) {
-        return false;
-    }
-
-    const auto at_pos = email.find('@');
-    if (at_pos == std::string::npos || at_pos == 0 || at_pos + 1 >= email.size()) {
-        return false;
-    }
-
-    const auto dot_pos = email.find('.', at_pos + 1);
-    if (dot_pos == std::string::npos || dot_pos == at_pos + 1 || dot_pos + 1 >= email.size()) {
-        return false;
-    }
-
-    return true;
-}
-
 auto is_valid_name(const std::string& name) -> bool {
     return !name.empty() && name.size() <= MAX_NAME_SIZE;
 }
@@ -166,7 +144,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     const std::string avatar_s3_key =
         has_avatar_s3_key ? body["avatar_s3_key"].get<std::string>() : "";
 
-    if (has_email && !is_valid_email(email)) {
+    if (has_email && !user_validation::is_valid_email(email)) {
         spdlog::error("User edit rejected: invalid email format");
         return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
                                "Invalid email format", json{{"email", "Invalid email format"}});

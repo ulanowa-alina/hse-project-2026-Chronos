@@ -1,7 +1,14 @@
 #include "login_screen.h"
 
+#include "api_error_utils.h"
+
 #include <QDebug>
 #include <QJsonDocument>
+
+namespace {
+const QString kInlineErrorStyle =
+    QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
+}
 
 LoginScreen::LoginScreen(QWidget* parent)
     : QWidget(parent) {
@@ -24,6 +31,7 @@ void LoginScreen::clearInputs() {
     if (password_input_) {
         password_input_->clear();
     }
+    clearErrorMessage();
 }
 
 void LoginScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
@@ -40,6 +48,7 @@ void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
     }
 
     if (code == 200) {
+        clearErrorMessage();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonObject data_obj = doc.object()["data"].toObject();
 
@@ -55,12 +64,15 @@ void LoginScreen::onNetworkResponse(const QString& endpoint, const QByteArray& d
         qDebug() << "LoginScreen: успешный вход";
     } else {
         qDebug() << "LoginScreen: Ошибка входа:" << code;
+        showErrorMessage(ApiErrorUtils::parseApiErrorMessage(data));
     }
 }
 
 void LoginScreen::onLoginRequest() {
     if (!network_manager_)
         return;
+
+    clearErrorMessage();
 
     QString email = email_input_->text().trimmed();
     QString password = password_input_->text();
@@ -75,6 +87,30 @@ void LoginScreen::onLoginRequest() {
     json["password"] = password;
 
     network_manager_->POST(network_manager_->login_url_, json);
+}
+
+void LoginScreen::showErrorMessage(const QString& message) {
+    if (!error_label_) {
+        return;
+    }
+
+    const QString trimmed_message = message.trimmed();
+    if (trimmed_message.isEmpty()) {
+        clearErrorMessage();
+        return;
+    }
+
+    error_label_->setText(trimmed_message);
+    error_label_->show();
+}
+
+void LoginScreen::clearErrorMessage() {
+    if (!error_label_) {
+        return;
+    }
+
+    error_label_->clear();
+    error_label_->hide();
 }
 
 void LoginScreen::setupLayout() {
@@ -166,6 +202,13 @@ void LoginScreen::setupLayout() {
     main_layout->addStretch();
     main_layout->addStretch();
 
+    error_label_ = new QLabel(this);
+    error_label_->setWordWrap(true);
+    error_label_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    error_label_->setStyleSheet(kInlineErrorStyle);
+    error_label_->hide();
+    main_layout->addWidget(error_label_);
+
     login_button_ = new QPushButton("Войти");
     login_button_->setMinimumHeight(45);
     login_button_->setStyleSheet("QPushButton { "
@@ -182,4 +225,6 @@ void LoginScreen::setupLayout() {
 
     connect(login_button_, &QPushButton::clicked, this, &LoginScreen::onLoginRequest);
     connect(reg_btn, &QPushButton::clicked, this, &LoginScreen::registrationRequested);
+    connect(email_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
+    connect(password_input_, &QLineEdit::textChanged, this, [this]() { clearErrorMessage(); });
 }

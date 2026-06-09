@@ -18,65 +18,6 @@ namespace auth::v1 {
 namespace {
 
 using nlohmann::json;
-auto is_valid_email(const std::string& email) -> bool {
-    if (email.empty()) {
-        return false;
-    }
-
-    if (email.size() > 254) {
-        return false;
-    }
-
-    if (email.find(' ') != std::string::npos) {
-        return false;
-    }
-
-    const auto at_pos = email.find('@');
-    if (at_pos == std::string::npos) {
-        return false;
-    }
-
-    if (at_pos == 0 || at_pos != email.rfind('@')) {
-        return false;
-    }
-
-    const std::string local = email.substr(0, at_pos);
-    const std::string domain = email.substr(at_pos + 1);
-
-    if (local.empty() || domain.empty()) {
-        return false;
-    }
-
-    if (local.front() == '.' || local.back() == '.') {
-        return false;
-    }
-
-    if (domain.front() == '.' || domain.back() == '.') {
-        return false;
-    }
-
-    if (email.find("..") != std::string::npos) {
-        return false;
-    }
-
-    if (domain.find('.') == std::string::npos) {
-        return false;
-    }
-
-    for (char ch : email) {
-        const bool is_ascii_letter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
-        const bool is_digit = ch >= '0' && ch <= '9';
-        const bool is_allowed_symbol =
-            ch == '@' || ch == '.' || ch == '_' || ch == '-' || ch == '+';
-
-        if (!is_ascii_letter && !is_digit && !is_allowed_symbol) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 auto build_json_response(const http::request<http::string_body>& req, http::status status,
                          const json& body) -> http::response<http::string_body> {
     http::response<http::string_body> res{status, req.version()};
@@ -160,7 +101,7 @@ User parse_new_user(const json& body) {
     const std::string status = require_string_field(body, "status");
     const std::string password = require_string_field(body, "password");
 
-    if (!is_valid_email(email)) {
+    if (!user_validation::is_valid_email(email)) {
         throw std::invalid_argument("invalid_email");
     }
 
