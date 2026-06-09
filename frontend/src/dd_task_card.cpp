@@ -88,6 +88,9 @@ void DdTaskCard::loadBoardTitle() {
 void DdTaskCard::freezeTaskCard() {
     inner_task_card_->setAcceptDrops(false);
     inner_task_card_->setAttribute(Qt::WA_StyledBackground, true);
+    if (auto* drag_handle = inner_task_card_->findChild<QLabel*>("dragHandle")) {
+        drag_handle->setVisible(false);
+    }
 
     auto* settings_btn = inner_task_card_->findChild<QPushButton*>("settings_button_");
     if (!settings_btn) {
@@ -113,14 +116,14 @@ void DdTaskCard::setCardData(const QString& title, const QString& description,
             title_edit->setFocusPolicy(Qt::NoFocus);
         }
 
-        auto* desc_edit = inner_task_card_->findChild<QTextEdit*>();
-        auto* desc_plain_edit = inner_task_card_->findChild<QPlainTextEdit*>();
+        if (auto* desc_edit = inner_task_card_->findChild<QTextEdit*>()) {
+            desc_edit->setReadOnly(true);
+            desc_edit->setFocusPolicy(Qt::NoFocus);
+        }
 
-        QTextEdit* target_desc = desc_edit ? (QTextEdit*) desc_edit : (QTextEdit*) desc_plain_edit;
-
-        if (target_desc) {
-            target_desc->setReadOnly(true);
-            target_desc->setFocusPolicy(Qt::NoFocus);
+        if (auto* desc_plain_edit = inner_task_card_->findChild<QPlainTextEdit*>()) {
+            desc_plain_edit->setReadOnly(true);
+            desc_plain_edit->setFocusPolicy(Qt::NoFocus);
         }
 
         inner_task_card_->setFixedWidth(300);

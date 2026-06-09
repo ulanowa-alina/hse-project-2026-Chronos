@@ -5,6 +5,7 @@
 #include "network_manager.h"
 
 #include <QDateTime>
+#include <QEvent>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
@@ -54,6 +55,7 @@ class TaskCard : public QFrame {
     void onUpdateTimer();
 
   protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
 
@@ -79,11 +81,13 @@ class TaskCard : public QFrame {
     QLabel* description_label_{nullptr};
     QWidget* blue_line_{nullptr};
 
+    QLabel* drag_handle_{nullptr};
     QLineEdit* title_{nullptr};
 
     QPushButton* settings_button_{nullptr};
     QPushButton* complete_button_{nullptr};
 
+    void startDrag();
     void scheduleDeletion();
     void setupLayout();
     void doneVisualState();

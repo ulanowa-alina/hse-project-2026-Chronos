@@ -136,7 +136,6 @@ void BoardScreen::removeStatusWindow(int status_id) {
     if (board_layout_) {
         board_layout_->removeWidget(status);
     }
-    status->setParent(nullptr);
     status->deleteLater();
 }
 

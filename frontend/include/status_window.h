@@ -37,6 +37,7 @@ class StatusWindow : public QFrame {
     }
     void addTaskCard(TaskCard* card);
     void clearTasks();
+    TaskCard* findTaskCard(int task_id) const;
 
   signals:
     void openTaskCreateScreen(int board_id, int status_id);
@@ -77,6 +78,7 @@ class StatusWindow : public QFrame {
 
     void insertTaskCard(TaskCard* card);
     void removeTaskCard(TaskCard* card);
+    StatusWindow* findStatusWindow(int status_id) const;
     void installDropForwarding(QWidget* widget);
     void removeDropForwarding(QWidget* widget);
     void processHighlight();

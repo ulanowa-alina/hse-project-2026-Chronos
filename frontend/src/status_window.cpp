@@ -177,15 +177,9 @@ void StatusWindow::dropEvent(QDropEvent* event) {
     int old_status_id = -1;
     stream >> task_id >> board_id >> old_status_id;
 
-    QList<StatusWindow*> statuses = window()->findChildren<StatusWindow*>();
-    StatusWindow* old_status_window = nullptr;
+    Q_UNUSED(board_id);
 
-    for (StatusWindow* status : statuses) {
-        if (status->getId() == old_status_id) {
-            old_status_window = status;
-            break;
-        }
-    }
+    StatusWindow* old_status_window = findStatusWindow(old_status_id);
 
     if (!old_status_window) {
         should_be_highlighted_ = false;
@@ -201,14 +195,9 @@ void StatusWindow::dropEvent(QDropEvent* event) {
         return;
     }
 
-    QList<TaskCard*> cards = old_status_window->findChildren<TaskCard*>();
-    TaskCard* dragged_card = nullptr;
-
-    for (TaskCard* card : cards) {
-        if (card->getTaskId() == task_id) {
-            dragged_card = card;
-            break;
-        }
+    TaskCard* dragged_card = qobject_cast<TaskCard*>(event->source());
+    if (!dragged_card || dragged_card->getTaskId() != task_id) {
+        dragged_card = old_status_window->findTaskCard(task_id);
     }
 
     if (!dragged_card) {
@@ -280,6 +269,26 @@ void StatusWindow::removeTaskCard(TaskCard* card) {
 
     removeDropForwarding(card);
     tasks_layout_->removeWidget(card);
+}
+
+TaskCard* StatusWindow::findTaskCard(int task_id) const {
+    const auto cards = findChildren<TaskCard*>();
+    for (TaskCard* card : cards) {
+        if (card && card->getTaskId() == task_id) {
+            return card;
+        }
+    }
+    return nullptr;
+}
+
+StatusWindow* StatusWindow::findStatusWindow(int status_id) const {
+    auto statuses = window()->findChildren<StatusWindow*>();
+    for (StatusWindow* status : statuses) {
+        if (status && status->getId() == status_id) {
+            return status;
+        }
+    }
+    return nullptr;
 }
 
 void StatusWindow::installDropForwarding(QWidget* widget) {

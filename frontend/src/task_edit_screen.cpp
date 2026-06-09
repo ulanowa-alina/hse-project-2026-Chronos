@@ -5,6 +5,21 @@
 #include <QCheckBox>
 #include <QDebug>
 
+namespace {
+QString priorityLabelForValue(const QString& priority_value) {
+    if (priority_value == "green") {
+        return QStringLiteral("🟢Низкий");
+    }
+    if (priority_value == "yellow") {
+        return QStringLiteral("🟡Средний");
+    }
+    if (priority_value == "red") {
+        return QStringLiteral("🔴Высокий");
+    }
+    return QStringLiteral("Не установлен");
+}
+} // namespace
+
 TaskEditScreen::TaskEditScreen(int task_id, int board_id, int status_id, QWidget* parent)
     : QWidget(parent)
     , task_id_(task_id)
@@ -47,7 +62,7 @@ void TaskEditScreen::loadTaskData() {
     if (task) {
         title_input_->setText(task->title_);
         description_input_->setPlainText(task->description_);
-        priority_combo_->setCurrentText(task->priority_color_);
+        priority_combo_->setCurrentText(priorityLabelForValue(task->priority_color_));
 
         if (!task->deadline_.isEmpty()) {
             QDateTime deadline = QDateTime::fromString(task->deadline_, Qt::ISODate);
