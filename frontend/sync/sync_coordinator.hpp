@@ -3,6 +3,7 @@
 
 #include "board_sync_manager.hpp"
 #include "network_manager.h"
+#include "pomodoro_sync_manager.hpp"
 #include "status_sync_manager.hpp"
 #include "sync_manager.hpp"
 #include "task_sync_manager.hpp"
@@ -54,6 +55,7 @@ class SyncCoordinator : public QObject {
     std::unique_ptr<BoardSyncManager> board_manager_;
     std::unique_ptr<StatusSyncManager> status_manager_;
     std::unique_ptr<TaskSyncManager> task_manager_;
+    std::unique_ptr<PomodoroSyncManager> pomodoro_manager_;
     std::vector<SyncManager*> managers_;
     QTimer* periodic_timer_{nullptr};
     bool waiting_initial_boards_{false};

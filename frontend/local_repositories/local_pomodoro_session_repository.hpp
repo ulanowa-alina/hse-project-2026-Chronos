@@ -17,6 +17,7 @@ class LocalPomodoroSessionRepository {
     bool insert(const LocalPomodoroSession& session);
     bool update(const LocalPomodoroSession& session);
     bool remove(int id);
+    bool deleteById(int id);
     int getNextId();
 
   private:

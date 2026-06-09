@@ -80,6 +80,7 @@ class PomodoroScreen : public QWidget {
     void stopTimer();
     void saveSession();
     void saveLocalSession();
+    void saveLocalSessionFromServer(const QJsonObject& obj);
     int nextWorkPhaseSeconds() const;
     QString formatTime(int seconds);
 };
