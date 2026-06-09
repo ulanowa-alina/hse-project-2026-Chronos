@@ -434,7 +434,8 @@ void DashboardScreen::loadDeadlines() {
             auto* card = new DdTaskCard(task.id_, board_id, task.status_id_, db_, this);
 
             QDateTime deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
-            card->setCardData(task.title_, task.description_, deadline, task.is_completed_);
+            card->setCardData(task.title_, task.description_, deadline, task.is_completed_,
+                              task.priority_color_);
 
             connect(card, &DdTaskCard::openBoardRequested, this, &DashboardScreen::onBoardRequest);
 

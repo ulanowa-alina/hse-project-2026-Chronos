@@ -11,8 +11,11 @@
 #include <QMainWindow>
 #include <QMap>
 #include <QPointer>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QShowEvent>
 #include <QSqlDatabase>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -43,17 +46,21 @@ class BoardScreen : public QWidget {
     void onStatusCreateRequest();
     void onStatusDeleteRequested(int status_id);
     void onProfileRequest();
+    void onAvatarImageDownloaded(QNetworkReply* reply);
     void onPomodoroRequest();
     void onBoardSettingsRequested();
+    void onNetworkResponse(const QString& endpoint, const QByteArray& data, int code);
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
   private:
     int board_id_;
     QSqlDatabase db_;
 
     NetworkManager* network_manager_{nullptr};
+    QNetworkAccessManager* avatar_network_manager_{nullptr};
     SyncCoordinator* sync_coordinator_{nullptr};
 
     QPushButton* profile_button_{nullptr};
@@ -70,6 +77,8 @@ class BoardScreen : public QWidget {
     QMap<int, QString> status_names_;
 
     void removeStatusWindow(int status_id);
+    void loadAvatar(const QString& avatar_s3_key);
+    void setDefaultAvatar();
     StatusWindow* showStatusWindow(int status_id, const QString& name);
     void loadFromLocalDatabase();
     void setupLayout();

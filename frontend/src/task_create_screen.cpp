@@ -37,6 +37,16 @@ void TaskCreateScreen::onCreateTaskRequest() {
     QString title = title_input_->text().trimmed();
     QString description = description_input_->toPlainText().trimmed();
     QString priority_color = priority_combo_->currentText();
+    if (priority_color == "🟢Низкий") {
+        priority_color = "green";
+    } else if (priority_color == "🟡Средний") {
+        priority_color = "yellow";
+    } else if (priority_color == "🔴Высокий") {
+        priority_color = "red";
+    } else {
+        priority_color = "none";
+    }
+
     QDateTime deadline = deadline_input_->dateTime();
 
     if (title.isEmpty()) {
@@ -149,15 +159,13 @@ void TaskCreateScreen::setupLayout() {
     main_layout->addSpacing(10);
 
     priority_combo_ = new QComboBox(this);
-    priority_combo_->addItem("red");
-    priority_combo_->addItem("orange");
-    priority_combo_->addItem("yellow");
-    priority_combo_->addItem("green");
-    priority_combo_->addItem("blue");
-    priority_combo_->addItem("purple");
+    priority_combo_->addItem("Не установлен");
+    priority_combo_->addItem("🟢Низкий");
+    priority_combo_->addItem("🟡Средний");
+    priority_combo_->addItem("🔴Высокий");
     priority_combo_->setStyleSheet(
         "border: none; font-size: 16px; background: transparent; color: #333333;");
-    main_layout->addWidget(create_field("Приоритет", priority_combo_));
+    main_layout->addWidget(create_field("Уровень приоритетности", priority_combo_));
 
     main_layout->addSpacing(10);
 

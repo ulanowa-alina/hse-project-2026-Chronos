@@ -50,24 +50,14 @@ std::string optional_string_field(const json& body, const std::string& key) {
     }
 }
 
-bool require_bool_field(const json& body, const std::string& key) {
-    try {
-        return body.at(key).get<bool>();
-    } catch (const json::out_of_range&) {
-        throw std::invalid_argument("missing:" + key);
-    } catch (const json::type_error&) {
-        throw std::invalid_argument("type:" + key);
-    }
-}
-
 json collect_missing_fields(const json& body) {
-    json missing = json::array();
+    json details = json::object();
 
     if (!body.contains("title")) {
-        missing.push_back("title");
+        details["title"] = "Missing required field";
     }
 
-    return missing;
+    return details;
 }
 
 json model_to_json(const Board& board) {
@@ -106,12 +96,11 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
                                                    "Invalid JSON format");
     }
 
-    const json missing_fields = collect_missing_fields(body);
-    if (!missing_fields.empty()) {
+    const json details = collect_missing_fields(body);
+    if (!details.empty()) {
         spdlog::error("Board create rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
-                                                   "Missing required fields",
-                                                   json{{"missing_fields", missing_fields}});
+                                                   "Missing required fields", details);
     }
 
     try {
@@ -145,9 +134,9 @@ auto handleCreate(const http::request<http::string_body>& req, ConnectionPool& p
         if (message.rfind("missing:", 0) == 0) {
             spdlog::error("Board create rejected: missing required fields");
             const std::string field = message.substr(8);
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
-                json{{"missing_fields", json::array({field})}});
+            return server::utils::build_error_response(req, http::status::bad_request,
+                                                       "MISSING_FIELD", "Missing required fields",
+                                                       json{{field, "Missing required field"}});
         }
 
         if (message.rfind("type:", 0) == 0) {

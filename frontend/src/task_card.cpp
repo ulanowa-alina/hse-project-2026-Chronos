@@ -63,7 +63,7 @@ void TaskCard::setSyncCoordinator(SyncCoordinator* coordinator) {
 }
 
 void TaskCard::setData(const QString& title, const QString& description, const QDateTime& deadline,
-                       bool is_completed) {
+                       bool is_completed, const QString& priority_color) {
     title_->setText(title);
     is_completed_ = is_completed;
     deadline_ = deadline;
@@ -75,6 +75,35 @@ void TaskCard::setData(const QString& title, const QString& description, const Q
         description_text_->setVisible(true);
     }
 
+    if (priority_color == "none") {
+        this->setStyleSheet("TaskCard { "
+                            "   background-color: white; "
+                            "   border: 4px solid transparent; "
+                            "   border-radius: 12px; "
+                            "}"
+                            "TaskCard:hover { "
+                            "   border: 4px solid #305CDE; "
+                            "}");
+    } else {
+        QString border_color;
+        if (priority_color == "green") {
+            border_color = "#A8E4A0";
+        } else if (priority_color == "yellow") {
+            border_color = "#FCE883";
+        } else if (priority_color == "red") {
+            border_color = "#E4717A";
+        }
+
+        this->setStyleSheet(QString("TaskCard { "
+                                    "   background-color: white; "
+                                    "   border: 4px solid %1; "
+                                    "   border-radius: 12px; "
+                                    "}"
+                                    "TaskCard:hover { "
+                                    "   border: 4px solid #305CDE; "
+                                    "}")
+                                .arg(border_color));
+    }
     doneVisualState();
 
     if (deadline_.isValid() && !deadline_.isNull() && !is_completed_) {
@@ -419,7 +448,7 @@ void TaskCard::setupLayout() {
     this->setObjectName("taskCard");
     this->setAttribute(Qt::WA_StyledBackground, true);
     this->setMinimumHeight(100);
-    this->setMaximumHeight(130);
+    this->setMaximumHeight(180);
 
     this->setMaximumWidth(260);
 
@@ -458,13 +487,14 @@ void TaskCard::setupLayout() {
     layout->addWidget(deadline_label_);
     description_text_ = new QWidget(this);
     auto* desc_layout = new QHBoxLayout(description_text_);
-    desc_layout->setContentsMargins(4, 8, 0, 4);
+
+    desc_layout->setContentsMargins(4, 2, 0, 2);
     desc_layout->setSpacing(10);
 
     blue_line_ = new QWidget(description_text_);
     blue_line_->setFixedWidth(BLUE_LINE_WIDTH);
     blue_line_->setStyleSheet("background-color: #305CDE; border-radius: 1.5px;");
-    blue_line_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    blue_line_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::MinimumExpanding);
 
     auto* desc_content_widget = new QWidget(description_text_);
     auto* desc_content_layout = new QVBoxLayout(desc_content_widget);
@@ -474,16 +504,14 @@ void TaskCard::setupLayout() {
     auto* description_title_label_ = new QLabel("Описание:", desc_content_widget);
     description_title_label_->setStyleSheet(
         "color: #7f8c8d; font-size: 12px; font-weight: 500; background: transparent;");
-    description_title_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     description_label_ = new QLabel(desc_content_widget);
     description_label_->setWordWrap(true);
     description_label_->setStyleSheet("color: #7f8c8d; font-size: 12px; background: transparent;");
-    description_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    description_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::MinimumExpanding);
 
     desc_content_layout->addWidget(description_title_label_);
     desc_content_layout->addWidget(description_label_);
-    desc_content_widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     desc_layout->addWidget(blue_line_);
     desc_layout->addWidget(desc_content_widget);

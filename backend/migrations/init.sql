@@ -4,6 +4,7 @@ CREATE TABLE users (
                        name VARCHAR(255) NOT NULL CHECK (char_length(name) BETWEEN 1 AND 50),
                        status VARCHAR(255) NOT NULL CHECK (char_length(status) BETWEEN 1 AND 255),
                        password_hash VARCHAR(255) NOT NULL CHECK (password_hash <> ''),
+                       avatar_s3_key VARCHAR(512),
                        created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

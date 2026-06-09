@@ -20,13 +20,19 @@ const size_t MAX_TITLE_SIZE = 100;
 const size_t MAX_DESCRIPTION_SIZE = 1000;
 
 json collect_missing_fields(const json& body) {
-    json missing = json::array();
+    json details = json::object();
 
     if (!body.contains("board_id")) {
-        missing.push_back("board_id");
+        details["board_id"] = "Missing required field";
+    }
+    if (!body.contains("title")) {
+        details["title"] = "Missing required field";
+    }
+    if (!body.contains("description")) {
+        details["description"] = "Missing required field";
     }
 
-    return missing;
+    return details;
 }
 
 int require_positive_int_field(const json& body, const std::string& key) {
@@ -46,16 +52,6 @@ int require_positive_int_field(const json& body, const std::string& key) {
 std::string require_string_field(const json& body, const std::string& key) {
     try {
         return body.at(key).get<std::string>();
-    } catch (const json::out_of_range&) {
-        throw std::invalid_argument("missing:" + key);
-    } catch (const json::type_error&) {
-        throw std::invalid_argument("type:" + key);
-    }
-}
-
-bool require_bool_field(const json& body, const std::string& key) {
-    try {
-        return body.at(key).get<bool>();
     } catch (const json::out_of_range&) {
         throw std::invalid_argument("missing:" + key);
     } catch (const json::type_error&) {
@@ -106,12 +102,11 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                    "Invalid JSON format");
     }
 
-    const json missing_fields = collect_missing_fields(body);
-    if (!missing_fields.empty()) {
+    const json details = collect_missing_fields(body);
+    if (!details.empty()) {
         spdlog::error("Board edit rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
-                                                   "Missing required fields",
-                                                   json{{"missing_fields", missing_fields}});
+                                                   "Missing required fields", details);
     }
 
     try {
@@ -133,24 +128,20 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                        "Resource belongs to another user");
         }
 
-        std::string title = existing_board->title_;
-        if (body.contains("title")) {
-            title = body["title"].get<std::string>();
-            if (title.empty() || title.size() > 100) {
-                return server::utils::build_error_response(
-                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                    json{{"title", "Title must be between 1 and 100 characters"}});
-            }
+        const std::string title = require_string_field(body, "title");
+        if (title.empty() || title.size() > MAX_TITLE_SIZE) {
+            spdlog::error("Board edit rejected: invalid title length");
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                json{{"title", "Title must be between 1 and 100 characters"}});
         }
 
-        std::string description = existing_board->description_;
-        if (body.contains("description")) {
-            description = body["description"].get<std::string>();
-            if (description.size() > 1000) {
-                return server::utils::build_error_response(
-                    req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
-                    json{{"description", "Description cannot exceed 1000 characters"}});
-            }
+        const std::string description = require_string_field(body, "description");
+        if (description.size() > MAX_DESCRIPTION_SIZE) {
+            spdlog::error("Board edit rejected: description too long");
+            return server::utils::build_error_response(
+                req, http::status::bad_request, "VALIDATION_ERROR", "Validation failed",
+                json{{"description", "Description cannot exceed 1000 characters"}});
         }
 
         const Board board_to_save(existing_board->id_, existing_board->user_id_, title, description,
@@ -167,9 +158,9 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         if (message.rfind("missing:", 0) == 0) {
             spdlog::error("Board edit rejected: missing required fields");
             const std::string field = message.substr(8);
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
-                json{{"missing_fields", json::array({field})}});
+            return server::utils::build_error_response(req, http::status::bad_request,
+                                                       "MISSING_FIELD", "Missing required fields",
+                                                       json{{field, "Missing required field"}});
         }
 
         if (message.rfind("type:", 0) == 0) {

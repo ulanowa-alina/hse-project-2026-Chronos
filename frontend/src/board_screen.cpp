@@ -6,16 +6,36 @@
 
 #include <QDebug>
 #include <QInputDialog>
+#include <QJsonDocument>
+#include <QNetworkRequest>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
+#include <QUrl>
 
 BoardScreen::BoardScreen(int board_id, QSqlDatabase db, QWidget* parent)
     : QWidget(parent)
     , board_id_(board_id)
-    , db_(db) {
+    , db_(db)
+    , avatar_network_manager_(new QNetworkAccessManager(this)) {
     setupLayout();
+
+    connect(avatar_network_manager_, &QNetworkAccessManager::finished, this,
+            &BoardScreen::onAvatarImageDownloaded);
 }
 
 void BoardScreen::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &BoardScreen::onNetworkResponse);
+    }
+
     network_manager_ = manager;
+
+    if (network_manager_) {
+        connect(network_manager_, &NetworkManager::responseReceived, this,
+                &BoardScreen::onNetworkResponse);
+    }
 }
 
 void BoardScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
@@ -28,6 +48,13 @@ void BoardScreen::reloadBoardData() {
     }
 
     loadFromLocalDatabase();
+}
+
+void BoardScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+    if (network_manager_) {
+        network_manager_->GET(network_manager_->user_info_url_);
+    }
 }
 
 void BoardScreen::loadFromLocalDatabase() {
@@ -68,7 +95,8 @@ void BoardScreen::loadFromLocalDatabase() {
         if (!task.deadline_.isEmpty()) {
             deadline = QDateTime::fromString(task.deadline_, Qt::ISODate);
         }
-        card->setData(task.title_, task.description_, deadline, task.is_completed_);
+        card->setData(task.title_, task.description_, deadline, task.is_completed_,
+                      task.priority_color_);
         connect(card, &TaskCard::openTaskEditScreen, this, &BoardScreen::openTaskEditScreen);
         status->addTaskCard(card);
     }
@@ -253,6 +281,7 @@ void BoardScreen::onStatusCreateRequest() {
         return;
     }
 
+
     auto* new_status = new StatusWindow(temp_id, board_id_, trimmed_name, db_, this);
     new_status->setSyncCoordinator(sync_coordinator_);
     connect(new_status, &StatusWindow::openTaskCreateScreen, this,
@@ -261,7 +290,8 @@ void BoardScreen::onStatusCreateRequest() {
             &BoardScreen::onStatusDeleteRequested);
     board_layout_->insertWidget(board_layout_->count() - 1, new_status);
     status_windows_.insert(temp_id, new_status);
-
+    status_names_.insert(temp_id, trimmed_name);
+    showStatusWindow(temp_id, trimmed_name);
     sync_coordinator_->syncStatuses();
 }
 
@@ -273,6 +303,82 @@ void BoardScreen::onProfileRequest() {
     emit openProfileScreen();
 }
 
+void BoardScreen::setDefaultAvatar() {
+    profile_button_->setText("👤");
+    profile_button_->setIcon(QIcon());
+}
+
+void BoardScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
+    if (!reply) {
+        setDefaultAvatar();
+        return;
+    }
+
+    const QByteArray image_data = reply->readAll();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        setDefaultAvatar();
+        reply->deleteLater();
+        return;
+    }
+
+    QPixmap pixmap;
+    if (!pixmap.loadFromData(image_data)) {
+        setDefaultAvatar();
+        reply->deleteLater();
+        return;
+    }
+
+    const int size = 40;
+    QPixmap scaled =
+        pixmap.scaled(size, size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPainterPath path;
+    path.addEllipse(0, 0, size, size);
+    painter.setClipPath(path);
+
+    const int x = (size - scaled.width()) / 2;
+    const int y = (size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
+    profile_button_->setText("");
+    profile_button_->setIcon(QIcon(rounded));
+    profile_button_->setIconSize(QSize(size, size));
+
+    reply->deleteLater();
+}
+
+void BoardScreen::loadAvatar(const QString& avatar_s3_key) {
+    if (avatar_s3_key.isEmpty() || !network_manager_ || !avatar_network_manager_) {
+        setDefaultAvatar();
+        return;
+    }
+
+    const QUrl avatar_url(network_manager_->avatar_public_base_url_ + avatar_s3_key);
+    avatar_network_manager_->get(QNetworkRequest(avatar_url));
+}
+
+void BoardScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data, int code) {
+    if (!network_manager_ || endpoint != network_manager_->user_info_url_) {
+        return;
+    }
+
+    if (code == 200) {
+        const QJsonDocument doc = QJsonDocument::fromJson(data);
+        const QString avatar_s3_key = doc.object()["data"].toObject()["avatar_s3_key"].toString();
+        loadAvatar(avatar_s3_key);
+    } else {
+        setDefaultAvatar();
+    }
+}
 void BoardScreen::onPomodoroRequest() {
     emit openPomodoroScreen();
 }

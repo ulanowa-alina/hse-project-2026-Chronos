@@ -49,11 +49,6 @@ MainWindow::MainWindow(QWidget* parent)
             &MainWindow::switchToBoardCreate);
     connect(dashboard_screen_, &DashboardScreen::logoutRequested, this, &MainWindow::switchToLogin);
 
-    connect(board_screen_, &BoardScreen::openTaskCreateScreen, this,
-            &MainWindow::switchToTaskCreate);
-    connect(board_screen_, &BoardScreen::openTaskEditScreen, this, &MainWindow::switchToTaskEdit);
-    connect(board_screen_, &BoardScreen::openBoardEditScreen, this, &MainWindow::switchToBoardEdit);
-
     connect(network_manager_, &NetworkManager::responseReceived, sync_coordinator_,
             &SyncCoordinator::handleResponse);
     connect(network_manager_, &NetworkManager::syncResponseReceived, sync_coordinator_,
@@ -203,6 +198,7 @@ void MainWindow::switchToProfile() {
     closeAllSmallWindows();
     if (!profile_screen_) {
         profile_screen_ = new ProfileScreen();
+        profile_screen_->setNetworkManager(network_manager_);
         profile_screen_->setDatabase(db_);
         profile_screen_->setSyncCoordinator(sync_coordinator_);
         connect(profile_screen_, &ProfileScreen::logoutRequested, this,
@@ -242,6 +238,7 @@ void MainWindow::switchToProfileEdit() {
         profile_screen_->close();
     if (!profile_edit_screen_) {
         profile_edit_screen_ = new ProfileEditScreen();
+        profile_edit_screen_->setNetworkManager(network_manager_);
         profile_edit_screen_->setDatabase(db_);
         profile_edit_screen_->setSyncCoordinator(sync_coordinator_);
         connect(profile_edit_screen_, &ProfileEditScreen::profileRequested, this,

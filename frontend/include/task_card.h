@@ -36,7 +36,8 @@ class TaskCard : public QFrame {
         status_id_ = new_status_id;
     }
     void setData(const QString& title, const QString& description,
-                 const QDateTime& deadline = QDateTime(), bool is_completed = false);
+                 const QDateTime& deadline = QDateTime(), bool is_completed = false,
+                 const QString& priority_color = QString());
     void updateTaskStatus();
 
   signals:

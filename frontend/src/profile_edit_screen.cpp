@@ -2,11 +2,29 @@
 
 #include "../local_repositories/local_user_repository.hpp"
 
+#include <QDebug>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QIcon>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMessageBox>
+#include <QMimeDatabase>
+#include <QNetworkRequest>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
+#include <QShowEvent>
 #include <QVBoxLayout>
 
 ProfileEditScreen::ProfileEditScreen(QWidget* parent)
-    : QWidget(parent) {
+    : QWidget(parent)
+    , avatar_network_manager_(new QNetworkAccessManager(this)) {
     setupLayout();
+
+    connect(avatar_network_manager_, &QNetworkAccessManager::finished, this,
+            &ProfileEditScreen::onAvatarImageDownloaded);
 }
 
 void ProfileEditScreen::setDatabase(QSqlDatabase db) {
@@ -17,6 +35,114 @@ void ProfileEditScreen::setSyncCoordinator(SyncCoordinator* coordinator) {
     sync_coordinator_ = coordinator;
 }
 
+void ProfileEditScreen::setNetworkManager(NetworkManager* manager) {
+    if (network_manager_) {
+        disconnect(network_manager_, &NetworkManager::responseReceived, this,
+                   &ProfileEditScreen::onNetworkResponse);
+    }
+
+    network_manager_ = manager;
+
+    if (network_manager_) {
+        connect(network_manager_, &NetworkManager::responseReceived, this,
+                &ProfileEditScreen::onNetworkResponse);
+    }
+}
+
+void ProfileEditScreen::onNetworkResponse(const QString& endpoint, const QByteArray& data,
+                                          int code) {
+    if (!network_manager_)
+        return;
+
+    if (endpoint == network_manager_->user_info_url_) {
+        if (code == 200) {
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject data_obj = doc.object()["data"].toObject();
+            QString avatar_s3_key = data_obj["avatar_s3_key"].toString();
+            current_avatar_s3_key_ = avatar_s3_key;
+            original_name_ = data_obj["name"].toString();
+            original_email_ = data_obj["email"].toString();
+            original_status_ = data_obj["status"].toString();
+            avatar_delete_requested_ = false;
+            resetAvatarSelection();
+            qDebug() << "ProfileEditScreen avatar_s3_key:" << avatar_s3_key;
+
+            name_input_->setText(original_name_);
+            email_input_->setText(original_email_);
+            status_input_->setText(original_status_);
+            loadRemoteAvatar(avatar_s3_key);
+        }
+        return;
+    }
+
+    if (endpoint == network_manager_->user_avatar_delete_url_) {
+        if (code == 200) {
+            current_avatar_s3_key_.clear();
+            original_name_ = name_input_->text();
+            original_email_ = email_input_->text();
+            original_status_ = status_input_->text();
+            avatar_delete_requested_ = false;
+            resetAvatarSelection();
+            qDebug() << "ProfileEditScreen: Фото профиля удалено";
+
+            password_input_->clear();
+            emit profileRequested();
+        } else {
+            qDebug() << "ProfileEditScreen: Ошибка удаления аватара. Код:" << code
+                     << "Данные:" << data;
+            QMessageBox::warning(this, "Ошибка удаления фото",
+                                 parseErrorMessage(data).isEmpty()
+                                     ? "Не удалось удалить фото профиля."
+                                     : parseErrorMessage(data));
+        }
+        return;
+    }
+
+    if (endpoint == network_manager_->user_avatar_upload_url_) {
+        if (code == 200) {
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject data_obj = doc.object()["data"].toObject();
+
+            current_avatar_s3_key_ = data_obj["avatar_s3_key"].toString();
+            original_name_ = name_input_->text();
+            original_email_ = email_input_->text();
+            original_status_ = status_input_->text();
+            avatar_delete_requested_ = false;
+            resetAvatarSelection();
+            qDebug() << "ProfileEditScreen uploaded avatar_s3_key:" << current_avatar_s3_key_;
+
+            password_input_->clear();
+            emit profileRequested();
+        } else {
+            qDebug() << "ProfileEditScreen: Ошибка загрузки аватара. Код:" << code
+                     << "Данные:" << data;
+            QMessageBox::warning(this, "Ошибка загрузки фото",
+                                 parseErrorMessage(data).isEmpty()
+                                     ? "Не удалось загрузить фото профиля."
+                                     : parseErrorMessage(data));
+        }
+        return;
+    }
+
+    if (endpoint == network_manager_->user_edit_info_url_) {
+        if (code == 200) {
+            qDebug() << "ProfileEditScreen: Изменения успешно сохранены";
+            password_input_->clear();
+            original_name_ = name_input_->text();
+            original_email_ = email_input_->text();
+            original_status_ = status_input_->text();
+            resetAvatarSelection();
+
+            emit profileRequested();
+        } else {
+            qDebug() << "ProfileEditScreen: Ошибка сохранения! Код:" << code << "Данные:" << data;
+            QMessageBox::warning(this, "Ошибка сохранения профиля",
+                                 parseErrorMessage(data).isEmpty()
+                                     ? "Не удалось сохранить изменения профиля."
+                                     : parseErrorMessage(data));
+        }
+    }
+}
 void ProfileEditScreen::reloadFromLocal() {
     if (!db_.isOpen()) {
         return;
@@ -38,11 +164,38 @@ void ProfileEditScreen::reloadFromLocal() {
     status_input_->setText(user->status_);
 }
 
+void ProfileEditScreen::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+    if (network_manager_) {
+        network_manager_->GET(network_manager_->user_info_url_);
+    }
+}
+
 void ProfileEditScreen::onProfileEditRequest() {
     if (!sync_coordinator_ || !db_.isOpen()) {
         return;
     }
 
+    if (!selected_avatar_file_path_.isEmpty()) {
+        sendAvatarUpload();
+        return;
+    }
+
+    if (avatar_delete_requested_) {
+        sendAvatarDelete();
+        return;
+    }
+
+    if (!hasPendingTextChanges()) {
+        qDebug() << "ProfileEditScreen: Нет изменений для сохранения";
+        emit profileRequested();
+        return;
+    }
+
+    sendProfileUpdate();
+}
+
+void ProfileEditScreen::sendProfileUpdate() {
     LocalUserRepository repo(db_);
     std::optional<LocalUser> user;
     if (sync_coordinator_ && sync_coordinator_->currentUserId() > 0) {
@@ -77,6 +230,244 @@ void ProfileEditScreen::onProfileEditRequest() {
     emit profileRequested();
 }
 
+void ProfileEditScreen::sendAvatarDelete() {
+    QJsonObject json;
+    json["name"] = name_input_->text();
+    json["email"] = email_input_->text();
+    json["status"] = status_input_->text();
+
+    if (!password_input_->text().isEmpty()) {
+        json["password"] = password_input_->text();
+    }
+
+    qDebug() << "ProfileEditScreen: Отправляю запрос на удаление фото...";
+    network_manager_->DELETE(network_manager_->user_avatar_delete_url_, json);
+}
+
+void ProfileEditScreen::sendAvatarUpload() {
+    if (selected_avatar_file_path_.isEmpty()) {
+        return;
+    }
+
+    QFile file(selected_avatar_file_path_);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "ProfileEditScreen: Не удалось открыть файл аватара:"
+                 << selected_avatar_file_path_;
+        QMessageBox::warning(this, "Ошибка чтения файла",
+                             "Не удалось открыть выбранный файл изображения.");
+        return;
+    }
+
+    const QByteArray raw_bytes = file.readAll();
+    file.close();
+
+    QFileInfo file_info(selected_avatar_file_path_);
+    QMimeDatabase mime_db;
+    const QString content_type = mime_db.mimeTypeForFile(selected_avatar_file_path_).name();
+
+    QJsonObject json;
+    json["file_name"] = file_info.fileName();
+    json["content_type"] = content_type.isEmpty() ? "application/octet-stream" : content_type;
+    json["file_base64"] = QString::fromLatin1(raw_bytes.toBase64());
+    json["name"] = name_input_->text();
+    json["email"] = email_input_->text();
+    json["status"] = status_input_->text();
+
+    if (!password_input_->text().isEmpty()) {
+        json["password"] = password_input_->text();
+    }
+
+    qDebug() << "ProfileEditScreen: Отправляю аватар на сервер...";
+    network_manager_->POST(network_manager_->user_avatar_upload_url_, json);
+}
+
+void ProfileEditScreen::onAvatarPickRequested() {
+    const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
+                                                           "Images (*.png *.jpg *.jpeg *.webp)");
+
+    if (file_path.isEmpty()) {
+        return;
+    }
+
+    avatar_delete_requested_ = false;
+    selected_avatar_file_path_ = file_path;
+    updateAvatarButtonPreview(selected_avatar_file_path_);
+    qDebug() << "ProfileEditScreen selected avatar file:" << selected_avatar_file_path_;
+}
+
+void ProfileEditScreen::onAvatarDeleteRequested() {
+    if (avatar_delete_requested_) {
+        avatar_delete_requested_ = false;
+        updateAvatarDeleteButtonState();
+        loadRemoteAvatar(current_avatar_s3_key_);
+        return;
+    }
+
+    if (!selected_avatar_file_path_.isEmpty()) {
+        resetAvatarSelection();
+        return;
+    }
+
+    if (current_avatar_s3_key_.isEmpty()) {
+        return;
+    }
+
+    const auto answer = QMessageBox::question(
+        this, "Удалить фото", "Фото профиля будет удалено после сохранения изменений. Продолжить?");
+    if (answer != QMessageBox::Yes) {
+        return;
+    }
+
+    avatar_delete_requested_ = true;
+    avatar_button_->setText("Выбрать фото");
+    avatar_button_->setIcon(QIcon());
+    updateAvatarDeleteButtonState();
+}
+
+void ProfileEditScreen::loadRemoteAvatar(const QString& avatar_s3_key) {
+    if (avatar_s3_key.isEmpty() || !network_manager_ || !avatar_network_manager_) {
+        return;
+    }
+
+    const QUrl avatar_url(network_manager_->avatar_public_base_url_ + avatar_s3_key);
+    qDebug() << "ProfileEditScreen: loading avatar from" << avatar_url.toString();
+    avatar_network_manager_->get(QNetworkRequest(avatar_url));
+}
+
+void ProfileEditScreen::updateAvatarButtonPreview(const QString& file_path) {
+    QPixmap pixmap(file_path);
+
+    if (pixmap.isNull()) {
+        avatar_button_->setText("Ошибка фото");
+        avatar_button_->setIcon(QIcon());
+        updateAvatarDeleteButtonState();
+        return;
+    }
+
+    const int size = 140;
+    const int border_width = 2;
+    const int image_size = size - border_width * 2;
+
+    QPixmap scaled = pixmap.scaled(image_size, image_size, Qt::KeepAspectRatioByExpanding,
+                                   Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPainterPath path;
+    path.addEllipse(border_width, border_width, image_size, image_size);
+    painter.setClipPath(path);
+
+    const int x = border_width + (image_size - scaled.width()) / 2;
+    const int y = border_width + (image_size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
+    avatar_button_->setText("");
+    avatar_button_->setIcon(QIcon(rounded));
+    avatar_button_->setIconSize(QSize(size, size));
+
+    updateAvatarDeleteButtonState();
+}
+
+void ProfileEditScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
+    if (!reply) {
+        return;
+    }
+
+    const QByteArray image_data = reply->readAll();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        qDebug() << "ProfileEditScreen: avatar download error:" << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+
+    QPixmap pixmap;
+    if (!pixmap.loadFromData(image_data)) {
+        qDebug() << "ProfileEditScreen: failed to load avatar from data, bytes ="
+                 << image_data.size();
+        reply->deleteLater();
+        return;
+    }
+
+    const int size = 140;
+    const int border_width = 2;
+    const int image_size = size - border_width * 2;
+
+    QPixmap scaled = pixmap.scaled(image_size, image_size, Qt::KeepAspectRatioByExpanding,
+                                   Qt::SmoothTransformation);
+
+    QPixmap rounded(size, size);
+    rounded.fill(Qt::transparent);
+
+    QPainter painter(&rounded);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPainterPath path;
+    path.addEllipse(border_width, border_width, image_size, image_size);
+    painter.setClipPath(path);
+
+    const int x = border_width + (image_size - scaled.width()) / 2;
+    const int y = border_width + (image_size - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+
+    painter.end();
+
+    avatar_button_->setText("");
+    avatar_button_->setIcon(QIcon(rounded));
+    avatar_button_->setIconSize(QSize(size, size));
+
+    reply->deleteLater();
+}
+
+auto ProfileEditScreen::hasPendingTextChanges() const -> bool {
+    return name_input_->text() != original_name_ || email_input_->text() != original_email_ ||
+           status_input_->text() != original_status_ || !password_input_->text().isEmpty();
+}
+
+auto ProfileEditScreen::parseErrorMessage(const QByteArray& data) const -> QString {
+    const QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        return {};
+    }
+
+    const QJsonObject error_obj = doc.object().value("error").toObject();
+    return error_obj.value("message").toString();
+}
+
+void ProfileEditScreen::resetAvatarSelection() {
+    selected_avatar_file_path_.clear();
+    avatar_button_->setText("Выбрать фото");
+    avatar_button_->setIcon(QIcon());
+    updateAvatarDeleteButtonState();
+}
+
+void ProfileEditScreen::updateAvatarDeleteButtonState() {
+    if (!delete_avatar_button_) {
+        return;
+    }
+
+    if (avatar_delete_requested_) {
+        delete_avatar_button_->setEnabled(true);
+        delete_avatar_button_->setText("Отменить удаление");
+        return;
+    }
+
+    if (!selected_avatar_file_path_.isEmpty()) {
+        delete_avatar_button_->setEnabled(true);
+        delete_avatar_button_->setText("Убрать выбор");
+        return;
+    }
+
+    delete_avatar_button_->setEnabled(!current_avatar_s3_key_.isEmpty());
+    delete_avatar_button_->setText("Удалить фото");
+}
+
 void ProfileEditScreen::setupLayout() {
     auto* main_layout = new QVBoxLayout(this);
     main_layout->setContentsMargins(20, 15, 20, 20);
@@ -101,6 +492,46 @@ void ProfileEditScreen::setupLayout() {
     top_bar->addStretch();
     top_bar->addWidget(cancel_button_);
     main_layout->addLayout(top_bar);
+
+    auto* avatar_layout = new QHBoxLayout();
+    avatar_layout->setAlignment(Qt::AlignCenter);
+
+    avatar_button_ = new QPushButton("Выбрать фото", this);
+    avatar_button_->setIconSize(QSize(136, 136));
+    avatar_button_->setFixedSize(140, 140);
+    avatar_button_->setCursor(Qt::PointingHandCursor);
+    avatar_button_->setStyleSheet("QPushButton {"
+                                  "   background-color: #F0F2F5;"
+                                  "   border: 2px dashed #305CDE;"
+                                  "   border-radius: 70px;"
+                                  "   color: #305CDE;"
+                                  "   font-size: 14px;"
+                                  "   font-weight: bold;"
+                                  "}"
+                                  "QPushButton:hover {"
+                                  "   background-color: #E1E4E8;"
+                                  "}");
+
+    avatar_layout->addWidget(avatar_button_);
+    main_layout->addLayout(avatar_layout);
+
+    auto* avatar_actions_layout = new QHBoxLayout();
+    avatar_actions_layout->setAlignment(Qt::AlignCenter);
+
+    delete_avatar_button_ = new QPushButton("Удалить фото", this);
+    delete_avatar_button_->setCursor(Qt::PointingHandCursor);
+    delete_avatar_button_->setEnabled(false);
+    delete_avatar_button_->setStyleSheet(
+        "QPushButton { "
+        "   background: transparent; color: #C03438; border: none; "
+        "   font-size: 14px; font-weight: 500; padding: 0px; "
+        "}"
+        "QPushButton:hover { color: #e74c3c; text-decoration: underline; }"
+        "QPushButton:disabled { color: #B9BCC4; text-decoration: none; }");
+
+    avatar_actions_layout->addWidget(delete_avatar_button_);
+    main_layout->addLayout(avatar_actions_layout);
+    main_layout->addSpacing(10);
 
     main_layout->addStretch();
 
@@ -207,4 +638,9 @@ void ProfileEditScreen::setupLayout() {
 
     connect(cancel_button_, &QPushButton::clicked, this, &ProfileEditScreen::profileRequested);
     connect(save_button_, &QPushButton::clicked, this, &ProfileEditScreen::onProfileEditRequest);
+    connect(avatar_button_, &QPushButton::clicked, this, &ProfileEditScreen::onAvatarPickRequested);
+    connect(delete_avatar_button_, &QPushButton::clicked, this,
+            &ProfileEditScreen::onAvatarDeleteRequested);
+
+    updateAvatarDeleteButtonState();
 }

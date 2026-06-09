@@ -1,4 +1,4 @@
-**Актуальная версия: 1.5**
+**Актуальная версия: 1.7**
 ### Содержание:
 1. [[#История изменений]]
 2. [[#Входные параметры]]<br>
@@ -25,6 +25,8 @@
 | 1.3    | 07.04.2026 | Документ приведён к единому стилю:<br>1. Названия полей переведены в `snake_case`<br>2. Форматы успешных ответов унифицированы через `data`<br>3. Примеры запросов и ответов синхронизированы с текущими endpoint'ами `.../v1/...`<br>4. Удалены упоминания `Tag/tags`|
 | 1.4    | 10.04.2026 | Обновлены endpoint'ы board/task и personal API: унифицированы пути для досок, добавлены `/board/v1/edit` и task endpoint'ы `/task/v1/create`, `/task/v1/edit`, `/task/v1/delete`; обновлены примеры запросов и таблица успешных ответов.                              |
 | 1.5    | 05.05.2026 | Добавлен endpoint `/task/v1/get_all` для получения задач пользователя с фильтрацией по `board_id` и `status_id`; добавлены описание параметров и пример запроса/ответа; еnpoint для получения всех статусов с фильтрацией по доске `board_id`                         |
+| 1.6    | 31.05.2026 | Добавлены endpoint'ы `/personal/v1/avatar/upload` и `/personal/v1/avatar` для загрузки и удаления аватара; обновлена модель `User` полем `avatar_s3_key`; уточнён контракт `PUT /personal/v1/edit`; добавлены новые коды ошибок `S3_UPLOAD_ERROR` и `S3_DELETE_ERROR` |
+| 1.7    | 05.06.2026 | Upload аватара переведён на public PUT в Yandex Object Storage; удаление фото работает как очистка `avatar_s3_key` в БД без физического удаления объекта из bucket; ключи доступа для текущего upload flow не требуются |
 
 
 ### Входные параметры
@@ -34,8 +36,10 @@
 | ------ | ----------------- |-------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------|
 | POST   | /auth/v1/login    | Авторизация пользователя            | {"email": "...",<br>"password": "..."}                                                                           | `data.token + user` |
 | POST   | /auth/v1/register | Регистрация пользователя            | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                                     | `data: User`        |
-| PUT    | /personal/v1/edit | Обновление данных пользователя      | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "..."}                                     | `data: User`        |
+| PUT    | /personal/v1/edit | Обновление данных пользователя      | {"name": "...",<br>"email": "...",<br>"status": "...",<br>"password": "... (optional)"}                          | `data: User`        |
 | GET    | /personal/v1/info | Получить информацию о пользователе  | —                                                                                                                | `data: User`        |
+| POST   | /personal/v1/avatar/upload | Загрузить фото профиля       | {"file_name": "...",<br>"content_type": "...",<br>"file_base64": "...",<br>"email": "...",<br>"name": "...",<br>"status": "...",<br>"password": "... (optional)"} | `data.avatar_s3_key` |
+| DELETE | /personal/v1/avatar | Удалить фото профиля              | {"email": "...",<br>"name": "...",<br>"status": "...",<br>"password": "... (optional)"}                          | `data.avatar_s3_key` |
 | GET    | /board/v1/get_all | Получить список досок пользователя  | —                                                                                                                | `data: Board[]`     |
 | POST   | /board/v1/create  | Создать новую доску                 | {"title": "...",<br>"description": "..."}                                                | `data: Board`       |
 | PATCH  | /board/v1/edit    | Обновить доску                      | {"board_id": "id",<br>"title": "...",<br>"description": "..."}                           | `data: Board`       |
@@ -44,7 +48,7 @@
 | GET    | /board/v1/tasks   | Получить задачи доски               | `query: board_id=<id>`                                                                                           | `data: Task[]`      |
 | GET    | /task/v1/get_all  | Получить задачи пользователя        | `query: board_id=<id> (optional), status_id=<id> (optional)`                                                     | `data: Task[]`      |
 | POST   | /task/v1/create   | Создать задачу в доске              | {"board_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."} | `data: Task`        |
-| PATCH  | /task/v1/edit     | Обновить задачу                     | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "..."}  | `data: Task`        |
+| PATCH  | /task/v1/edit     | Обновить задачу                     | {"task_id": "id",<br>"title": "...",<br>"description": "...",<br>"status_id": "id",<br>"priority_color": "...",<br>"deadline": "2026-01-10T12:00:00Z" \| null}  | `data: Task`        |
 | DELETE | /task/v1/delete   | Удалить задачу                      | {"task_id": "id"}                                                                                                | 204 No Content      |
 | POST   | /status/v1/create | Создать статус доски                | {"board_id": "id",<br>"name": "...",<br>"position": 0}                                                           | `data: Status`      |
 | PATCH  | /status/v1/edit   | Обновить статус доски               | {"status_id": "id",<br>"name": "...",<br>"position": 0}                                                          | `data: Status`      |
@@ -62,7 +66,8 @@
 | 2   | email      | string            | да             | Email для авторизации                 | user@mail.ru         |
 | 3   | name       | string            | да             | Имя пользователя                      | John                 |
 | 4   | status     | string            | да             | Статус пользователя                   | student              |
-| 5   | created_at | string (ISO 8601) | да             | Дата регистрации                      | 2026-01-10T12:00:00Z |
+| 5   | avatar_s3_key | string         | да             | Ключ объекта фото профиля в S3        | avatars/user_1/avatar |
+| 6   | created_at | string (ISO 8601) | да             | Дата регистрации                      | 2026-01-10T12:00:00Z |
 
 2. Board (Доска)
    Board object
@@ -90,7 +95,7 @@
 | 7   | is_completed   | bool              | да             | Выполнена ли задача           | false                |
 | 8   | created_at     | string (ISO 8601) | да             | Дата создания карточки        | 2026-01-10T12:00:00Z |
 | 9   | updated_at     | string (ISO 8601) | да             | Дата обновления карточки      | 2026-01-10T12:00:00Z |
-| 10  | deadline       | string (ISO 8601) | нет            | Дедлайн                       | 2026-01-10T12:00:00Z |
+| 10  | deadline       | string (ISO 8601) \| null | нет     | Дедлайн; в `PATCH /task/v1/edit` `null` снимает дедлайн | 2026-01-10T12:00:00Z |
 
 4. Status (Статус доски)
    Status object
@@ -126,6 +131,15 @@ LoginResponse
 | email    | Валидный email, уникальный |
 | name     | 1–50 символов              |
 | password | Минимум 8 символов         |
+| avatar_s3_key | Строка, может быть пустой |
+
+Дополнительно для endpoint'ов работы с аватаром:
+
+| Параметр      | Ограничения                                 |
+| ------------- | ------------------------------------------- |
+| file_name     | Непустая строка                             |
+| content_type  | `image/jpeg`, `image/png`, `image/webp`     |
+| file_base64   | Валидный Base64, размер после decode до 5 MB |
 
 2. Board
 
@@ -133,7 +147,6 @@ LoginResponse
 | ----------- | ---------------- |
 | title       | 1–100 символов   |
 | description | До 1000 символов |
-| is_private  | true / false     |
 
 Примечание:
 Поле `user_id` не передаётся клиентом при создании доски. Оно определяется сервером на основе JWT токена авторизованного пользователя.
@@ -167,7 +180,9 @@ LoginResponse
 - Кодировка: `UTF-8`
 - Все даты возвращаются в формате `ISO 8601`
 - Сервер возвращает только актуальные данные, сохранённые в базе
-- При успешном удалении объекта возвращается `HTTP 204 No Content` без тела ответа
+- Для endpoint'ов удаления возможны два формата ответа:
+  - `HTTP 204 No Content` без тела ответа
+  - `application/json` с полем `data`
 
 Форматы положительных ответов:
 
@@ -201,7 +216,7 @@ LoginResponse
 
 3. Формат успешного ответа без тела
 
-Используется для операций удаления.
+Используется для операций удаления ресурсов board/task/status.
 
 ```
 HTTP 204 No Content
@@ -229,6 +244,8 @@ HTTP 204 No Content
 |--------------------------|--------------------------|
 | POST /auth/v1/login      | `data.token + data.user` |
 | POST /auth/v1/register   | `data: User`             |
+| POST /personal/v1/avatar/upload | `data.avatar_s3_key` |
+| DELETE /personal/v1/avatar | `data.avatar_s3_key`   |
 | GET /task/v1/get_all     | `data: Task[]`           |
 | PUT /personal/v1/edit    | `data: User`             |
 | GET /personal/v1/info    | `data: User`             |
@@ -237,6 +254,7 @@ HTTP 204 No Content
 | PATCH /board/v1/edit     | `data: Board`            |
 | GET /board/v1/get        | `data: Board`            |
 | DELETE /board/v1/delete  | `204 No Content`         |
+| DELETE /personal/v1/avatar | `data.avatar_s3_key`   |
 | GET /board/v1/tasks      | `data: Task[]`           |
 | POST /task/v1/create     | `data: Task`             |
 | PATCH /task/v1/edit      | `data: Task`             |
@@ -274,7 +292,7 @@ HTTP 204 No Content
 | 403 | Ошибки доступа                 | FORBIDDEN<br> RESOURCE_NOT_OWNED                                        |
 | 404 | Запрашиваемый ресурс не найден | USER_NOT_FOUND<br> BOARD_NOT_FOUND<br> TASK_NOT_FOUND<br> STATUS_NOT_FOUND |
 | 405 | Конфликты данных               | DUPLICATE_RESOURCE<br> EMAIL_ALREADY_EXISTS                             |
-| 500 | Внутренняя ошибка сервера      | INTERNAL_ERROR<br> DATABASE_ERROR                                       |
+| 500 | Внутренняя ошибка сервера      | INTERNAL_ERROR<br> DATABASE_ERROR<br> S3_UPLOAD_ERROR |
 
 Значения ошибок и их коды:
 
@@ -322,6 +340,7 @@ HTTP 204 No Content
 | --------------- | --------------------------------- |
 | INTERNAL_ERROR  | Внутренняя ошибка сервера         |
 | DATABASE_ERROR  | Ошибка работы с базой данных      |
+| S3_UPLOAD_ERROR | Ошибка загрузки файла в S3        |
 
 
 ### Примеры запросов и ответов
@@ -349,13 +368,153 @@ Content-Type: application/json
       "email": "user@mail.ru",
       "name": "John",
       "status": "student",
+      "avatar_s3_key": "",
       "created_at": "2026-01-10T12:00:00Z"
     }
   }
 }
 ```
 
-2. Получение списка досок пользователя
+2. Регистрация пользователя
+
+Запрос:
+```bash
+POST /auth/v1/register
+Content-Type: application/json
+
+{
+  "name": "John",
+  "email": "user@mail.ru",
+  "status": "student",
+  "password": "password123"
+}
+```
+
+Ответ:
+```json
+{
+  "data": {
+    "id": 1,
+    "email": "user@mail.ru",
+    "name": "John",
+    "status": "student",
+    "avatar_s3_key": "",
+    "created_at": "2026-01-10T12:00:00Z"
+  }
+}
+```
+
+3. Получение информации о пользователе
+
+Запрос:
+```bash
+GET /personal/v1/info
+Authorization: Bearer <JWT>
+```
+
+Ответ:
+```json
+{
+  "data": {
+    "id": 1,
+    "email": "user@mail.ru",
+    "name": "John",
+    "status": "student",
+    "avatar_s3_key": "avatars/user_1/avatar",
+    "created_at": "2026-01-10T12:00:00Z"
+  }
+}
+```
+
+4. Обновление данных пользователя
+
+Запрос:
+```bash
+PUT /personal/v1/edit
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "name": "John",
+  "email": "user@mail.ru",
+  "status": "student"
+}
+```
+
+Ответ:
+```json
+{
+  "data": {
+    "id": 1,
+    "email": "user@mail.ru",
+    "name": "John",
+    "status": "student",
+    "avatar_s3_key": "avatars/user_1/avatar",
+    "created_at": "2026-01-10T12:00:00Z"
+  }
+}
+```
+
+5. Загрузка фото профиля
+
+Запрос:
+```bash
+POST /personal/v1/avatar/upload
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "file_name": "avatar.jpg",
+  "content_type": "image/jpeg",
+  "file_base64": "<BASE64_DATA>",
+  "email": "user@mail.ru",
+  "name": "John",
+  "status": "student"
+}
+```
+
+Ответ:
+```json
+{
+  "data": {
+    "avatar_s3_key": "avatars/user_1/avatar"
+  }
+}
+```
+
+Примечание:
+- Загрузка выполняется backend-прокси через публичный `PUT` в bucket Yandex Object Storage.
+- Для текущего upload flow `S3_ACCESS_KEY` и `S3_SECRET_KEY` не используются.
+
+6. Удаление фото профиля
+
+Запрос:
+```bash
+DELETE /personal/v1/avatar
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "email": "user@mail.ru",
+  "name": "John",
+  "status": "student"
+}
+```
+
+Ответ:
+```json
+{
+  "data": {
+    "avatar_s3_key": ""
+  }
+}
+```
+
+Примечание:
+- Endpoint очищает `avatar_s3_key` в БД.
+- Физическое удаление объекта из bucket в этой версии не гарантируется.
+
+7. Получение списка досок пользователя
 
 Запрос:
 ```bash
@@ -372,7 +531,6 @@ Authorization: Bearer <JWT>
       "user_id": 1,
       "title": "Project",
       "description": "Мой первый проект",
-      "is_private": true,
       "created_at": "2026-01-10T12:00:00Z",
       "updated_at": "2026-01-10T12:00:00Z"
     }
@@ -380,7 +538,7 @@ Authorization: Bearer <JWT>
 }
 ```
 
-3. Создание новой доски
+8. Создание новой доски
 
 Запрос:
 ```bash
@@ -390,8 +548,7 @@ Content-Type: application/json
 
 {
   "title": "Учёба",
-  "description": "Весенний семестр",
-  "is_private": false
+  "description": "Весенний семестр"
 }
 ```
 
@@ -403,14 +560,13 @@ Content-Type: application/json
     "user_id": 1,
     "title": "Учёба",
     "description": "Весенний семестр",
-    "is_private": false,
     "created_at": "2026-02-07T10:15:00Z",
     "updated_at": "2026-02-07T10:15:00Z"
   }
 }
 ```
 
-4. Создание задачи в доске
+9. Создание задачи в доске
 
 Запрос:
 ```bash
@@ -442,7 +598,7 @@ Content-Type: application/json
 }
 ```
 
-5. Ошибка валидации входных данных
+10. Ошибка валидации входных данных
 
 Запрос:
 ```bash
@@ -476,7 +632,7 @@ Content-Type: application/json
 }
 ```
 
-6. Получение задач пользователя с фильтрацией по доске и статусу
+11. Получение задач пользователя с фильтрацией по доске и статусу
 
 Запрос:
 ```bash
@@ -504,7 +660,7 @@ Authorization: Bearer <JWT>
 }
 ```
 
-7. Получение всех статусов пользователя
+12. Получение всех статусов пользователя
 
 Запрос:
 ```bash
@@ -539,7 +695,7 @@ Authorization: Bearer <JWT>
 }
 ```
 
-8. Получение всех статусов одной доски
+13. Получение всех статусов одной доски
  
 Запрос:
 ```bash

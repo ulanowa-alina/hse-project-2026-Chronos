@@ -6,7 +6,10 @@
 #include "../../utils/response_utils.hpp"
 
 #include <array>
+#include <chrono>
 #include <ctime>
+#include <iomanip>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <spdlog/spdlog.h>
@@ -24,13 +27,25 @@ const size_t MAX_DESCRIPTION_SIZE = 1000;
 const size_t MAX_PRIORITY_COLOR_SIZE = 500;
 
 json collect_missing_fields(const json& body) {
-    json missing = json::array();
+    json details = json::object();
 
     if (!body.contains("task_id")) {
-        missing.push_back("task_id");
+        details["task_id"] = "Missing required field";
+    }
+    if (!body.contains("title")) {
+        details["title"] = "Missing required field";
+    }
+    if (!body.contains("description")) {
+        details["description"] = "Missing required field";
+    }
+    if (!body.contains("status_id")) {
+        details["status_id"] = "Missing required field";
+    }
+    if (!body.contains("priority_color")) {
+        details["priority_color"] = "Missing required field";
     }
 
-    return missing;
+    return details;
 }
 
 int require_positive_int_field(const json& body, const std::string& key) {
@@ -63,6 +78,27 @@ std::string time_to_string_iso8601(std::time_t t) {
         return {buffer.data()};
     }
     throw std::runtime_error("Failed to format timestamp");
+}
+
+std::time_t parse_iso8601_utc(const std::string& value) {
+    if (value.empty() || value.back() != 'Z') {
+        throw std::invalid_argument("value:deadline");
+    }
+
+    std::tm tm = {};
+    std::istringstream stream(value.substr(0, value.size() - 1));
+    stream >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+    if (stream.fail() || !stream.eof()) {
+        throw std::invalid_argument("value:deadline");
+    }
+
+    const std::time_t parsed = timegm(&tm);
+    if (parsed < 0) {
+        throw std::invalid_argument("value:deadline");
+    }
+
+    const auto tp = std::chrono::system_clock::from_time_t(parsed);
+    return std::chrono::system_clock::to_time_t(tp);
 }
 
 json model_to_json(const Task& task) {
@@ -112,12 +148,11 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                                    "Invalid JSON format");
     }
 
-    const json missing_fields = collect_missing_fields(body);
-    if (!missing_fields.empty()) {
+    const json details = collect_missing_fields(body);
+    if (!details.empty()) {
         spdlog::error("Task edit rejected: missing required fields");
         return server::utils::build_error_response(req, http::status::bad_request, "MISSING_FIELD",
-                                                   "Missing required fields",
-                                                   json{{"missing_fields", missing_fields}});
+                                                   "Missing required fields", details);
     }
 
     try {
@@ -207,8 +242,19 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
             is_completed = body["is_completed"].get<bool>();
         }
 
+        std::optional<std::time_t> deadline = existing_task->deadline_;
+        if (body.contains("deadline")) {
+            if (body["deadline"].is_null()) {
+                deadline = std::nullopt;
+            } else if (body["deadline"].is_string()) {
+                deadline = parse_iso8601_utc(body["deadline"].get<std::string>());
+            } else {
+                throw std::invalid_argument("type:deadline");
+            }
+        }
+
         const Task task_to_save(existing_task->id_, existing_task->board_id_, title, description,
-                                existing_task->deadline_, status_id, priority_color, is_completed,
+                                deadline, status_id, priority_color, is_completed,
                                 existing_task->created_at_, existing_task->updated_at_);
 
         const Task updated_task = task_repository.save(task_to_save);
@@ -222,9 +268,9 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         if (message.rfind("missing:", 0) == 0) {
             spdlog::error("Task edit rejected: missing required fields");
             const std::string field = message.substr(8);
-            return server::utils::build_error_response(
-                req, http::status::bad_request, "MISSING_FIELD", "Missing required fields",
-                json{{"missing_fields", json::array({field})}});
+            return server::utils::build_error_response(req, http::status::bad_request,
+                                                       "MISSING_FIELD", "Missing required fields",
+                                                       json{{field, "Missing required field"}});
         }
 
         if (message.rfind("type:", 0) == 0) {

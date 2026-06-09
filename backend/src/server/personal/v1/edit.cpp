@@ -83,6 +83,7 @@ auto build_update_response(const http::request<http::string_body>& req,
              {"email", user.email_},
              {"name", user.name_},
              {"status", user.status_},
+             {"avatar_s3_key", user.avatar_s3_key_},
              {"created_at", to_iso8601(user.created_at_)}};
 
     return build_json_response(req, http::status::ok, json{{"data", out}});
@@ -111,6 +112,7 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     const bool has_name = body.contains("name");
     const bool has_status = body.contains("status");
     const bool has_password = body.contains("password");
+    const bool has_avatar_s3_key = body.contains("avatar_s3_key");
 
     if (has_email && !body["email"].is_string()) {
         spdlog::error("User edit rejected: invalid email format");
@@ -133,6 +135,11 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
                                "Invalid password format",
                                json{{"password", "Invalid password format"}});
     }
+    if (has_avatar_s3_key && !body["avatar_s3_key"].is_string()) {
+        return build_api_error(req, http::status::bad_request, "INVALID_FORMAT",
+                               "Invalid avatar_s3_key format",
+                               json{{"avatar_s3_key", "Invalid avatar_s3_key format"}});
+    }
 
     json missing_fields = json::array();
 
@@ -145,9 +152,6 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     if (!has_status) {
         missing_fields.push_back("status");
     }
-    if (!has_password) {
-        missing_fields.push_back("password");
-    }
 
     if (!missing_fields.empty()) {
         spdlog::error("User edit rejected: missing required fields");
@@ -159,6 +163,8 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
     const std::string name = has_name ? body["name"].get<std::string>() : "";
     const std::string status = has_status ? body["status"].get<std::string>() : "";
     const std::string password = has_password ? body["password"].get<std::string>() : "";
+    const std::string avatar_s3_key =
+        has_avatar_s3_key ? body["avatar_s3_key"].get<std::string>() : "";
 
     if (has_email && !is_valid_email(email)) {
         spdlog::error("User edit rejected: invalid email format");
@@ -212,6 +218,9 @@ auto handleEdit(const http::request<http::string_body>& req, ConnectionPool& poo
         }
         if (has_password) {
             updated.password_hash_ = password_hash;
+        }
+        if (has_avatar_s3_key) {
+            updated.avatar_s3_key_ = avatar_s3_key;
         }
 
         const User saved = repo.save(updated);
