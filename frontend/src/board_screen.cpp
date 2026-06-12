@@ -1,6 +1,7 @@
 #include "board_screen.h"
 
 #include "api_error_utils.h"
+#include "validation_utils.h"
 #include "../local_repositories/local_board_repository.hpp"
 #include "../local_repositories/local_status_repository.hpp"
 #include "../local_repositories/local_task_repository.hpp"
@@ -142,6 +143,9 @@ void BoardScreen::removeStatusWindow(int status_id) {
     if (board_layout_) {
         board_layout_->removeWidget(status);
     }
+    status->clearTasks();
+    status->hide();
+    status->setParent(nullptr);
     status->deleteLater();
 }
 
@@ -270,7 +274,13 @@ void BoardScreen::onStatusCreateRequest() {
                                                "Название статуса:", QLineEdit::Normal, "", &flag);
 
     const QString trimmed_name = name.trimmed();
-    if (!flag || trimmed_name.isEmpty()) {
+    if (!flag) {
+        return;
+    }
+
+    const QString validation_error = ValidationUtils::validateStatusName(trimmed_name);
+    if (!validation_error.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка создания статуса", validation_error);
         return;
     }
 

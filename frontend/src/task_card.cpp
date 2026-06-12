@@ -1,5 +1,6 @@
 #include "task_card.h"
 
+#include "validation_utils.h"
 #include "../local_repositories/local_task_repository.hpp"
 
 #include <QApplication>
@@ -7,6 +8,7 @@
 #include <QDebug>
 #include <QDrag>
 #include <QLineF>
+#include <QMessageBox>
 #include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -276,6 +278,12 @@ void TaskCard::onTaskSaveRequest() {
         return;
     }
 
+    const QString validation_error = ValidationUtils::validateTaskFields(title, QString());
+    if (!validation_error.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка изменения задачи", validation_error);
+        return;
+    }
+
     if (!sync_coordinator_) {
         return;
     }
@@ -338,13 +346,30 @@ void TaskCard::onOpenSettings() {
 
 void TaskCard::onTitleEditRequest() {
     QString title = title_->text().trimmed();
-    if (title.isEmpty() || task_id_ < 0 || !sync_coordinator_) {
+    if (task_id_ < 0 || !sync_coordinator_) {
         return;
     }
 
     LocalTaskRepository repo(db_);
     const auto existing = repo.findById(task_id_);
     if (!existing) {
+        return;
+    }
+
+    auto restoreTitle = [this, &existing]() {
+        title_->setText(existing->title_);
+        title_->setCursorPosition(0);
+    };
+
+    if (title.isEmpty()) {
+        restoreTitle();
+        return;
+    }
+
+    const QString validation_error = ValidationUtils::validateTaskFields(title, QString());
+    if (!validation_error.isEmpty()) {
+        restoreTitle();
+        QMessageBox::warning(this, "Ошибка изменения задачи", validation_error);
         return;
     }
 
@@ -446,12 +471,37 @@ void TaskCard::onDeleteTaskRequest() {
 }
 
 void TaskCard::scheduleDeletion() {
+    if (deletion_scheduled_) {
+        return;
+    }
+    deletion_scheduled_ = true;
+
+    if (timer_) {
+        timer_->stop();
+    }
+    if (network_manager_) {
+        disconnect(network_manager_, nullptr, this, nullptr);
+    }
+    if (drag_handle_) {
+        drag_handle_->removeEventFilter(this);
+    }
+
+    for (QWidget* ancestor = parentWidget(); ancestor; ancestor = ancestor->parentWidget()) {
+        removeEventFilter(ancestor);
+        const auto child_widgets = findChildren<QWidget*>();
+        for (QWidget* child : child_widgets) {
+            child->removeEventFilter(ancestor);
+        }
+    }
+
     if (QWidget* parent_widget = parentWidget()) {
         if (QLayout* parent_layout = parent_widget->layout()) {
             parent_layout->removeWidget(this);
         }
     }
 
+    hide();
+    setParent(nullptr);
     deleteLater();
 }
 

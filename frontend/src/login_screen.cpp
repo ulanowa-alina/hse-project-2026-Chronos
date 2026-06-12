@@ -1,6 +1,7 @@
 #include "login_screen.h"
 
 #include "api_error_utils.h"
+#include "validation_utils.h"
 
 #include <QDebug>
 #include <QJsonDocument>
@@ -77,9 +78,17 @@ void LoginScreen::onLoginRequest() {
     QString email = email_input_->text().trimmed();
     QString password = password_input_->text();
 
-    if (email.isEmpty() || password.isEmpty()) {
-        qDebug() << "LoginScreen: Email и пароль не могут быть пустыми. Но отправлю запрос, чтобы "
-                    "ошибка нормально обработалась на беке";
+    if (email.isEmpty()) {
+        showErrorMessage(ValidationUtils::fillFieldMessage(QStringLiteral("Email")));
+        return;
+    }
+    if (password.isEmpty()) {
+        showErrorMessage(QStringLiteral("Введите пароль."));
+        return;
+    }
+    if (!ValidationUtils::isValidEmail(email)) {
+        showErrorMessage(QStringLiteral("Введите корректный email."));
+        return;
     }
 
     QJsonObject json;

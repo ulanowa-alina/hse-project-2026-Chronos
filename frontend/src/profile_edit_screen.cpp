@@ -1,6 +1,7 @@
 #include "profile_edit_screen.h"
 
 #include "api_error_utils.h"
+#include "validation_utils.h"
 #include "../local_repositories/local_user_repository.hpp"
 
 #include <QDebug>
@@ -182,6 +183,14 @@ void ProfileEditScreen::onProfileEditRequest() {
     }
 
     clearErrorMessage();
+
+    const QString validation_error = ValidationUtils::validateUserFields(
+        name_input_->text(), email_input_->text(), status_input_->text(), password_input_->text(),
+        false);
+    if (!validation_error.isEmpty()) {
+        showErrorMessage(validation_error);
+        return;
+    }
 
     if (!selected_avatar_file_path_.isEmpty()) {
         sendAvatarUpload();

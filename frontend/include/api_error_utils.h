@@ -93,8 +93,8 @@ inline auto translateRawMessage(const QString& raw_message,
         return QStringLiteral("Введите корректный пароль.");
     }
     if (message == QStringLiteral("Invalid name format")) {
-        return field == QStringLiteral("name") ? QStringLiteral("Введите корректное название.")
-                                               : QStringLiteral("Введите корректное имя.");
+        return field == QStringLiteral("name") ? QStringLiteral("Введите корректное имя.")
+                                               : QStringLiteral("Введите корректное название.");
     }
     if (message == QStringLiteral("Invalid status format")) {
         return QStringLiteral("Введите корректный статус.");
@@ -133,7 +133,9 @@ inline auto translateRawMessage(const QString& raw_message,
         return QStringLiteral("Файл не может быть пустым.");
     }
     if (message == QStringLiteral("Name length must be between 1 and 50 symbols")) {
-        return QStringLiteral("Длина названия должна быть от 1 до 50 символов.");
+        return field == QStringLiteral("name")
+                   ? QStringLiteral("Длина имени должна быть от 1 до 50 символов.")
+                   : QStringLiteral("Длина названия должна быть от 1 до 50 символов.");
     }
     if (message == QStringLiteral("Position must be greater than or equal to 0")) {
         return QStringLiteral("Позиция должна быть больше или равна 0.");

@@ -1,5 +1,6 @@
 #include "task_edit_screen.h"
 
+#include "validation_utils.h"
 #include "../local_repositories/local_task_repository.hpp"
 
 #include <QCheckBox>
@@ -8,7 +9,6 @@
 namespace {
 const QString kInlineErrorStyle =
     QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
-const QString kTitleRequiredMessage = QStringLiteral("Название задачи не может быть пустым");
 const QString kLocalSaveErrorMessage =
     QStringLiteral("Не удалось сохранить задачу. Попробуйте еще раз.");
 
@@ -104,9 +104,9 @@ void TaskEditScreen::onUpdateTaskRequest() {
     QString priority_color = priority_combo_->currentText();
     QDateTime deadline = deadline_input_->dateTime();
 
-    if (title.isEmpty()) {
-        qDebug() << "TaskEditScreen: Название задачи не может быть пустым";
-        showErrorMessage(kTitleRequiredMessage);
+    const QString validation_error = ValidationUtils::validateTaskFields(title, description);
+    if (!validation_error.isEmpty()) {
+        showErrorMessage(validation_error);
         return;
     }
 
