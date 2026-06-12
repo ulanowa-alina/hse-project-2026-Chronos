@@ -291,8 +291,17 @@ void ProfileEditScreen::sendAvatarUpload() {
 
 void ProfileEditScreen::onAvatarPickRequested() {
     clearErrorMessage();
-    const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
-                                                           "Images (*.png *.jpg *.jpeg *.webp)");
+    qDebug() << "ProfileEditScreen: onAvatarPickRequested called";
+
+    QFileDialog::Options options = QFileDialog::Options();
+
+#if defined(Q_OS_MAC)
+    options |= QFileDialog::DontUseNativeDialog;
+#endif
+
+    const QString file_path =
+        QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
+                                     "Images (*.png *.jpg *.jpeg *.webp)", nullptr, options);
 
     if (file_path.isEmpty()) {
         return;
@@ -303,7 +312,6 @@ void ProfileEditScreen::onAvatarPickRequested() {
     updateAvatarButtonPreview(selected_avatar_file_path_);
     qDebug() << "ProfileEditScreen selected avatar file:" << selected_avatar_file_path_;
 }
-
 void ProfileEditScreen::onAvatarDeleteRequested() {
     clearErrorMessage();
     if (avatar_delete_requested_) {

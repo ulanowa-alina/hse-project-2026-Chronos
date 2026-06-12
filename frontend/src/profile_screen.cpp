@@ -103,6 +103,10 @@ void ProfileScreen::updateAvatarPreview(const QString& avatar_s3_key) {
 void ProfileScreen::setDefaultAvatar() {
     avatar_label_->clear();
     avatar_label_->setText("🐶");
+    avatar_label_->setStyleSheet("background-color: #f0f2f5; "
+                                 "border: 4px solid #305CDE; "
+                                 "border-radius: 60px; "
+                                 "font-size: 50px;");
 }
 
 void ProfileScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
@@ -138,10 +142,12 @@ void ProfileScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
 
     QPainter painter(&rounded);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor("#305CDE"));
-    painter.drawEllipse(0, 0, size, size);
+
+    painter.drawEllipse(1, 1, size - 2, size - 2);
 
     QPainterPath path;
     path.addEllipse(border_width, border_width, image_size, image_size);
@@ -153,6 +159,7 @@ void ProfileScreen::onAvatarImageDownloaded(QNetworkReply* reply) {
 
     painter.end();
 
+    avatar_label_->setStyleSheet("background: transparent; border: none;");
     avatar_label_->setText("");
     avatar_label_->setPixmap(rounded);
 
