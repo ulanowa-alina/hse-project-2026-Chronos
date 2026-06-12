@@ -81,6 +81,8 @@ add_executable(ChronosClient
         sync/task_sync_manager.cpp
         sync/board_sync_manager.cpp
         sync/status_sync_manager.cpp
+
+        icons/resources.qrc
 )
 target_include_directories(ChronosClient PRIVATE include sync)
 

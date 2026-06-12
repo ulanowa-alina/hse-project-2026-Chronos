@@ -70,6 +70,7 @@ void TaskCard::setSyncCoordinator(SyncCoordinator* coordinator) {
 void TaskCard::setData(const QString& title, const QString& description, const QDateTime& deadline,
                        bool is_completed, const QString& priority_color) {
     title_->setText(title);
+    title_->setCursorPosition(0);
     is_completed_ = is_completed;
     deadline_ = deadline;
 
@@ -356,6 +357,7 @@ void TaskCard::onTitleEditRequest() {
         qDebug() << "TaskCard: failed to save task:" << e.what();
         return;
     }
+    title_->setCursorPosition(0);
     sync_coordinator_->syncTasks();
 }
 
@@ -421,6 +423,7 @@ void TaskCard::doneVisualState() {
             timer_->start();
         }
     }
+    title_->setCursorPosition(0);
 }
 
 void TaskCard::onDeleteTaskRequest() {
@@ -476,6 +479,7 @@ void TaskCard::setupLayout() {
     this->setMaximumHeight(180);
 
     this->setMaximumWidth(260);
+    this->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
 
     this->setStyleSheet(
         "#taskCard { background: white; border: 1px solid #e0e0e0; border-radius: 12px; }"
@@ -491,14 +495,23 @@ void TaskCard::setupLayout() {
     header_layout->setContentsMargins(0, 0, 0, 0);
     header_layout->setSpacing(6);
 
-    drag_handle_ = new QLabel("⋮⋮", this);
+    drag_handle_ = new QLabel(this);
     drag_handle_->setObjectName("dragHandle");
     drag_handle_->setFixedSize(DRAG_HANDLE_SIZE, DRAG_HANDLE_SIZE);
     drag_handle_->setAlignment(Qt::AlignCenter);
     drag_handle_->setCursor(Qt::OpenHandCursor);
-    drag_handle_->setStyleSheet("QLabel { color: #7f8c8d; font-size: 14px; font-weight: bold; "
-                                "background: transparent; }"
-                                "QLabel:hover { color: #305CDE; }");
+
+    QIcon drag_icon(":/icons/move_icon.svg");
+
+    if (!drag_icon.isNull()) {
+        int target_size = DRAG_HANDLE_SIZE - 6;
+        QPixmap drag_pixmap = drag_icon.pixmap(QSize(target_size, target_size));
+        drag_handle_->setPixmap(drag_pixmap);
+    } else {
+        drag_handle_->setText("⋮⋮");
+        drag_handle_->setStyleSheet(
+            "QLabel { color: #8E8E8E; font-size: 16px; font-weight: bold; }");
+    }
     drag_handle_->installEventFilter(this);
 
     title_ = new QLineEdit(this);

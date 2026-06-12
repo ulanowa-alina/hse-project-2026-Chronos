@@ -175,8 +175,16 @@ void RegistrationScreen::onRegisterRequest() {
 void RegistrationScreen::onAvatarPickRequested() {
     clearErrorMessage();
     qDebug() << "RegistrationScreen: onAvatarPickRequested called";
-    const QString file_path = QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
-                                                           "Images (*.png *.jpg *.jpeg *.webp)");
+
+    QFileDialog::Options options = QFileDialog::Options();
+
+#if defined(Q_OS_MAC)
+    options |= QFileDialog::DontUseNativeDialog;
+#endif
+
+    const QString file_path =
+        QFileDialog::getOpenFileName(this, "Выбрать фото профиля", QString(),
+                                     "Images (*.png *.jpg *.jpeg *.webp)", nullptr, options);
 
     if (file_path.isEmpty()) {
         return;
@@ -186,7 +194,6 @@ void RegistrationScreen::onAvatarPickRequested() {
     qDebug() << "RegistrationScreen avatar file:" << avatar_file_path_;
     updateAvatarButton(avatar_file_path_);
 }
-
 void RegistrationScreen::showErrorMessage(const QString& message) {
     if (!error_label_) {
         return;
