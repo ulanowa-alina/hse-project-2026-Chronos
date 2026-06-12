@@ -184,9 +184,9 @@ void ProfileEditScreen::onProfileEditRequest() {
 
     clearErrorMessage();
 
-    const QString validation_error = ValidationUtils::validateUserFields(
-        name_input_->text(), email_input_->text(), status_input_->text(), password_input_->text(),
-        false);
+    const QString validation_error =
+        ValidationUtils::validateUserFields(name_input_->text(), email_input_->text(),
+                                            status_input_->text(), password_input_->text(), false);
     if (!validation_error.isEmpty()) {
         showErrorMessage(validation_error);
         return;

@@ -25,8 +25,8 @@ inline auto maxLengthMessage(const QString& field_name, int max_length) -> QStri
         .arg(max_length);
 }
 
-inline auto rangeLengthMessage(const QString& field_name, int min_length,
-                               int max_length) -> QString {
+inline auto rangeLengthMessage(const QString& field_name, int min_length, int max_length)
+    -> QString {
     return QStringLiteral("Длина %1 должна быть от %2 до %3 символов.")
         .arg(field_name)
         .arg(min_length)
