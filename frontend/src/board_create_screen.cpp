@@ -1,5 +1,7 @@
 #include "board_create_screen.h"
 
+#include "validation_utils.h"
+
 #include <QDebug>
 #include <QJsonObject>
 #include <QSqlDatabase>
@@ -7,7 +9,6 @@
 namespace {
 const QString kInlineErrorStyle =
     QStringLiteral("color: #C03438; font-size: 13px; font-weight: 500; background: transparent;");
-const QString kTitleRequiredMessage = QStringLiteral("Название доски не может быть пустым");
 const QString kLocalSaveErrorMessage =
     QStringLiteral("Не удалось сохранить доску. Попробуйте еще раз.");
 } // namespace
@@ -39,9 +40,9 @@ void BoardCreateScreen::onCreateBoardRequest() {
     QString title = title_input_->text().trimmed();
     QString description = description_input_->toPlainText().trimmed();
 
-    if (title.isEmpty()) {
-        qDebug() << "BoardCreateScreen: Название доски не может быть пустым";
-        showErrorMessage(kTitleRequiredMessage);
+    const QString validation_error = ValidationUtils::validateBoardFields(title, description);
+    if (!validation_error.isEmpty()) {
+        showErrorMessage(validation_error);
         return;
     }
 

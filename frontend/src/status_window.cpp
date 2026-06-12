@@ -1,11 +1,13 @@
 #include "status_window.h"
 
+#include "validation_utils.h"
 #include "../local_repositories/local_status_repository.hpp"
 #include "../local_repositories/local_task_repository.hpp"
 
 #include <QDataStream>
 #include <QDebug>
 #include <QEvent>
+#include <QMessageBox>
 #include <QMenu>
 #include <QMimeData>
 
@@ -17,6 +19,32 @@ StatusWindow::StatusWindow(int status_id, int board_id, const QString& name, QSq
     , db_(db) {
     setupLayout(name);
     setAcceptDrops(true);
+}
+
+StatusWindow::~StatusWindow() {
+    if (tasks_container_) {
+        tasks_container_->removeEventFilter(this);
+    }
+    if (tasks_scroll_area_) {
+        tasks_scroll_area_->removeEventFilter(this);
+        if (tasks_scroll_area_->viewport()) {
+            tasks_scroll_area_->viewport()->removeEventFilter(this);
+        }
+    }
+    if (status_name_) {
+        status_name_->removeEventFilter(this);
+    }
+    if (settings_button_) {
+        settings_button_->removeEventFilter(this);
+    }
+    if (create_task_button_) {
+        create_task_button_->removeEventFilter(this);
+    }
+
+    const auto child_widgets = findChildren<QWidget*>();
+    for (QWidget* child : child_widgets) {
+        child->removeEventFilter(this);
+    }
 }
 
 void StatusWindow::setNetworkManager(NetworkManager* manager) {
@@ -82,12 +110,33 @@ void StatusWindow::onStatusNameSaved() {
     }
 
     const QString name = status_name_->text().trimmed();
-    if (name.isEmpty()) {
+    auto restoreStatusName = [this, &existing]() {
         status_name_->setText(existing->name_);
         status_name_->setReadOnly(true);
         status_name_->setStyleSheet(
             "QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "
             "border: none; background: transparent; }");
+    };
+
+    const QString validation_error = ValidationUtils::validateStatusName(name);
+    if (!validation_error.isEmpty()) {
+        restoreStatusName();
+        QMessageBox::warning(this, "Ошибка изменения статуса", validation_error);
+        return;
+    }
+
+    const std::vector<LocalStatus> existing_statuses = repo.findByBoardId(board_id_);
+    for (const LocalStatus& existing_status : existing_statuses) {
+        if (existing_status.id_ != status_id_ && existing_status.name_.trimmed() == name) {
+            restoreStatusName();
+            QMessageBox::warning(this, "Ошибка изменения статуса",
+                                 "Статус с таким названием уже существует.");
+            return;
+        }
+    }
+
+    if (name == existing->name_) {
+        restoreStatusName();
         return;
     }
 
@@ -98,11 +147,9 @@ void StatusWindow::onStatusNameSaved() {
         repo.save(status);
     } catch (const std::exception& e) {
         qDebug() << "StatusWindow: failed to save status:" << e.what();
-        status_name_->setText(existing->name_);
-        status_name_->setReadOnly(true);
-        status_name_->setStyleSheet(
-            "QLineEdit { font-weight: bold; font-size: 16px; color: #172b4d; "
-            "border: none; background: transparent; }");
+        restoreStatusName();
+        QMessageBox::warning(this, "Ошибка изменения статуса",
+                             "Не удалось изменить статус. Проверьте название.");
         return;
     }
 
@@ -327,6 +374,7 @@ void StatusWindow::clearTasks() {
         }
 
         if (item->widget()) {
+            removeDropForwarding(item->widget());
             delete item->widget();
         }
         delete item;

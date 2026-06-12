@@ -1,6 +1,7 @@
 #include "registration_screen.h"
 
 #include "api_error_utils.h"
+#include "validation_utils.h"
 
 #include <QDebug>
 #include <QFile>
@@ -162,10 +163,18 @@ void RegistrationScreen::onRegisterRequest() {
 
     clearErrorMessage();
 
+    const QString validation_error =
+        ValidationUtils::validateUserFields(name_input_->text(), email_input_->text(),
+                                            status_input_->text(), password_input_->text(), true);
+    if (!validation_error.isEmpty()) {
+        showErrorMessage(validation_error);
+        return;
+    }
+
     QJsonObject json;
-    json["name"] = name_input_->text();
-    json["email"] = email_input_->text();
-    json["status"] = status_input_->text();
+    json["name"] = name_input_->text().trimmed();
+    json["email"] = email_input_->text().trimmed();
+    json["status"] = status_input_->text().trimmed();
     json["password"] = password_input_->text();
 
     qDebug() << "RegistrationScreen: Отправляю данные на регистрацию...";

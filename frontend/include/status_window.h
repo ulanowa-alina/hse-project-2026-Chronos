@@ -25,6 +25,7 @@ class StatusWindow : public QFrame {
   public:
     explicit StatusWindow(int status_id, int board_id, const QString& name, QSqlDatabase db,
                           QWidget* parent = nullptr);
+    ~StatusWindow() override;
 
     void setNetworkManager(NetworkManager* manager);
     void setSyncCoordinator(SyncCoordinator* coordinator);

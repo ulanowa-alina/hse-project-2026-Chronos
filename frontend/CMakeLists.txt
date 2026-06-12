@@ -54,6 +54,7 @@ add_executable(ChronosClient
         src/circular_progress.cpp
         src/local_db.cpp
         include/local_db.h
+        include/validation_utils.h
 
         local_repositories/local_board_repository.cpp
         local_repositories/local_board_repository.hpp
