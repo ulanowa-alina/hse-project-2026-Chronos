@@ -25,8 +25,8 @@ inline auto maxLengthMessage(const QString& field_name, int max_length) -> QStri
         .arg(max_length);
 }
 
-inline auto rangeLengthMessage(const QString& field_name, int min_length, int max_length)
-    -> QString {
+inline auto rangeLengthMessage(const QString& field_name, int min_length,
+                               int max_length) -> QString {
     return QStringLiteral("Длина %1 должна быть от %2 до %3 символов.")
         .arg(field_name)
         .arg(min_length)
@@ -40,8 +40,8 @@ inline auto isValidEmail(const QString& email) -> bool {
 }
 
 inline auto validateUserFields(const QString& name, const QString& email, const QString& status,
-                               const QString& password = QString(), bool require_password = false)
-    -> QString {
+                               const QString& password = QString(),
+                               bool require_password = false) -> QString {
     if (name.trimmed().isEmpty()) {
         return fillFieldMessage(QStringLiteral("Имя"));
     }
